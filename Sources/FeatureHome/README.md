@@ -770,6 +770,11 @@ records on both platforms; error dialogs, playback routing and timeouts are unch
   This read-only preview does not start trailers or expose playback actions;
   lookup failures still show the existing error and retry action.
   The tvOS More Info button is unchanged.
+  Mobile Home and detail heroes meet the physical top edge. On iOS 26+, the
+  shared hero navigation chrome hides the navigation-bar background and top
+  scroll-edge effect while a hero is present; older systems keep the existing
+  hidden-bar behavior. Home's loading skeleton and the detail loading hero use
+  the same rule, and the top scroll-edge effect returns when Home has no hero.
   Mobile Home and detail hero actions share native Liquid Glass buttons on iOS 26+.
   Primary actions use the prominent style with their existing monochrome theme
   tint and contrasting label; secondary actions use untinted glass. The existing
