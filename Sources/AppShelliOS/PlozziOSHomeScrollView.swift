@@ -22,6 +22,7 @@ struct PlozziOSHomeScrollView<Hero: View, Rows: View>: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
         .ignoresSafeArea(.container, edges: heroActive ? .top : [])
+        .plozziOSHeroNavigationChrome(isFullBleed: heroActive)
         .background {
             PlozziOSStationaryNavigationSource()
                 .frame(width: 0, height: 0)

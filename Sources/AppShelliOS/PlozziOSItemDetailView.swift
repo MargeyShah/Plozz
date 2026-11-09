@@ -700,6 +700,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
             heroPullDistance = pullDistance
         }
         .ignoresSafeArea(.container, edges: .top)
+        .plozziOSHeroNavigationChrome()
         .navigationTitle(Text(verbatim: ""))
         .task(id: seasonRequestRefreshKey(for: detail)) {
             await refreshVisibleSeasonRequests(for: detail)
