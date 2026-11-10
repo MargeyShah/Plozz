@@ -151,23 +151,26 @@ public struct PlozzSeasonTabStyle: ButtonStyle {
         @ViewBuilder
         private func basePill(_ shape: Capsule) -> some View {
             if reduceTransparency {
+                // The viewer asked for reduced transparency (or the system did):
+                // keep the pill on a solid surface. This is the one branch the
+                // in-app Liquid Glass preference is not allowed to override.
                 shape.fill(palette.cardSurface)
+            } else if #available(iOS 26.0, tvOS 26.0, *) {
+                // True Liquid Glass, the same material as the hero's Play and
+                // secondary action pills. Deliberately ignores `reducePanelGlass`:
+                // those are the buttons this control sits beside, and a frosted
+                // stand-in next to real glass read as two different materials in
+                // one row. The panel budget exists for large panels, not for a
+                // single selected tab.
+                shape.fill(.clear).glassEffect(.regular, in: shape)
             } else if reducePanelGlass {
-                // Matches whatever panel this control is sitting on. These pills
-                // are cheap enough to keep their glass on cost alone, but a
-                // refracting button on a frosted panel reads as two materials
-                // that do not belong together — and that looks worse than either
-                // material does everywhere.
-                //
-                // The hairline edge replaces the specular one glass draws for
-                // itself; frost takes its brightness from behind, so over a dark
-                // scene it would otherwise have no boundary at all.
+                // Pre-Liquid-Glass only. Match the frosted panel this control is
+                // sitting on; the hairline replaces the specular edge glass draws
+                // for itself, so the frost still has a boundary over dark art.
                 shape
                     .fill(.clear)
                     .plozzFrostedBackground(shape)
                     .plozzFrostedBorder(shape)
-            } else if #available(iOS 26.0, tvOS 26.0, *) {
-                shape.fill(.clear).glassEffect(.regular, in: shape)
             } else {
                 shape.fill(.ultraThinMaterial)
             }

@@ -656,6 +656,24 @@ final class HomeHeroFullWidthPresentationTests: XCTestCase {
         }
     }
 
+    func testHeroArtworkMeetsTopEdgeInsideNavigationStack() async throws {
+        let item = try await artworkItem(marksTop: true)
+        for sizeClass in [UserInterfaceSizeClass.compact, .regular] {
+            let size = sizeClass == .compact
+                ? CGSize(width: 390, height: 844)
+                : CGSize(width: 1_024, height: 768)
+            let markerY: CGFloat = sizeClass == .compact ? 42 : 70
+            try await withWindow(
+                item: item, size: size, sizeClass: sizeClass, insets: .zero,
+                pull: PlozziOSHomeHeroPullModel(), removesSafeAreaRegions: false
+            ) { window, _ in
+                try await waitForHostedLayout(window)
+                let image = snapshot(window, name: "nav-hero-top-\(sizeClass == .compact ? "phone" : "tablet")")
+                try assertTopMarker(image, atY: markerY)
+            }
+        }
+    }
+
     private func artworkItem(marksTop: Bool = false) async throws -> MediaItem {
         let url = try XCTUnwrap(URL(string: "https://hero-width.invalid/\(UUID().uuidString).png"))
         let size = marksTop ? CGSize(width: 1_600, height: 900) : CGSize(width: 900, height: 1_200)
@@ -693,6 +711,7 @@ final class HomeHeroFullWidthPresentationTests: XCTestCase {
         item: MediaItem, size: CGSize, sizeClass: UserInterfaceSizeClass?,
         insets: UIEdgeInsets, pull: PlozziOSHomeHeroPullModel, nativeTabs: Bool = false,
         isRunningOnMac: Bool = false,
+        removesSafeAreaRegions: Bool = true,
         tracksWindowHeight: Bool = false,
         heroItems: [MediaItem]? = nil,
         onHeroPinnedItemsChanged: @escaping (Set<String>) -> Void = { _ in },
@@ -728,7 +747,7 @@ final class HomeHeroFullWidthPresentationTests: XCTestCase {
         window.frame = CGRect(origin: .zero, size: size)
         let host = UIHostingController(rootView: AnyView(root))
         if let sizeClass {
-            host.safeAreaRegions = []
+            if removesSafeAreaRegions { host.safeAreaRegions = [] }
             host.rootView = AnyView(root.environment(\.horizontalSizeClass, sizeClass))
         }
         host.additionalSafeAreaInsets = insets
@@ -838,11 +857,11 @@ final class HomeHeroFullWidthPresentationTests: XCTestCase {
         }
     }
 
-    private func assertTopMarker(_ image: UIImage) throws {
+    private func assertTopMarker(_ image: UIImage, atY y: CGFloat = 80) throws {
         let cgImage = try XCTUnwrap(image.cgImage)
         let x = Int(image.size.width * 0.8 * image.scale)
-        let y = Int(80 * image.scale)
-        let marker = try XCTUnwrap(cgImage.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+        let sampleY = Int(y * image.scale)
+        let marker = try XCTUnwrap(cgImage.cropping(to: CGRect(x: x, y: sampleY, width: 1, height: 1)))
         var pixel = [UInt8](repeating: 0, count: 4)
         try pixel.withUnsafeMutableBytes { bytes in
             let context = try XCTUnwrap(CGContext(

@@ -1809,8 +1809,20 @@ struct PlozziOSHomeHeroCarousel: View {
             async let play: Void = resolvePlayTarget(for: currentItem)
             _ = await (root, play)
         }
-        .task(id: selectedItemID) {
+        // Warm the slides either side of the fronted one whenever the curated
+        // set or the fronted slide changes. Keyed on BOTH so a background
+        // curation that folds new media in re-warms the new neighbours instead
+        // of leaving the first swipe onto them cold.
+        .task(id: heroArtworkWarmKey) {
             await warmAdjacentArtwork()
+        }
+        // Warm the incoming slide the moment a swipe targets it, rather than
+        // only when the swap commits. Dragging toward a slide that is already
+        // warm is what makes the picture arrive at full size instead of
+        // loading under the finger.
+        .task(id: dragTargetItem?.id) {
+            guard let target = dragTargetItem else { return }
+            await Self.warmBackdrop(references: heroReferences(for: target))
         }
         .onChange(of: items.map(\.id)) { _, ids in
             let retained = Set(ids)
@@ -1955,9 +1967,7 @@ struct PlozziOSHomeHeroCarousel: View {
             artworkStyle: horizontalSizeClass == .compact ? .compactPortrait : .landscape,
             surface: .home
         ).artworkReferences(settings: artworkPolicy.settings, in: .home)
-        return references.contains {
-            ArtworkImageCache.shared.cachedImage(for: $0, variant: .heroBackdrop) != nil
-        }
+        return HeroBackdropArtworkPolicy.hasUsableCachedBackdrop(for: references)
     }
 
     private func provider(for item: MediaItem) -> (any MediaProvider)? {
@@ -2208,6 +2218,14 @@ struct PlozziOSHomeHeroCarousel: View {
         items.firstIndex { $0.id == selectedItemID } ?? 0
     }
 
+    /// Identity of the full-size artwork-warming job: the curated set plus the
+    /// fronted slide. Including the set means a curation that folds new media in
+    /// re-warms the new neighbours instead of leaving the first swipe onto them
+    /// with only a 768px preview.
+    private var heroArtworkWarmKey: String {
+        items.map(\.id).joined(separator: "|") + "#" + (selectedItemID ?? "")
+    }
+
     private func heroReferences(for item: MediaItem) -> [ArtworkReference] {
         let style: HeroArtworkStyle = horizontalSizeClass == .compact
             ? .compactPortrait
@@ -2240,24 +2258,32 @@ struct PlozziOSHomeHeroCarousel: View {
                 let references = heroReferences(for: target)
                 guard !references.isEmpty else { continue }
                 group.addTask(priority: .utility) {
-                    for reference in references {
-                        guard !Task.isCancelled else { return }
-                        await ArtworkSession.warmLimiter.run {
-                            guard !Task.isCancelled else { return }
-                            _ = await ArtworkImageCache.shared.image(
-                                for: reference,
-                                variant: .heroBackdrop,
-                                background: true
-                            )
-                        }
-                        // One usable decode per slide is the whole job; the rest
-                        // of the list is fallbacks for when that one is missing.
-                        if HeroBackdropArtworkPolicy
-                            .hasUsableCachedArtwork(for: [reference]) {
-                            return
-                        }
-                    }
+                    await Self.warmBackdrop(references: references)
                 }
+            }
+        }
+    }
+
+    /// Decodes one slide's full-size artwork, stopping at the first candidate
+    /// that is actually usable. One decode per slide is the whole job; the rest
+    /// of the list is fallbacks for when that one is missing.
+    ///
+    /// Static so both the neighbour window and the drag-start warm share one
+    /// implementation (and so the background task captures only `references`).
+    private static func warmBackdrop(references: [ArtworkReference]) async {
+        for reference in references {
+            guard !Task.isCancelled else { return }
+            await ArtworkSession.warmLimiter.run {
+                guard !Task.isCancelled else { return }
+                _ = await ArtworkImageCache.shared.image(
+                    for: reference,
+                    variant: .heroBackdrop,
+                    background: true
+                )
+            }
+            guard !Task.isCancelled else { return }
+            if HeroBackdropArtworkPolicy.hasUsableCachedBackdrop(for: [reference]) {
+                return
             }
         }
     }

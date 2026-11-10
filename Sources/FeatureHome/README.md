@@ -770,11 +770,21 @@ records on both platforms; error dialogs, playback routing and timeouts are unch
   This read-only preview does not start trailers or expose playback actions;
   lookup failures still show the existing error and retry action.
   The tvOS More Info button is unchanged.
+  Mobile Home and detail heroes meet the physical top edge. On iOS 26+, the
+  shared hero navigation chrome hides the navigation-bar background and top
+  scroll-edge effect while a hero is present; older systems keep the existing
+  hidden-bar behavior. Home's loading skeleton and the detail loading hero use
+  the same rule, and the top scroll-edge effect returns when Home has no hero.
   Mobile Home and detail hero actions share native Liquid Glass buttons on iOS 26+.
   Primary actions use the prominent style with their existing monochrome theme
   tint and contrasting label; secondary actions use untinted glass. The existing
   solid styles remain on older systems and when transparency/panel glass is reduced.
   Native controls own the glass and press treatment; tvOS and multiview are unchanged.
+  Mobile hero warming decodes the full-size (2000px) backdrop for the slides
+  either side of the fronted one, and re-warms when the curated set changes. A
+  swipe also warms its exact target as soon as a direction is chosen, rather than
+  waiting for the swap to commit. A warmed 768px preview or landscape card is not
+  proof that the full-size pass is resident, so it cannot suppress that decode.
   Request Seasons is a primary button, not a dropdown. Home and request-only
   detail heroes open the same Seasons sheet with per-season status, Request All
   Missing, refresh/retry and the active request identity. Unknown/loading status
