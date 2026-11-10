@@ -780,6 +780,11 @@ records on both platforms; error dialogs, playback routing and timeouts are unch
   tint and contrasting label; secondary actions use untinted glass. The existing
   solid styles remain on older systems and when transparency/panel glass is reduced.
   Native controls own the glass and press treatment; tvOS and multiview are unchanged.
+  Mobile hero warming decodes the full-size (2000px) backdrop for the slides
+  either side of the fronted one, and re-warms when the curated set changes. A
+  swipe also warms its exact target as soon as a direction is chosen, rather than
+  waiting for the swap to commit. A warmed 768px preview or landscape card is not
+  proof that the full-size pass is resident, so it cannot suppress that decode.
   Request Seasons is a primary button, not a dropdown. Home and request-only
   detail heroes open the same Seasons sheet with per-season status, Request All
   Missing, refresh/retry and the active request identity. Unknown/loading status

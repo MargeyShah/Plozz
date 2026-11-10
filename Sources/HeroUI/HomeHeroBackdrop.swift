@@ -434,6 +434,25 @@ public enum HeroBackdropArtworkPolicy {
         }
     }
 
+    /// Whether a FULL-SIZE hero backdrop is already decoded for any of these
+    /// references.
+    ///
+    /// Unlike ``hasUsableCachedArtwork(for:)`` this deliberately ignores the
+    /// smaller variants (`.landscapeCard`, `.heroPreview`). Those are good enough
+    /// to paint a slide while it loads, but they are not proof that the sharp
+    /// 2000px pass is resident — treating them as a hit let a warmed preview
+    /// suppress the full-size decode a swipe was about to need.
+    public static func hasUsableCachedBackdrop(
+        for references: [ArtworkReference],
+        cachedImage: (ArtworkReference, ArtworkImageVariant) -> UIImage? = {
+            ArtworkImageCache.shared.cachedImage(for: $0, variant: $1)
+        }
+    ) -> Bool {
+        references.contains { reference in
+            cachedImage(reference, .heroBackdrop).map(isUsable) == true
+        }
+    }
+
     /// Warms candidates in display order until one yields a usable instant frame.
     /// A malformed primary must not prevent a valid fallback from becoming cache-hot.
     public static func warmFirstUsablePreview(

@@ -589,9 +589,6 @@ struct PlozziOSHeroStage<Foreground: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.plozziOSHeroContainerHeight) private var containerHeight
     @Environment(\.plozziOSIsRunningOnMac) private var isRunningOnMac
-    @Environment(\.themePalette) private var palette
-    @Environment(\.gradientBackgroundsEnabled) private var gradientEnabled
-    @Environment(\.plozzReduceTransparency) private var reduceTransparency
     @State private var artworkAppearanceID = UUID().uuidString
 
     let item: MediaItem
@@ -723,6 +720,14 @@ struct PlozziOSHeroStage<Foreground: View>: View {
                         }
                         .frame(height: height)
                     }
+                    // The band is BELOW the artwork, so it must never paint its
+                    // own surface: the page's ambient gradient (or its base
+                    // colour when gradients are off) is the background the
+                    // viewer already sees under the season rail. Painting
+                    // `backgroundBase` here produced a hard-edged grey rectangle
+                    // that cut the hero off from that gradient, most visibly
+                    // when Reduce Transparency made the band take the opaque
+                    // branch while the page gradient kept rendering behind it.
                     foreground()
                         .padding(.horizontal, PlozziOSPageLayout.horizontalInset(for: style))
                         .padding(
@@ -731,7 +736,6 @@ struct PlozziOSHeroStage<Foreground: View>: View {
                         )
                         .padding(.bottom, 8)
                         .frame(maxWidth: .infinity)
-                        .background(gradientEnabled && !reduceTransparency ? Color.clear : palette.backgroundBase)
                 }
             } else {
                 ZStack {

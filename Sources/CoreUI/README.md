@@ -729,9 +729,17 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   confirmed. Its portrait stack and landscape columns scroll at constrained
   heights. Standalone PIN prompts and tvOS keep their existing presentation.
   The detail information band retains its darker 40%-opaque surface.
-  Compact mobile detail metadata and actions reveal the page gradient instead
-  of covering it with a solid rectangle; Gradient Off and Reduce Transparency
-  retain the original opaque base. The artwork's existing readability fade stays.
+  Compact mobile detail metadata and actions reveal the page background instead
+  of covering it with a solid rectangle — the ambient gradient when gradients
+  are on, or the page's base colour when they are off. This holds under Reduce
+  Transparency too, because the band sits below the artwork rather than over it;
+  an opaque band there was a grey rectangle laid across a gradient. The
+  artwork's existing readability fade stays.
+  The selected season tab uses true Liquid Glass on iOS/tvOS 26+, the same
+  material as the hero's Play and secondary action pills, and deliberately does
+  not defer to the panel-glass budget. Reduce Transparency (the viewer's in-app
+  Liquid Glass setting resolved against the system setting) keeps the tab on its
+  solid surface.
   Native tvOS cards display their local portion of a shared page-mesh texture,
   with the information band precomposed because TVUIKit replaces fill alpha.
   A background-only tint layer applies each card's wash without fading text or
