@@ -111,7 +111,12 @@ fi
 
 # Xcode GUI/indexing uses the native workspace location; command-line writers
 # supply their own private -derivedDataPath instead of sharing this store.
-/usr/bin/python3 -B tools/plozz-build-lifecycle.py workspace --repo "$PWD" >/dev/null
+# The unsigned IPA builder intentionally generates from a tracked-file snapshot
+# without .git, so build-lifecycle ownership cannot be registered there. Skip it
+# rather than failing project generation for a non-Git build directory.
+if git -C "$PWD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  /usr/bin/python3 -B tools/plozz-build-lifecycle.py workspace --repo "$PWD" >/dev/null
+fi
 
 # Xcode project builds read the workspace lock rather than the package-root lock.
 # Keep the generated copy byte-for-byte identical on both full generation and
