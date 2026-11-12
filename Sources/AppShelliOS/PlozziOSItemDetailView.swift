@@ -408,6 +408,10 @@ private struct PlozziOSCanonicalItemDetailView: View {
         .onChange(of: presentsSeriesDownloads) { _, isPresented in
             if isPresented { seasonRequestRetryToken &+= 1 }
         }
+        .task(id: locale.identifier) {
+            viewModel.updateMetadataLanguage(locale.identifier)
+            await viewModel.load()
+        }
         .contentRefreshSurface(
             id: contentRefreshSurfaceID,
             isVisible: contentRefreshSurfaceIsVisible
@@ -417,6 +421,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                 await viewModel.refreshSeriesContextAfterReturn()
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
+            case .reloadHome:
                 break
             }
         }
@@ -1764,6 +1769,7 @@ struct PlozziOSInlineSeriesBrowser: View {
                     resolvedSeasonID = nil
                     railTargetID = nil
                 }
+                if !hasExplicitSeasonSelection, initialEpisode == nil {
                     resolvedSeasonID = nil
                     if let series = viewModel.state.value?.item,
                        let seed = SeriesEpisodeEntry.openingSeed(
