@@ -18,8 +18,13 @@ configure_plozz_package_resolution() {
   lifecycle_args+=(--root package-workspace "$cloned_source_packages")
   local lifecycle_tool
   lifecycle_tool="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/plozz-build-lifecycle.py"
-  /usr/bin/python3 -B "$lifecycle_tool" register --repo "$PWD" \
-    "${lifecycle_args[@]}" >/dev/null || return $?
+  # Tracked-file snapshots (the unsigned IPA builder) are not Git worktrees, so
+  # they cannot own lifecycle registrations. The private package paths above
+  # remain usable without registry metadata.
+  if [ -e "$PWD/.git" ]; then
+    /usr/bin/python3 -B "$lifecycle_tool" register --repo "$PWD" \
+      "${lifecycle_args[@]}" >/dev/null || return $?
+  fi
   PACKAGE_RESOLUTION_ARGS=(
     -clonedSourcePackagesDirPath "$cloned_source_packages"
     -packageCachePath "$package_cache"
