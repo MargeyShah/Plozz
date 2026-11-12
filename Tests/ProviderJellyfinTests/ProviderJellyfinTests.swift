@@ -422,8 +422,9 @@ final class JellyfinProviderMappingTests: XCTestCase {
             .filter { $0.0.hasSuffix("/Shows/NextUp") }
             .map(\.1)
         XCTAssertEqual(nextUpQueries.count, 3)
-        XCTAssertEqual(nextUpQueries.last?.first { $0.name == "Limit" }?.value, "100")
-        XCTAssertNil(nextUpQueries.last?.first { $0.name == "StartIndex" },
+        let fallbackQuery = try XCTUnwrap(nextUpQueries.last)
+        XCTAssertEqual(fallbackQuery.first { $0.name == "Limit" }?.value, "100")
+        XCTAssertNil(fallbackQuery.first { $0.name == "StartIndex" },
                      "The fallback must be one bounded request, not another paged attempt")
     }
 
