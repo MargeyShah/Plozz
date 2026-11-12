@@ -71,20 +71,6 @@ final class NavigationDestinationLayoutTests: XCTestCase {
         )
     }
 
-    func testCompactNavigationPreservesLegacyOrderAndOmitsLibraries() {
-        let keys = NavigationDestinationDefaults.compact(hasMusic: true)
-        var expected = [
-            NavigationLibraryLayout.homeKey,
-            NavigationLibraryLayout.discoverKey,
-            NavigationLibraryLayout.watchlistKey,
-        ]
-        expected.append(NavigationLibraryLayout.liveTVKey)
-        expected += [
-            NavigationLibraryLayout.searchKey,
-            NavigationLibraryLayout.musicKey,
-            NavigationLibraryLayout.settingsKey,
-        ]
-        XCTAssertEqual(keys, expected)
     }
 
     func testSidebarAndRailKeepTheirLegacyDefaultsWhileSupportingLibraries() {

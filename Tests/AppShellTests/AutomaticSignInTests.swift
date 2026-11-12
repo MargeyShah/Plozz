@@ -695,7 +695,9 @@ final class AutomaticSignInTests: XCTestCase {
         let env = launch(house)
         let flow = env.flow
         let profileID = env.profiles.activeProfileID
+        let tokenResolution = expectation(description: "The in-flight switch reaches server token resolution")
         env.plex.plexServerTokenResolve = { _, _, _ in
+            tokenResolution.fulfill()
             await MainActor.run { flow.switchProfile(to: profileID) }
             return "stale-server-token"
         }

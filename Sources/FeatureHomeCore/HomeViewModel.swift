@@ -723,7 +723,6 @@ public final class HomeViewModel {
     /// detail), so binding `load()` directly to the task would reload on every
     /// back-navigation — flashing the skeleton and resetting focus to the top.
     /// This guard makes the reappearance a no-op while still reacting to a genuine
-    /// This guard makes the reappearance a no-op while still reacting to a genuine
     /// change: hiding/showing/disabling a library, or flipping the merge switch.
     public func loadIfNeeded(
         for visibility: HomeLibraryVisibility,
@@ -763,7 +762,7 @@ public final class HomeViewModel {
                 // reloading there would reshuffle the row under the viewer for
                 // nothing.
                 let age = lastLoadedAt.map { Date().timeIntervalSince($0) }
-                let isStale = (age ?? .infinity) > policy.refreshAfter
+                let isStale = (age ?? .infinity) >= policy.refreshAfter
                 ContinueWatchingDiagnostics.emit(ContinueWatchingDiagnostics.refreshLine(
                     trigger: trigger,
                     willReload: isStale,
@@ -2546,7 +2545,7 @@ public final class HomeViewModel {
 
         func targetKey(_ accountID: String, _ itemID: String) -> String { accountID + "\u{1}" + itemID }
         let pendingByTarget: [String: [WatchMutation]] = pending.reduce(into: [:]) { acc, m in
-            for t in m.optimisticTargets { acc[targetKey(t.accountID, t.itemID), default: []].append(m) }
+            for t in m.effectiveOptimisticTargets { acc[targetKey(t.accountID, t.itemID), default: []].append(m) }
         }
 
         func newestMatch(for item: MediaItem) -> WatchMutation? {
@@ -2582,7 +2581,7 @@ public final class HomeViewModel {
                 : clampInflatedRecency(rawItem, appliedRecency: appliedRecency, now: now, clampFreshness: clampFreshness)
             guard let m = newestMatch(for: item) else { overlaid.append(item); continue }
             // Ignore a pending write the server has already superseded with a newer play.
-            let observedReset = m.played == false && m.clearResume
+            let observedReset = m.clearResume
                 && hasObservedPlayback(item, in: m)
             guard m.capturedAt >= (item.lastPlayedAt ?? .distantPast) || observedReset else {
                 overlaid.append(item)

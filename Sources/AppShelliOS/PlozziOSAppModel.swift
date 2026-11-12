@@ -33,6 +33,7 @@ import UIKit
 @MainActor
 @Observable
 final class PlozziOSAppModel {
+    let music: PlozziOSMusicRuntime? = AppReleaseChannel.current.isBeta ? PlozziOSMusicRuntime() : nil
     private let appAdmission: AppAdmissionModel
     let offlineMode: PlozziOSOfflineModeModel
     var isOfflineModeAvailable: Bool {
@@ -229,6 +230,19 @@ final class PlozziOSAppModel {
     @ObservationIgnored
     lazy var portableCredentialPublisher = Self.makePortableCredentialPublisher()
 
+    @ObservationIgnored
+    lazy var providerCredentialSync = ProviderCredentialSync(
+        accounts: accountStore,
+        enabled: { SyncSetupFeatureFlag().allowsAutomaticSync && !OfflineMode.shared.isEnabled },
+        canRestore: { [weak self] in self?.managementRequiresParentalPIN == false },
+        didRestore: { [weak self] in
+            guard let self else { return }
+            reloadAccountsAndCrashContext()
+            clearFirstRunStepIfHouseholdSetUp()
+            refreshPendingSyncedServers()
+        },
+        onProgress: { [weak self] in self?.initialSetupRestoration.recordProgress() })
+
     /// A same-Apple-ID device is asking to be set up; drives a one-tap source-side
     /// confirmation before any credential is pushed (nil = no pending offer).
     var pendingSyncSetupOffer: SyncPairingRendezvous?
@@ -248,6 +262,7 @@ final class PlozziOSAppModel {
 
     /// Observable CloudKit sync status for the Sync & Setup page.
     let cloudSyncStatus = CloudSyncStatus()
+    let initialSetupRestoration = InitialSetupRestoration()
 
     /// Persist a setup received over pairing: create accounts from the descriptors,
     /// store their transferred tokens in the Keychain, and refresh providers so the
@@ -889,6 +904,7 @@ final class PlozziOSAppModel {
             guard let self else { throw CancellationError() }
             return try await self.plexHomeUsers.resolveCloudToken(for: account, expectedRevision: revision)
         }
+        accountsProviders.configureAuthenticatedArtwork()
         authenticatedHTTPResolver.configure { [weak accountsProviders] locator in
             guard let accountsProviders,
                   let account = accountsProviders.accounts.first(where: {
@@ -1008,6 +1024,7 @@ final class PlozziOSAppModel {
         identityIndex.reset()
         if enabled {
             accountsProviders.localProviders = [:]
+            providerCredentialSync.cancel()
             cloudPublishTask?.cancel()
             portableCredentialPublisher.cancelPendingPublication()
             await cloudSync?.deactivateAndCancel()
@@ -1463,7 +1480,7 @@ final class PlozziOSAppModel {
     /// Resuming asks the question that was never answered: importing anyway is
     /// the leak the gate exists to prevent, and clearing it without asking is the
     /// same thing by another route.
-    func resumeProfileOnboardingIfNeeded() {
+    func resumeProfileOnboardingIfNeeded(manualICloudSetup: Bool = false) {
         // `profileOnboardingID` — not just the step — because creation claims the
         // id and origin synchronously and only raises the step a runloop turn
         // later (so the editor sheet can close first). Switching into the new
@@ -1475,7 +1492,7 @@ final class PlozziOSAppModel {
         guard profileOnboardingStep == nil, profileOnboardingID == nil,
               pendingFirstRunStep == nil, plexHomeUsers.pendingPlexUserSelection == nil,
               pendingLibrarySelection == nil else { return }
-        guard profiles.activeProfile.needsSetup else { return }
+        guard profiles.activeProfile.needsSetup || manualICloudSetup else { return }
         profileOnboardingID = profiles.activeProfileID
         profileOnboardingStep = .libraries
     }
@@ -1502,6 +1519,10 @@ final class PlozziOSAppModel {
         } else {
             profileOnboardingStep = nil
             profileOnboardingID = nil
+            if id == profiles.activeProfileID, profiles.profiles.contains(where: { $0.id == id }) {
+                initialSetupRestoration.completeManualSetup(for: id)
+                continueManualICloudSetupIfReady()
+            }
         }
     }
 
@@ -2205,11 +2226,13 @@ final class PlozziOSAppModel {
         watchedPercent: Double
     ) {
         guard let mutation else { return }
-        var itemIDs = Set(mutation.optimisticTargets.map(\.itemID))
+        let targets = mutation.effectiveOptimisticTargets
+        guard !targets.isEmpty else { return }
+        var itemIDs = Set(targets.map(\.itemID))
         itemIDs.insert(item.id)
         MediaItemMutation(
             itemIDs: itemIDs,
-            scopedItemIDs: Set(mutation.optimisticTargets.map(\.id)),
+            scopedItemIDs: Set(targets.map(\.id)),
             played: mutation.played,
             resumePosition: mutation.resumePosition,
             playedPercentage: mutation.played == true
@@ -2949,6 +2972,7 @@ final class PlozziOSAppModel {
                 let account = registration.account
                 // A (re)added server clears any household-removal tombstone for it.
                 clearRemovalTombstone(for: account.id)
+                providerCredentialSync.didAuthenticateLocally(accountID: account.id)
                 if registration.previousAccount == nil || activateIPTVAccount {
                     try accountsProviders.includeIPTVAccountInActiveProfile(account)
                     addedLiveTV = addedLiveTV || account.server.provider == .iptv
@@ -3132,6 +3156,8 @@ final class PlozziOSAppModel {
             appliesPlexIdentityAfterLibrarySelection = false
             plexHomeUsers.ensurePlexIdentityForActiveProfile()
         }
+        initialSetupRestoration.completeManualSetup(for: profiles.activeProfileID)
+        continueManualICloudSetupIfReady()
     }
 
     private func preparePostSignInOnboarding(
@@ -3210,6 +3236,8 @@ final class PlozziOSAppModel {
             // (and isn't re-offered to the user's other devices). Without this, sync's
             // auto-connect immediately re-adds the account the user just removed.
             removePortableCredential(id)
+            var pending = PendingSyncedServersStore()
+            pending.ignore(id)
             accountError = nil
         } catch {
             accountError = error.localizedDescription

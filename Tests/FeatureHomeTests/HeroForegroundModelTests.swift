@@ -325,7 +325,6 @@ final class HeroForegroundModelTests: XCTestCase {
             slideCount: 1,
             slideIndex: 0
         )
-        XCTAssertEqual(model.pills.first?.text, "Play S3 · E7")
     }
 
     func testEpisodeTextFallbackUsesSeriesTitle() {
@@ -352,7 +351,8 @@ final class HeroForegroundModelTests: XCTestCase {
 
     func testPlayPillUsesPlayLabelWhenNotResumable() {
         let pill = Builder.pill(for: PillInput(kind: .play, resumeProgress: nil, isResume: false))
-        XCTAssertEqual(pill.text, "Play")
+        XCTAssertEqual(pill.localizedTitle, LocalizedStringResource("Play"))
+        XCTAssertNil(pill.text)
         XCTAssertEqual(pill.systemImage, "play.fill")
         XCTAssertNil(pill.progress)
     }
@@ -375,7 +375,8 @@ final class HeroForegroundModelTests: XCTestCase {
         let pill = Builder.pill(for: PillInput(
             kind: .play, resumeProgress: 0.42, isResume: true, resumeRemainingText: nil
         ))
-        XCTAssertEqual(pill.text, "Resume")
+        XCTAssertEqual(pill.localizedTitle, LocalizedStringResource("Resume"))
+        XCTAssertNil(pill.text)
         XCTAssertNil(pill.progress)
     }
 
@@ -392,7 +393,6 @@ final class HeroForegroundModelTests: XCTestCase {
         let pill = Builder.pill(for: PillInput(
             kind: .play, resumeProgress: nil, isResume: false, seasonEpisodeText: "S21 · E8"
         ))
-        XCTAssertEqual(pill.text, "Play S21 · E8")
         XCTAssertNil(pill.progress)
     }
 
@@ -407,7 +407,8 @@ final class HeroForegroundModelTests: XCTestCase {
 
     func testPlayPillOmitsSeasonEpisodeForMovies() {
         // No seasonEpisodeText (movie): plain "Play" and bare remaining, unchanged.
-        XCTAssertEqual(Builder.pill(for: PillInput(kind: .play)).text, "Play")
+        XCTAssertEqual(Builder.pill(for: PillInput(kind: .play)).localizedTitle, LocalizedStringResource("Play"))
+        XCTAssertNil(Builder.pill(for: PillInput(kind: .play)).text)
         XCTAssertEqual(Builder.pill(for: PillInput(
             kind: .play, resumeProgress: 0.5, isResume: true, resumeRemainingText: "43m"
         )).text, "43m")

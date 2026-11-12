@@ -7,9 +7,27 @@ import FeaturePlayback
 
 @main
 struct FocusHostApp: App {
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("--live-root-fixture") {
+            URLProtocol.registerClass(SourceSmokeNetworkBlocker.self)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--disc-review-fixture") {
+            if ProcessInfo.processInfo.arguments.contains("--live-webdav-watchlist-fixture") {
+                LiveWebDAVWatchlistFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--detail-selection-fixture") {
+                DetailSelectionFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--live-content-refresh-fixture") {
+                LiveContentRefreshFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--content-refresh-return-fixture") {
+                ContentRefreshReturnFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--live-root-fixture") {
+                LiveTVRootFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--multiview-fixture") {
+                MultiviewFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--disc-review-fixture") {
                 DiscReviewFixture()
             } else if ProcessInfo.processInfo.arguments.contains("--detail-information-fixture") {
                 DetailInformationFixture()
@@ -102,7 +120,13 @@ struct FocusHostApp: App {
             } else if ProcessInfo.processInfo.arguments.contains("--library-channel-actions") {
                 LibraryChannelActionsFixture()
             } else if ProcessInfo.processInfo.arguments.contains("--navigation-fixture") {
-                NavigationRailFixture { Color.clear }
+                NavigationRailFixture {
+                    if ProcessInfo.processInfo.arguments.contains("--navigation-guide") {
+                        LiveTVCategorySearchFixture()
+                    } else {
+                        Color.clear
+                    }
+                }
             } else if ProcessInfo.processInfo.arguments.contains("--live-jellyfin-home") {
                 LiveJellyfinHomeFixture()
             } else if ProcessInfo.processInfo.arguments.contains("--production-home-fixture") {
@@ -239,22 +263,22 @@ private struct CollectionRowEditorFixture: View {
         store: HomeLibraryVisibilityStore(namespace: "collection-row-editor-fixture")
     )
     @State private var navigation = SettingsPageNavigation<String>()
-    @State private var provider: CollectionRowEditorProvider?
+    @State private var account: ResolvedAccount?
+    private var isNew: Bool { !ProcessInfo.processInfo.arguments.contains("--collection-row-existing") }
 
     var body: some View {
         SettingsPageStack(navigation: navigation, pageWidth: SettingsFormMetrics.pageWidth, onRootBack: {}) {
-            if let provider {
-                let account = ResolvedAccount(account: Account(from: provider.session), provider: provider)
+            if let account {
                 CollectionSectionSettingsView(
-                    section: CollectionSection(
+                    section: visibility.visibility.collectionSections.first ?? CollectionSection(
                         source: .init(
                             accountID: account.account.id, collectionID: "weekend", title: "Weekend picks",
-                            serverUserID: provider.session.userID
+                            serverUserID: account.provider.session.userID
                         ),
                         cardStyle: .landscape,
                         titleLogo: ProcessInfo.processInfo.arguments.contains("--collection-row-logo-on") ? .on : .default
                     ),
-                    isNew: true, inventory: HomeSectionCatalogModel(), visibility: visibility,
+                    isNew: isNew, inventory: HomeSectionCatalogModel(), visibility: visibility,
                     libraries: [], accounts: [account]
                 )
             } else {
@@ -267,7 +291,7 @@ private struct CollectionRowEditorFixture: View {
         .environment(\.colorScheme, .dark)
         .background { SettingsPageBackground() }
         .task {
-            guard provider == nil else { return }
+            guard account == nil else { return }
             let backgroundURL = URL(string: "https://collection-fixture.invalid/\(UUID())-background.png")!
             let logoURL = URL(string: "https://collection-fixture.invalid/\(UUID())-logo.png")!
             let background = UIGraphicsImageRenderer(size: CGSize(width: 640, height: 360)).image {
@@ -292,7 +316,21 @@ private struct CollectionRowEditorFixture: View {
                     CachedURLResponse(response: response, data: data), for: URLRequest(url: url)
                 )
             }
-            provider = CollectionRowEditorProvider(background: backgroundURL, logo: logoURL)
+            let loaded = CollectionRowEditorProvider(background: backgroundURL, logo: logoURL)
+            let resolved = ResolvedAccount(
+                account: Account(id: "collection-editor-fixture", from: loaded.session), provider: loaded
+            )
+            if !isNew && visibility.visibility.collectionSections.isEmpty {
+                do {
+                    try visibility.saveCollectionSection(CollectionSection(source: .init(
+                        accountID: resolved.account.id, collectionID: "weekend", title: "Weekend picks",
+                        serverUserID: loaded.session.userID
+                    ), cardStyle: .landscape, titleLogo: .on), catalog: HomeSectionCatalog(libraries: []))
+                } catch {
+                    preconditionFailure("Could not seed existing collection fixture")
+                }
+            }
+            account = resolved
         }
     }
 }

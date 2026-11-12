@@ -935,7 +935,7 @@ struct SeriesDetailView: View {
                 guard let id = newValue,
                       let season = seasons.first(where: { $0.id == id }) else { return }
                 enterSeasonBrowser(onFocusEntered: onFocusEntered)
-                select(season)
+                select(season, explicit: id != activeSeasonID)
                 // Deliberately *don't* move the hero to the season: focusing the tab bar
                 // keeps the page on the episode you were last viewing, so going up and
                 // back down stays anchored to that episode rather than the season.
@@ -1091,8 +1091,6 @@ struct SeriesDetailView: View {
 
     /// Selects `season`: marks it active and kicks off (cached) episode loading
     /// so the rail and Play target are ready as focus settles on the tab.
-    private func select(_ season: MediaItem) {
-        hasExplicitSeasonSelection = true
         selectedSeasonID = season.id
         Task {
             await viewModel.loadEpisodes(for: season.id)
@@ -1579,7 +1577,7 @@ struct SeriesDetailView: View {
             await frontSwitchTarget(target)
             return
         }
-        if !hasUserDirectedFocus, initialEpisode == nil,
+        if !hasExplicitSeasonSelection, initialEpisode == nil,
            let seed = SeriesEpisodeEntry.openingSeed(
                for: series, initialEpisode: initialEpisode,
                initialSeasonID: initialSeasonID, resumeEpisode: viewModel.serverResumeEpisode

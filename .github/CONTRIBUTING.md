@@ -290,6 +290,9 @@ assets live under `App/Resources/Assets.xcassets/…brandassets`.
 
 ## Architecture
 
+For proposed, incremental maintainability and performance work, see the
+[architecture roadmap](../docs/architecture-roadmap.md).
+
 Plozz is a Swift Package with one library per concern, consumed by thin app
 targets generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
@@ -340,18 +343,6 @@ for one backend, call that out explicitly in the issue/PR.
 
 Keep changes focused and match the surrounding style. Follow the
 [Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md).
-
-- State/lifecycle behavior uses the shared coordinator/profile scaffold, not
-  ad-hoc foreground refresh logic in views.
-- Tests use named constants or shared fixtures. The owner of a formatted value
-  owns the literal assertion; unrelated tests reference the owner instead of
-  duplicating the literal.
-- Comments explain why and invariants. Do not restate current formatted output;
-  reference the owning symbol (for example `MediaItem.seasonEpisodeLabel`).
-- A shared format/helper change should touch the owner and call sites, not
-  unrelated comments or tests.
-- Split rules/documentation work from feature work, and keep generated project
-  files out of the diff.
 
 Open an issue if you're unsure whether something's a good fit before investing a
 lot of time.

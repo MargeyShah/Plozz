@@ -140,6 +140,20 @@ SCENARIOS = {
         for state in ("enabled", "disabled", "tap-only", "tap-paced", "lifecycle",
                       "soak-enabled", "soak-disabled", "soak-tap-only")
     },
+    **{
+        f"music-{provider}-live": {
+            "suite": "ui", "explicitOnly": True,
+            "test": f"MusicPlaybackPerformanceTests/testPerformance{provider.title()}Music",
+            "file": "Tests/PerformancePresentationSupport/MusicPlaybackPerformanceTests.swift",
+            "description": "Authorized internal music: real provider resolution and AVQueuePlayer cold, next, previous, arbitrary, new-queue and rapid switches; require sustained playback.",
+            "counters": ["completedTransitions", "maxResolveMilliseconds"] + [
+                f"{action}{metric}Milliseconds"
+                for action in ("cold", "next", "previous", "jump", "newQueue", "rapid")
+                for metric in ("Playback", "Ready", "OldStop", "Reset")
+            ],
+        }
+        for provider in ("plex", "jellyfin", "subsonic")
+    },
     "home-jellyfin-live": {
         "suite": "network", "target": "FeatureHomeCoreTests", "explicitOnly": True,
         "test": "JellyfinHomePerformanceTests/testPerformanceLiveHome",
@@ -590,6 +604,13 @@ SCENARIOS = {
                      "scrollCPUTimeMicroseconds", "scrollWallMicroseconds",
                      "firstRowMicroseconds", "allRowsMicroseconds", "scrollableDistancePoints"],
     },
+    "mobile-home-library-row-comparison": {
+        "suite": "ui", "platforms": ["iOS"],
+        "test": "HomeLoadingLayoutTests/testPerformanceLibraryRowComparison",
+        "file": "Tests/iOSPresentationTests/HomeLoadingLayoutTests.swift",
+        "description": "Compare production library-row inputs with independently decoded complete metadata; preserve deep changes and owner scope.",
+        "counters": ["comparisons", "items", "metadataPeople"],
+    },
     "mobile-home-multi-server-scroll": {
         "suite": "ui", "platforms": ["iOS"],
         "test": "HomeMultiServerLoadingTests/testPerformanceScrollingAcrossTwentyServers",
@@ -663,6 +684,20 @@ SCENARIOS = {
         "file": "Tests/PerformancePresentationSupport/PlaybackSourceMenuPerformanceTests.swift",
         "description": "Build actual source-menu version presentations, preserving every displayed title and supplemental fact.",
         "counters": ["versions", "menuUpdates", "presentedRows"],
+    },
+    "detail-selection-legacy": {
+        "suite": "ui",
+        "test": "PlaybackSourceMenuPerformanceTests/testPerformanceLegacyDetailSelectionComposition",
+        "file": "Tests/PerformancePresentationSupport/PlaybackSourceMenuPerformanceTests.swift",
+        "description": "Compose existing detail selection primitives as a same-binary control; verify exact picker and playback identities.",
+        "counters": ["selections", "presentedVersions", "playTargets"],
+    },
+    "detail-selection-resolved": {
+        "suite": "ui",
+        "test": "PlaybackSourceMenuPerformanceTests/testPerformanceResolvedDetailSelectionComposition",
+        "file": "Tests/PerformancePresentationSupport/PlaybackSourceMenuPerformanceTests.swift",
+        "description": "Resolve identical detail picker and playback inputs through the shared composition; not a whole-detail startup measurement.",
+        "counters": ["selections", "presentedVersions", "playTargets"],
     },
     "native-poster-composition": {
         "suite": "ui", "platforms": ["tvOS"],
@@ -818,12 +853,15 @@ def configure_scheme(tree):
         action.remove(old)
     variables = ET.SubElement(action, "EnvironmentVariables")
     ET.SubElement(variables, "EnvironmentVariable", key="PLOZZ_PERFORMANCE", value="1", isEnabled="YES")
-    if broker := os.environ.get("PLOZZ_JELLYFIN_HOME_BROKER"):
+    for name in ("PLOZZ_JELLYFIN_HOME_BROKER", "PLOZZ_MUSIC_BROKER"):
+        broker = os.environ.get(name)
+        if not broker:
+            continue
         parsed = urlparse(broker)
         if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or not parsed.port
                 or parsed.username or parsed.password or parsed.query or parsed.fragment):
             raise Failure("Live Home broker must be an explicit loopback HTTP URL without credentials or a query.")
-        ET.SubElement(variables, "EnvironmentVariable", key="PLOZZ_JELLYFIN_HOME_BROKER",
+        ET.SubElement(variables, "EnvironmentVariable", key=name,
                       value=broker, isEnabled="YES")
     return tree
 

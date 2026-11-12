@@ -525,15 +525,26 @@ public struct RootView: View {
 
     public var body: some View {
         Group {
-            if needsDiagnosticConsent {
+            if needsDiagnosticConsent || appState.syncSetup.needsOnboardingChoice
+                || appState.initialSetupRestoration.phase != .hidden {
                 Group {
                     if !startupLogoIntroCompleted {
                         launchView
                             .background { AppBackground(palette: resolvedPalette) }
-                    } else {
+                    } else if needsDiagnosticConsent {
                         CrashReportingConsentView { enabled in
                             appState.crashReportingModel.isEnabled = enabled
                         }
+                    } else if appState.syncSetup.needsOnboardingChoice {
+                        ICloudOnboardingView(onChoice: appState.completeICloudOnboarding)
+                    } else {
+                        ICloudRestorationView(
+                            phase: appState.initialSetupRestoration.phase,
+                            activity: appState.initialSetupRestoration.activity
+                                ?? (appState.providerCredentialSync.isRestoringSignIn ? .signingInToServers : nil),
+                            onRetry: appState.restoreInitialICloudSetup,
+                            onSetUpManually: appState.setUpManuallyAfterICloudRestore
+                        )
                     }
                 }
                 .environment(\.themePalette, resolvedPalette)
@@ -551,8 +562,16 @@ public struct RootView: View {
                     }
             }
         }
+        .onChange(
+            of: appState.isActiveProfileAuthorized && !appState.profilesModel.activeProfile.needsSetup
+                && appState.initialSetupRestoration.phase == .hidden,
+            initial: true
+        ) { _, ready in
+            if ready { appState.continueManualICloudSetupIfReady() }
+        }
         .onOpenURL { url in
-            if needsDiagnosticConsent || showsStartupLogo {
+            if needsDiagnosticConsent || appState.syncSetup.needsOnboardingChoice
+                || appState.initialSetupRestoration.phase != .hidden || showsStartupLogo {
                 deferredStartupURL = url
             } else {
                 appState.handle(url: url)
@@ -917,6 +936,7 @@ public struct RootView: View {
         // state without another argument on an already ~60-argument chain.
         .environment(appState.profilesModel)
         .environment(appState.profileSettings.navigationStyleModel)
+        .environment(appState.profileSettings.homeLibraryVisibilityModel)
         .environment(appState.guidePreparation)
         .environment(glassPerformance)
         .environment(displayVeil)
@@ -939,10 +959,6 @@ public struct RootView: View {
         .environment(\.colorScheme, resolvedPalette.isLight ? .light : .dark)
         .transientStatusOverlay(
             presenter: appState.transientStatusPresenter,
-            palette: resolvedPalette
-        )
-        .guidePreparationOverlay(
-            model: appState.guidePreparation, presenter: appState.transientStatusPresenter,
             palette: resolvedPalette
         )
         // Resumes setup that was abandoned part-way — quit mid-flow, or synced
@@ -971,10 +987,6 @@ public struct RootView: View {
             onDismiss: rootPresentationDidDismiss
         ) {
             rootPresentationContent
-                .guidePreparationOverlay(
-                    model: appState.guidePreparation, presenter: appState.transientStatusPresenter,
-                    palette: resolvedPalette
-                )
                 .environment(\.themePalette, resolvedPalette)
                 .environment(\.gradientBackgroundsEnabled, appState.profileSettings.themeModel.gradientEnabled)
                 .environment(\.colorScheme, resolvedPalette.isLight ? .light : .dark)
@@ -1351,6 +1363,10 @@ private struct OnboardingPageContent: View {
                         throw IPTVAuthViewModel.CompletionError.persistence
                     }
                 },
+                onSubsonicAuthenticated: { [profileID = appState.profilesModel.activeProfileID] session in
+                    guard appState.profilesModel.activeProfileID == profileID else { throw AppError.cancelled }
+                    guard appState.didAuthenticate(session) else { throw AppError.invalidResponse }
+                },
                 onPlexAuthenticatedMany: { sessions in appState.didAuthenticatePlexMany(sessions) },
                 onShareConfigured: { draft in
                     appState.didConfigureShare(
@@ -1411,7 +1427,17 @@ private struct OnboardingPageContent: View {
             )
 
         case let .authenticating(server):
-            if server.provider == .plex {
+            if server.provider == .subsonic {
+                SubsonicSignInView(
+                    deviceID: appState.accountsProviders.deviceID,
+                    address: server.baseURL.absoluteString,
+                    onAuthenticated: { [profileID = appState.profilesModel.activeProfileID] session in
+                        guard appState.profilesModel.activeProfileID == profileID else { throw AppError.cancelled }
+                        guard appState.didAuthenticate(session) else { throw AppError.invalidResponse }
+                    },
+                    onCancel: { appState.cancelAuthentication() }
+                )
+            } else if server.provider == .plex {
                 ProgressView("Finishing Plex sign-in…")
                     .font(.title2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

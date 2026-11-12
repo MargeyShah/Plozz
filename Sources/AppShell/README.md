@@ -49,8 +49,6 @@ registry.
 
 ## Invariants
 
-- **The root owns content-refresh coordination.** `RootView` injects the
-  profile-scoped `ContentRefreshCoordinator` and mounts
   `ContentRefreshLifecycleReader`; app shells do not decide refresh timing.
   Home/detail views register their visible surface and perform the typed action.
   Follow [state management](../../docs/state-management.md).
@@ -106,6 +104,12 @@ registry.
   data-loading regions wait for their existing readiness notification.
   `EmptyPinnedNavigationTests` covers entry, return, cold startup, and retained
   Live TV while switching back to Settings and empty Home.
+
+- **Live TV owns the guide-to-categories directional handoff.** The native guide
+  declares horizontal-input ownership while it has a category exit, so pinned
+  navigation cannot interpret a held Left or swipe as an unused page-edge move.
+  Categories remain outside that ownership: a subsequent Left can open navigation,
+  and Back retains its existing navigation behavior.
 
 - **Native Sidebar owns its screen insets.** Its startup focus host fills the
   window so the native sidebar, scrim, controls and scrolling page viewport do
@@ -234,6 +238,20 @@ registry.
   receiver QR. Nearby-device labels inherit native button foregrounds so their
   codes remain readable when focus inverts the surface. The QR, nearby devices,
   and manual code entry stay on one page in distinct sections.
+
+- **Automatic server sign-ins.** TV and mobile use AppRuntime's
+  `ProviderCredentialSync`, separately from non-secret server descriptors.
+  Private CloudKit encrypted fields carry managed-server tokens, portable
+  share credentials and Silo bootstrap authority; local copies stay in
+  Keychain and encrypted ledgers. Endpoint authority comes from the encrypted
+  record, never from an advisory descriptor. Restoration checks server/user
+  identity, consent, household removal, local dismissal and parental authority,
+  including after asynchronous enrollment. Generated SSH keys remain local;
+  Silo requires bound independent-device enrollment and never transfers PIN
+  proofs. Failed automatic sign-ins retain manual setup. Apple-account changes
+  invalidate cached authority and suppress old local credentials until fresh
+  authentication rather than uploading them to a different account. Encryption
+  does not imply Apple lacks key access without Advanced Data Protection.
 
 - **Bounded setup summaries.** Both sending and receiving use CoreUI's shared
   scrolling summary on TV and mobile. Group accounts by physical server, retain

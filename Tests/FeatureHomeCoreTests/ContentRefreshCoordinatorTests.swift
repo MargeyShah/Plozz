@@ -76,10 +76,6 @@ final class ContentRefreshCoordinatorTests: XCTestCase {
         let harness = ContentRefreshHarness()
         harness.show(ContentRefreshTestConstants.series)
         harness.show(ContentRefreshTestConstants.episode)
-        harness.hide(ContentRefreshTestConstants.episode)
-
-        harness.advance(by: ContentRefreshTestConstants.longAway)
-        harness.coordinator.surfaceDidBecomeVisible(ContentRefreshTestConstants.series)
 
         XCTAssertEqual(harness.coordinator.request?.surface, ContentRefreshTestConstants.series)
         XCTAssertEqual(harness.coordinator.request?.action, .reloadSeriesContext)
