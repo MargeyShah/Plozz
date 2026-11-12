@@ -293,6 +293,9 @@ public struct ItemDetailView: View {
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
                 break
+            case .reloadHome:
+                // Owned by the Home surface; the detail rules never emit it.
+                break
             }
         }
         .detailPlaybackPreparation(

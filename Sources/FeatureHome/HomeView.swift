@@ -913,6 +913,9 @@ public struct HomeView: View {
                     trigger: request.reason.diagnosticTrigger
                 )
                 break
+            case .reloadSeriesContext, .refreshWatchStateOnly:
+                // Owned by the detail surfaces; the Home rule never emits them.
+                break
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .identityIndexDidUpdate)) { _ in
