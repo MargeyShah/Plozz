@@ -93,7 +93,6 @@
     "PlozziOSStreamingSettings",
     "PlozziOSSubtitleSettingsView",
     "PlozziOSSyncSetupSettingsView",
-    "PlozziOSThemeSettingsView",
     "PlozziOSTrackerSettingsView",
     "ProfileActionsList",
     "ProfileDetailView",
@@ -1061,35 +1060,11 @@
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|body|Button|\"Disconnect\"": {
-      "count": 1,
-      "reason": "Explicit navigation, confirmation, reset, connection or diagnostic action; not a preference input."
-    },
     "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|authorizationForm|TextField|\"Authorization code\"": {
       "count": 1,
       "reason": "credential: OAuth exchange."
     },
     "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|authorizationForm|Button|\"Cancel\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|body|TextField|\"Authorization code\"": {
-      "count": 1,
-      "reason": "credential: OAuth exchange."
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|body|Button|\"Cancel\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|body|Button|\"Disconnect\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|body|Button|\"Cancel\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|body|Button|\"Disconnect\"": {
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
@@ -1332,20 +1307,6 @@
       ],
       "count": 1
     },
-    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|TextField|\"Row name\"": {
-      "reason": "Configured renderer or contextual choice for the indexed control family; the containing editor owns reveal and selection.",
-      "covered_by": [
-        "home-row-arrangement"
-      ],
-      "count": 1
-    },
-    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|\"Remove from Home\"": {
-      "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
-      "covered_by": [
-        "home-row-arrangement"
-      ],
-      "count": 1
-    },
     "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|previewContent|Button|\"Retry\"": {
       "count": 1,
       "reason": "Explicit navigation, confirmation, reset, connection or diagnostic action; not a preference input."
@@ -1378,13 +1339,6 @@
       "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
       "covered_by": [
         "home-row-preset"
-      ],
-      "count": 1
-    },
-    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeSectionSettingsView|body|Button|\"Remove from Home\"": {
-      "reason": "Configured renderer or contextual choice for the indexed control family; the containing editor owns reveal and selection.",
-      "covered_by": [
-        "library-covers"
       ],
       "count": 1
     },
@@ -1771,19 +1725,7 @@
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|body|Button|\"Open MyAnimeList\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|body|Button|\"Redeem Code\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
     "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|connectButton|Button|\"Connect MyAnimeList\"": {
-      "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
-      "count": 1
-    },
-    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|body|Button|\"Open Simkl\"": {
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
@@ -2212,13 +2154,6 @@
       ],
       "count": 1
     },
-    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|if isNew { Text(\"Add to Home\") } else { Text(\"Save changes\") }": {
-      "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
-      "covered_by": [
-        "home-row-arrangement"
-      ],
-      "count": 1
-    },
     "Sources/FeatureSettings/ContinueWatchingArtworkPicker.swift|ContinueWatchingArtworkPicker|body|Button|optionLabel(option) .padding(.horizontal, 12) .padding(.vertical, usesRows ? 8 : 12) .contentShape(RoundedRectangle(cornerRadius: PlozzTheme.Metrics.Radius.panel)) .accessibilityElement(children: .ignore) .accessibilityLabel(Text(option.displayName))": {
       "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
       "covered_by": [
@@ -2323,13 +2258,6 @@
       "reason": "Configured renderer or contextual choice for the indexed control family; the containing editor owns reveal and selection.",
       "covered_by": [
         "continue-playback-details"
-      ],
-      "count": 1
-    },
-    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeAddSectionView|body|Button|HomeSectionChoiceLabel(choice: choice, accessory: \"plus\", accounts: accounts)": {
-      "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
-      "covered_by": [
-        "home-row-arrangement"
       ],
       "count": 1
     },
@@ -2988,6 +2916,1034 @@
     "Sources/FeatureSettings/PreferenceDetailViews.swift|DetailPageDetailView|heroRows.rows|SettingsPageLink|SettingsDisclosureLabel { Text(\"Trailers & music\") }": {
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
+    },
+    "Sources/AppShelliOS/PlozziOSSeerrSettingsView.swift|PlozziOSSeerrSettingsView|connectionFields|TextField|\"Server address\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSSettingsView.swift|PlozziOSAppearanceSettingsView|body|Button|SettingsDisclosureLabel { Text(Page.musicPlayer.title) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSSettingsView.swift|PlozziOSSubtitleSettingsView|body|TextField|\"Preferred language code\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|content|Button|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|content|Button|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|AniListSettingsContent|content|Button|\"Disconnect\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Open MyAnimeList\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|TextField|\"Authorization code\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Redeem Code\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|MALSettingsContent|content|Button|\"Disconnect\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|content|Button|\"Open Simkl\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|content|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|content|Button|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|content|Button|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|SimklSettingsContent|content|Button|\"Disconnect\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|TraktSettingsContent|content|Button|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|TraktSettingsContent|content|Button|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|WetrakrSettingsContent|content|Button|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/PlozziOSTrackerSettingsView.swift|WetrakrSettingsContent|content|Button|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/AppShelliOS/ServerOnboardingViews.swift|ServerProviderChoices|body|Button|HStack(spacing: 16) { ProviderBrandMark(provider: .subsonic, size: 40).accessibilityHidden(true) Text(verbatim: ProviderKind.subsonic.displayName) Spacer(minLength: 8) Image(systemName: \"chevron.forward\").accessibilityHidden(true) } .frame(minHeight: 44)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|\"Retry\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|nameInput|TextField|\"Row name\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|explicitSaveAction|Button|Group { if isNew { Text(\"Add to Home\") } else { Text(\"Save changes\") } } .plozzPageActionLabel()": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ExternalPlayerSettingsView.swift|CustomExternalPlayerControls|body|TextField|\"Player URL template\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeEditorAutosavingNameInput.swift|HomeEditorAutosavingNameInput|body|TextField|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeEditorAutosavingNameInput.swift|HomeEditorAutosavingNameInput|body|Button|\"Retry\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeAddSectionView|body|Button|HomeSectionChoiceLabel( choice: choice, accessory: \"plus\", accounts: accounts, visibility: visibility.visibility )": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeEditorSaveAction|body|Button|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeEditorSaveAction|body|Button|\"OK\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeRowNameEditor|body|Button|\"Save changes\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeRowNameEditor|nameField|TextField|\"Row name\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/HomeSectionSettingsViews.swift|HomeRowRemoveAction|body|Button|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ICloudOnboardingView.swift|ICloudOnboardingChoices|body|Button|\"Enable iCloud Sync\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ICloudOnboardingView.swift|ICloudOnboardingChoices|body|Button|\"Not now\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ICloudOnboardingView.swift|ICloudRestorationActions|body|Button|\"Retry\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ICloudOnboardingView.swift|ICloudRestorationActions|body|Button|\"Set up manually\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/ICloudOnboardingView.swift|ICloudSetupUnavailableView|body|Button|\"Retry\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/IntegrationsDetailView.swift|IntegrationsDetailView|rows.trackers|Button|\"Compare with server history\"": {
+      "count": 5,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/IntegrationsDetailView.swift|IntegrationsDetailView|rows.trackers|Button|\"Export server history\"": {
+      "count": 5,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/IntegrationsDetailView.swift|IntegrationsDetailView|rows.trackers|Button|\"Listening history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/LastFmListeningHistoryView.swift|LastFmListeningHistoryView|body|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/LastFmListeningHistoryView.swift|LastFmListeningHistoryView|body|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/LastFmListeningHistoryView.swift|LastFmListeningHistoryView|body|Button|\"Refresh\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/NavigationLibrariesDetailView.swift|NavigationNameEditor|body|TextField|\"Name\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/NavigationLibrariesDetailView.swift|NavigationNameEditor|body|Button|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|Toggle|\"Look up community ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Playback reporting\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Watchlist destination\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Compare with server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Export server history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Watch history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|VStack(alignment: .leading) { PublicMetaDBContentLabel(content: record.value.content, allowsFocus: false) PublicMetaDBWatchDateLabel(date: record.value.watchedAt) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Delete multiple plays\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Resume points\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|VStack(alignment: .leading) { PublicMetaDBContentLabel(content: record.value.content, allowsFocus: false) Text(record.value.progress / 100, format: .percent.precision(.fractionLength(1))) .foregroundStyle(.secondary) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Dropped titles\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|PublicMetaDBContentLabel(content: record.value, allowsFocus: false)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Lists\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|VStack(alignment: .leading) { Text(verbatim: list.name) Text(list.isPublic ? \"Public\" : \"Private\").foregroundStyle(.secondary) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Create a list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Open a public list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Picks\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|NavigationLink|\"Look up an external ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBAccountView|body|Button|\"Done\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPagedRecords|body|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPagedRecords|body|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPagedRecords|body|Button|\"Refresh\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPickItemsView|body|NavigationLink|VStack(alignment: .leading) { Text(verbatim: item.title) if let year = item.year { Text(verbatim: year).foregroundStyle(.secondary) } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPicksView|body|NavigationLink|VStack(alignment: .leading) { Text(verbatim: pick.name) if let description = pick.description { Text(verbatim: description).foregroundStyle(.secondary) } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAccountView.swift|PublicMetaDBPicksView|body|Button|\"Refresh\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeChunkFields|body|TextField|\"TMDB season (0 for specials)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeChunkFields|body|TextField|\"First episode (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeChunkFields|body|TextField|\"Last episode (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeChunkFields|body|TextField|\"Different TMDB show ID (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeDeleteView|body|TextField|\"Logical anime season (1 or greater)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeDeleteView|body|Button|\"Review season\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeDeleteView|body|Button|\"Delete my mapping\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeDeleteView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeEditor|body|TextField|\"Logical anime season (1 or greater)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeEditor|body|TextField|\"Season name (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeEditor|body|Button|\"Remove this chunk\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeEditor|body|Button|\"Add a chunk\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeEditor|body|Button|\"Review replacement\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeMappingsView|body|NavigationLink|\"Publish or replace my mapping\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeMappingsView|body|NavigationLink|\"Delete my mapping for a logical season\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeMappingsView|body|NavigationLink|PublicMetaDBAnimeChunkLabel(chunk: record.value, anchorID: tmdbID)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeReviewView|body|Button|\"Replace my mapping\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeReviewView|body|Button|\"Publish replacement\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBAnimeMappingsView.swift|PublicMetaDBAnimeReviewView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Review deletion\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Refresh history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Delete \\(draft.records.count) plays\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBBulkHistoryView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBBulkHistoryView.swift|PublicMetaDBHistorySelectionRows|body|Toggle|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentPresentation|body|Button|\"Close\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Add a watched play\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Community timestamps\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Watch history\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|VStack(alignment: .leading) { PublicMetaDBContentLabel(content: record.value.content, allowsFocus: false) PublicMetaDBWatchDateLabel(date: record.value.watchedAt) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Add to a list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"External IDs\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Community and personal ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Drop show on PublicMetaDB\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Season ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBContentView|body|NavigationLink|\"Anime season mappings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContentView.swift|PublicMetaDBOpenCatalogTitle|body|Button|content.season == nil ? \"Open title in Plozz\" : \"Open show in Plozz\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBContentRatingsView|body|NavigationLink|\"Submit a rating\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBContentRatingsView|body|NavigationLink|VStack(alignment: .leading) { Text(verbatim: record.value.label) Text(\"\\(record.value.score.formatted()) / 100\") if let contributor = record.contributor { Text(verbatim: contributor).foregroundStyle(.secondary) } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBRatingRecordView|body|NavigationLink|\"Vote on this contribution\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBRatingRecordView|body|Button|\"Delete rating\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBRatingRecordView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBReadContent|body|Button|\"Refresh\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBSubmitRatingView|body|TextField|\"Rating label\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBSubmitRatingView|body|Picker|\"Score out of 100\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBSubmitRatingView|body|Button|\"Submit rating\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBSubmitRatingView|body|Button|\"Publish rating\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBSubmitRatingView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBVoteView|body|Button|voteLabel(vote)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBVoteView|body|Button|\"Remove my vote\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBVoteView|body|Button|\"Confirm vote\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBContributionView.swift|PublicMetaDBVoteView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Picker|\"Server user\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Picker|\"Library\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Picker|\"History to export\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Preview export\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Toggle|\"Export this title\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Export \\(selected.count) selected titles\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Export selected titles\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryExportView.swift|PublicMetaDBHistoryExportContent|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|Toggle|\"Watch date unknown\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|TextField|\"Date and time (ISO 8601)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|DatePicker|\"Watch date\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|Button|\"Review change\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|Button|\"Save play\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryDateView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryRecordView|body|NavigationLink|\"Title controls\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryRecordView|body|NavigationLink|\"Change watch date\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryRecordView|body|NavigationLink|\"Add another play\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryRecordView|body|Button|Text(action.label)": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBHistoryManagementView.swift|PublicMetaDBHistoryRecordView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBAddToListView|body|Button|VStack(alignment: .leading) { Text(verbatim: list.name) Text(list.isPublic ? \"Public\" : \"Private\").foregroundStyle(.secondary) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBAddToListView|body|Button|\"Add to list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBAddToListView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBAddToListView|body|Button|\"OK\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|TextField|\"List name\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|TextField|\"Description (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|Toggle|\"Public list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|Picker|\"List type\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|Button|\"Create list\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBCreateListView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBListItemActionsView|body|NavigationLink|\"Title controls\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBListItemActionsView|body|Button|\"Remove from list\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBListItemActionsView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOpenListView|body|TextField|\"PublicMetaDB list URL\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOpenListView|body|Button|\"Open list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOwnedListView|body|NavigationLink|\"Browse items\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOwnedListView|body|NavigationLink|PublicMetaDBContentLabel(content: record.value, allowsFocus: false)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOwnedListView|body|Button|\"Delete list\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBListManagementView.swift|PublicMetaDBOwnedListView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingEditor|body|Picker|\"Database\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingEditor|body|TextField|\"External ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingEditor|body|Button|\"Review mapping\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingLookupView|body|Picker|\"Database\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingLookupView|body|TextField|\"External ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingLookupView|body|Button|\"Look up ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingLookupView|body|NavigationLink|PublicMetaDBContentLabel(content: content, allowsFocus: false)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingReviewView|body|Button|\"Publish mapping\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingReviewView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingsView|body|NavigationLink|\"Submit an external ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingsView|body|NavigationLink|\"Look up an external ID\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMappingView.swift|PublicMetaDBMappingsView|body|NavigationLink|PublicMetaDBMappingLabel(record: record)": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBContributionRecordView|body|NavigationLink|\"Vote on this contribution\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBContributionRecordView|body|Button|\"Delete contribution\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBContributionRecordView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|TextField|\"Description (optional)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|Picker|\"Release source\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|Toggle|\"I verified these timestamps for this title and release\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|Button|\"Review contribution\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|Button|\"Publish contribution\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerEditor|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerView|body|NavigationLink|\"Publish skip timestamps\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerView|body|NavigationLink|\"Publish a highlight\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerView|body|NavigationLink|VStack(alignment: .leading) { PublicMetaDBSkipDescription(skip: record.value) if let contributor = record.contributor { Text(verbatim: contributor) } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerView|body|Toggle|\"Show highlights (may contain spoilers)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBMarkerView|body|NavigationLink|VStack(alignment: .leading) { PublicMetaDBSegmentLabel(segment: record.value.segment) if let description = record.value.description { Text(verbatim: description) } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBSegmentFields|body|TextField|\"Start (milliseconds)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBMarkerView.swift|PublicMetaDBSegmentFields|body|TextField|\"End (milliseconds)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBPlaybackSettingsView.swift|PublicMetaDBPlaybackSettingsView|body|Button|\"Stop reporting playback\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBPlaybackSettingsView.swift|PublicMetaDBPlaybackSettingsView|body|Button|\"Enable playback reporting\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBPlaybackSettingsView.swift|PublicMetaDBPlaybackSettingsView|body|Button|\"Enable reporting\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBPlaybackSettingsView.swift|PublicMetaDBPlaybackSettingsView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsDeletionView|body|Toggle|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsDeletionView|body|Button|\"Delete selected ratings\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsDeletionView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|TextField|\"Rating label\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|TextField|\"TMDB episode number\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Picker|\"Score out of 100\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Button|\"Remove row\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Button|\"Add an episode\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Button|\"Review ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Button|\"Publish ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBEpisodeRatingsEditor|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBSeasonRatingsView|body|TextField|\"TMDB season number\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBSeasonRatingsView|body|Button|\"Load season\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBSeasonRatingsView|body|NavigationLink|\"Rate multiple episodes\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBSeasonRatingsView|body|NavigationLink|\"Delete selected episode ratings\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSeasonRatingsView.swift|PublicMetaDBSeasonRatingsView|body|NavigationLink|VStack(alignment: .leading) { Text(\"Episode \\(episode.episode)\") ForEach(episode.aggregates.keys.sorted(), id: \\.self) { key in if let score = episode.aggregates[key] { Text(\"\\(score.label): \\(score.average.formatted()) / 100 (\\(score.count) ratings)\") } } }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBBrowserEntryView|body|Button|\"Try again\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBKeyEntryView|body|SecureField|\"API key\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBKeyEntryView|body|Button|\"Connect\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBKeyEntryView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"Browse PublicMetaDB\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|service.hasSavedKey ? \"Replace API key\" : \"Enter API key\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"Retry saved connection\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"Disconnect\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"Replace API key\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"Cancel\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBSettingsContent.swift|PublicMetaDBSettingsContent|body|Button|\"OK\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistPicker|body|Button|VStack(alignment: .leading) { Text(verbatim: list.name) Text(list.isPublic ? \"Public\" : \"Private\").foregroundStyle(.secondary) }": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistPicker|body|Button|\"Use this list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistPicker|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistPicker|body|Button|\"OK\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistSettingsView|body|Button|\"Stop syncing this list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/PublicMetaDBWatchlistSettingsView.swift|PublicMetaDBWatchlistSettingsView|body|NavigationLink|\"Choose a list\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/SeerDetailView.swift|SeerDetailView|connectPanel|TextField|\"Server address\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Picker|\"Server user\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Picker|\"Library\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Preview export\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Export \\(selected.count) selected titles\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Export selected titles\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportContent|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryExportView.swift|TrackerHistoryExportRow|body|Toggle|\"Export this title\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|body|Button|\"Apply selected changes\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|rows|Button|\"Previous page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|rows|Button|\"Next page\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|rows|Button|\"Apply \\(selected.count) selected changes\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|rows|Button|\"Compare again\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonContent|rows|NavigationLink|\"Ongoing sync\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistoryImportView.swift|TrackerHistoryComparisonRow|body|Toggle|<dynamic>": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Sync now\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Turn off sync\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Toggle|\"\\(destination.serverName) · \\(destination.userName)\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Toggle|\"Watched\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Toggle|\"Resume points\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Enable sync\"": {
+      "count": 2,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Remove previous permission\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Cancel\"": {
+      "count": 1,
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
     }
   }
 }
