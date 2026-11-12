@@ -153,13 +153,17 @@ def verify_and_unsign(app, platform, run):
     binaries = macho_files(app)
     if app / info.get("CFBundleExecutable", "") not in binaries:
         raise ValueError("Missing app executable")
+    extension_executables: list[Path] = []
     for extension in extensions:
         ext_info = plistlib.loads((extension / "Info.plist").read_bytes())
-        if extension / ext_info.get("CFBundleExecutable", "") not in binaries:
+        executable = extension / ext_info.get("CFBundleExecutable", "")
+        if executable not in binaries:
             raise ValueError("Missing extension executable")
+        extension_executables.append(executable)
     framework_names = {p.parent.name for p in binaries if p.parent.suffix == ".framework"}
     if "AetherEngine.framework" not in framework_names:
         raise ValueError("Missing embedded playback engine")
+    app_executable = app / info.get("CFBundleExecutable", "")
     inventory = []
     for binary in binaries:
         archs = run(["xcrun", "lipo", "-archs", str(binary)]).strip().split()
@@ -182,13 +186,22 @@ def verify_and_unsign(app, platform, run):
                 container / "Frameworks" / relative in binaries for container in containers
             ):
                 raise ValueError(f"Unresolved embedded dependency in {binary.name}: {link}")
-        # Vendor frameworks may arrive signed even with app signing disabled.
-        run(["codesign", "--remove-signature", str(binary)])
-        commands = run(["xcrun", "otool", "-l", "-arch", "all", str(binary)])
-        if "LC_CODE_SIGNATURE" in commands:
-            raise ValueError(f"Signature remains in {binary.name}")
+        # Strip only the app/extension executable signatures. Embedded vendor
+        # frameworks may arrive already signed; removing those signatures forces
+        # every sideload signer to re-sign nested code and can leave the playback
+        # engine unloadable when a signer only handles the app executable.
+        if binary in [app_executable, *extension_executables]:
+            run(["codesign", "--remove-signature", str(binary)])
+            commands = run(["xcrun", "otool", "-l", "-arch", "all", str(binary)])
+            if "LC_CODE_SIGNATURE" in commands:
+                raise ValueError(f"Signature remains in {binary.name}")
         inventory.append({"path": str(binary.relative_to(app)), "architectures": archs})
-    for signature in app.rglob("_CodeSignature"):
+    # Remove the app/extension seal only. A framework's own seal belongs to its
+    # executable and is preserved with it.
+    for container in [app, *extensions]:
+        signature = container / "_CodeSignature"
+        if not signature.exists():
+            continue
         if signature.is_symlink() or not signature.is_dir():
             raise ValueError("Unexpected signature metadata")
         shutil.rmtree(signature)
