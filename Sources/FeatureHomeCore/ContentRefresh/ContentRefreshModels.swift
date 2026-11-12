@@ -14,6 +14,10 @@ public enum ContentRefreshAction: String, Sendable, Equatable {
     case reloadHome
     case reloadSeriesContext
     case refreshWatchStateOnly
+}
+
+/// Why a refresh is being considered.
+public enum ContentRefreshReason: Sendable, Hashable {
     case foreground(awayFor: TimeInterval)
     case surfaceReturn(after: TimeInterval)
     case manual
@@ -27,6 +31,8 @@ public enum ContentRefreshAction: String, Sendable, Equatable {
     }
 }
 
+/// Content identity. Registration identity distinguishes repeated navigation;
+/// the root resets the coordinator when the profile changes.
 public struct ContentRefreshSurfaceID: Hashable, Sendable {
     public let kind: ContentRefreshSurfaceKind
     public let accountID: String?
@@ -45,17 +51,22 @@ public struct ContentRefreshSurfaceID: Hashable, Sendable {
 
 /// A single structured refresh request. `generation` is monotonic so a view can
 /// reject work that was superseded while it was still starting.
+public struct ContentRefreshRequest: Hashable, Sendable {
+    public let surface: ContentRefreshSurfaceID
+    public let registrationID: UUID
     public let action: ContentRefreshAction
     public let reason: ContentRefreshReason
     public let generation: UInt64
 
     public init(
         surface: ContentRefreshSurfaceID,
+        registrationID: UUID,
         action: ContentRefreshAction,
         reason: ContentRefreshReason,
         generation: UInt64
     ) {
         self.surface = surface
+        self.registrationID = registrationID
         self.action = action
         self.reason = reason
         self.generation = generation
@@ -91,6 +102,7 @@ public struct ContentRefreshProfile: Sendable, Equatable {
         home: ContentRefreshRule,
         seriesDetail: ContentRefreshRule,
         episodeDetail: ContentRefreshRule,
+        movieDetail: ContentRefreshRule
     ) {
         self.home = home
         self.seriesDetail = seriesDetail
