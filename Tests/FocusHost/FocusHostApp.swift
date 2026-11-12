@@ -15,7 +15,11 @@ struct FocusHostApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--live-webdav-watchlist-fixture") {
+            if ProcessInfo.processInfo.arguments.contains("--tracker-history-import-fixture") {
+                TrackerHistoryImportFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--publicmetadb-pairing-fixture") {
+                PublicMetaDBPairingFixture()
+            } else if ProcessInfo.processInfo.arguments.contains("--live-webdav-watchlist-fixture") {
                 LiveWebDAVWatchlistFixture()
             } else if ProcessInfo.processInfo.arguments.contains("--detail-selection-fixture") {
                 DetailSelectionFixture()

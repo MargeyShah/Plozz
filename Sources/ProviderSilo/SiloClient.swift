@@ -17,11 +17,23 @@ actor SiloClient {
     private var refresh: Task<SiloCredential, Error>?
     private let uptime: @Sendable () -> TimeInterval
     private var browseRetryAfter: TimeInterval?
+    private let now: @Sendable () -> Date
+    private var requestNotBefore = Date.distantPast
+    private let backgroundReadInterval: Duration
+    private var lastBackgroundRead: ContinuousClock.Instant?
+    private var requestsSent = 0
+    private var backgroundRequestsSent = 0
+    private var detailRequestsSent = 0
+    private var requestSecond: TimeInterval?
+    private var requestsInSecond = 0
+    private var peakRequestsInSecond = 0
 
     init(
         context: ProviderResolutionContext, store: any RotatingCredentialStoring, http: any HTTPClient,
         addressProbe: any HTTPClient = URLSessionHTTPClient(session: .plozzDiscovery),
-        uptime: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+        uptime: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        now: @escaping @Sendable () -> Date = { Date() },
+        backgroundReadInterval: Duration = .milliseconds(200)
     ) throws {
         let credential = try SiloCredential.decode(context.session.accessToken)
         guard context.session.server.provider == .silo,
@@ -46,6 +58,8 @@ actor SiloClient {
         loginID = credential.loginID
         self.store = store
         self.uptime = uptime
+        self.now = now
+        self.backgroundReadInterval = backgroundReadInterval
     }
 
     private func currentCredential() throws -> (String, SiloCredential) {
@@ -204,6 +218,7 @@ actor SiloClient {
         try checkBrowseCooldown(path)
         let credential = try await authorizedCredential()
         _ = try currentCredential()
+        try checkRequestCooldown()
         var endpoint = SiloAPI.endpoint(path, method: method, query: query, token: credential.accessToken,
                                         profileID: credential.profileID, profileToken: credential.profileToken)
         endpoint.body = body
@@ -212,6 +227,7 @@ actor SiloClient {
         var result = try await transmit(endpoint, path: path)
         if result.1.statusCode == 401, method == .get {
             let refreshed = try await authorizedCredential(rejectedToken: credential.accessToken)
+            try checkRequestCooldown()
             endpoint.headers["Authorization"] = "Bearer \(refreshed.accessToken)"
             result = try await transmit(endpoint, path: path)
         }
@@ -242,6 +258,10 @@ actor SiloClient {
                 return value
             }.joined(separator: ",")
             HandoffDiagnostics.emit("silo api rejected operation=\(operation) status=\(result.1.statusCode) problem=\(safeCode) fields=\(fields)")
+            if result.1.statusCode == 429 {
+                let limit = result.1.value(forHTTPHeaderField: "X-RateLimit-Limit").flatMap(Int.init).map(String.init) ?? "unknown"
+                HandoffDiagnostics.emit("silo api pressure sent=\(requestsSent) background=\(backgroundRequestsSent) details=\(detailRequestsSent) peakSecond=\(peakRequestsInSecond) advertisedLimit=\(limit)")
+            }
         }
         switch result.1.statusCode {
         case 200...299: break
@@ -249,12 +269,51 @@ actor SiloClient {
         case 404: throw AppError.notFound
         case 409, 412: throw AppError.conflict
         case 429:
-            throw AppError.rateLimited(retryAfter: HTTPDate.retryAfter(result.1.value(forHTTPHeaderField: "Retry-After")))
+            let current = now()
+            let serverDate = result.1.value(forHTTPHeaderField: "Date").flatMap(HTTPDate.parse) ?? current
+            let delay = HTTPDate.retryAfter(result.1.value(forHTTPHeaderField: "Retry-After"), now: serverDate)
+            requestNotBefore = max(requestNotBefore, current.addingTimeInterval(max(1, delay ?? 60)))
+            throw AppError.rateLimited(retryAfter: delay)
         default: throw AppError.invalidResponse
         }
         try Task.checkCancellation()
         _ = try currentCredential()
         return result
+    }
+
+    private func checkRequestCooldown() throws {
+        let remaining = requestNotBefore.timeIntervalSince(now())
+        if remaining > 0 { throw AppError.rateLimited(retryAfter: remaining) }
+    }
+
+    private func admitBackgroundRead(method: HTTPMethod) async throws {
+        guard method == .get, IdentityEnrichment.isBackgroundScan else { return }
+        // Recheck after each suspension: queued readers must not wake as a burst.
+        // Interactive requests never join this background-only gate.
+        while let lastBackgroundRead {
+            let deadline = lastBackgroundRead.advanced(by: backgroundReadInterval)
+            guard deadline > .now else { break }
+            try await Task.sleep(until: deadline, clock: .continuous)
+        }
+        try Task.checkCancellation()
+        lastBackgroundRead = .now
+    }
+
+    private func recordRequest(_ path: String) {
+        requestsSent = min(requestsSent + 1, 1_000_000_000)
+        if IdentityEnrichment.isBackgroundScan {
+            backgroundRequestsSent = min(backgroundRequestsSent + 1, 1_000_000_000)
+        }
+        if path.hasPrefix("/catalog/items/") {
+            detailRequestsSent = min(detailRequestsSent + 1, 1_000_000_000)
+        }
+        let second = floor(now().timeIntervalSince1970)
+        if requestSecond != second {
+            requestSecond = second
+            requestsInSecond = 0
+        }
+        requestsInSecond = min(requestsInSecond + 1, 1_000_000_000)
+        peakRequestsInSecond = max(peakRequestsInSecond, requestsInSecond)
     }
 
     private func checkBrowseCooldown(_ path: String) throws {
@@ -279,11 +338,18 @@ actor SiloClient {
         try Task.checkCancellation()
         _ = try currentCredential()
         try checkBrowseCooldown(path)
+        try checkRequestCooldown()
+        try await admitBackgroundRead(method: endpoint.method)
+        try Task.checkCancellation()
+        _ = try currentCredential()
+        try checkRequestCooldown()
+        recordRequest(path)
         let result: (Data, HTTPURLResponse)
         do {
             result = try await http.sendRaw(endpoint, baseURL: baseURL)
         } catch AppError.rateLimited(let delay) {
             recordBrowseCooldown(delay, path: path)
+            requestNotBefore = max(requestNotBefore, now().addingTimeInterval(max(1, delay ?? 60)))
             throw AppError.rateLimited(retryAfter: delay)
         }
         if result.1.statusCode == 429 {

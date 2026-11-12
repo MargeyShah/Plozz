@@ -640,7 +640,7 @@ final class PlayerTransportPositionTests: XCTestCase {
                         pictureInPictureAvailable: false, onTogglePictureInPicture: {},
                         onScrubChanged: { _ in }, onScrubEditingChanged: { _ in },
                         onSkipBackward: {}, onPlayPause: {}, onSkipForward: {},
-                        supportsVideoZoom: false, hasVersions: false, menuPresentation: .init(),
+                        supportsVideoZoom: false, hasTimestamps: false, hasVersions: false, menuPresentation: .init(),
                         isCardOpen: .constant(false),
                         onInteraction: {}, availableSize: geometry.size
                     )

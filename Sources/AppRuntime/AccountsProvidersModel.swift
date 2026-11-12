@@ -63,6 +63,8 @@ public final class AccountsProvidersModel {
     @ObservationIgnored
     private var liveTVAuthorizationCache: [String: (fingerprint: String, digest: String)] = [:]
     @ObservationIgnored private var sourceDiagnosticObserver: ObservationLease?
+    @ObservationIgnored private var historySyncControllers: [String: TrackerHistorySyncController] = [:]
+    public private(set) var trackerHistorySyncIsForeground = false
 
     /// The auth token to use for an account id, preferring an in-memory Plex
     /// Home-user override over the account's stored (admin) token. Injected so the
@@ -218,6 +220,176 @@ public final class AccountsProvidersModel {
         }) else {
             throw WatchMutationServerScopeError.unavailable
         }
+    }
+
+    public func makeTrackerHistoryImportSession(
+        tracker: any TrackerHistoryReading, reconciler: WatchStateReconciler,
+        syncStore: DurableLocalStateStore? = nil,
+        index: @escaping @MainActor @Sendable () -> IdentityIndexSnapshot,
+        isPlexIdentityResolved: @escaping @MainActor @Sendable (String) -> Bool,
+        isAuthorized: @escaping @MainActor @Sendable () -> Bool
+    ) -> TrackerHistoryImportSession {
+        let connection = tracker.historyConnectionID
+        let session = makeTrackerHistoryImportSession(
+            reconciler: reconciler,
+            readSnapshot: {
+                guard let connection else { throw TrackerHistoryError.scopeChanged }
+                return try await tracker.historySnapshot(expectedConnectionID: connection)
+            },
+            index: index, isPlexIdentityResolved: isPlexIdentityResolved,
+            isAuthorized: {
+                isAuthorized() && connection != nil && tracker.historyConnectionID == connection
+            }
+        )
+        if let syncStore, let tracker = tracker as? any TrackerHistorySyncReading,
+           let identity = tracker.historySyncIdentity, identity.trackerID == tracker.historySyncTrackerID,
+           (tracker.historySyncNamespace ?? ProfileStore.defaultProfileID) == watchMutationServerScope.profileID {
+            bindTrackerHistorySync(tracker, store: syncStore)
+            let scope = watchMutationServerScope
+            let controller: TrackerHistorySyncController
+            if let cached = historySyncControllers[identity.trackerID],
+               cached.identity == identity, cached.contextScope == scope,
+               cached.supportedCategories == tracker.historySyncCategories {
+                controller = cached
+            } else {
+                historySyncControllers[identity.trackerID]?.stop()
+                controller = TrackerHistorySyncController(
+                    identity: identity, scope: scope, store: syncStore,
+                    supportedCategories: tracker.historySyncCategories,
+                    isAuthorized: { [weak self, weak tracker] in
+                        guard let self else { return false }
+                        return self.trackerHistorySyncIsForeground && isAuthorized()
+                            && !self.pendingHistorySyncRevocations.contains(.init(
+                                profileID: scope.profileID, trackerID: identity.trackerID
+                            ))
+                            && tracker?.historySyncIdentity == identity
+                            && self.watchMutationServerScope == scope
+                            && self.isCurrentWatchMutationServerScope(scope, isPlexIdentityResolved: isPlexIdentityResolved)
+                    },
+                    makeSession: { [weak self, weak tracker] selectedScope, permitsDelivery in
+                        guard let self else { throw TrackerHistoryError.scopeChanged }
+                        return self.makeTrackerHistoryImportSession(
+                            reconciler: reconciler, scope: selectedScope,
+                            readSnapshot: {
+                                guard let tracker, let connection = tracker.historyConnectionID else {
+                                    throw TrackerHistoryError.scopeChanged
+                                }
+                                return try await tracker.historySnapshot(expectedConnectionID: connection)
+                            },
+                            index: index, isPlexIdentityResolved: isPlexIdentityResolved,
+                            isAuthorized: permitsDelivery
+                        )
+                    }
+                )
+                historySyncControllers[identity.trackerID] = controller
+            }
+            session.ongoingSync = controller
+        }
+        return session
+    }
+
+    private struct HistorySyncRevocationScope: Hashable {
+        let profileID: String
+        let trackerID: String
+    }
+
+    private var pendingHistorySyncRevocations: Set<HistorySyncRevocationScope> = []
+
+    public func bindTrackerHistorySync(_ tracker: any TrackerHistorySyncReading, store: DurableLocalStateStore?) {
+        tracker.onHistorySyncDisconnect = { [weak self, weak tracker] in
+            guard let self, let tracker else { throw TrackerHistoryError.scopeChanged }
+            let scope = HistorySyncRevocationScope(
+                profileID: tracker.historySyncNamespace ?? ProfileStore.defaultProfileID,
+                trackerID: tracker.historySyncTrackerID
+            )
+            self.pendingHistorySyncRevocations.insert(scope)
+            do {
+                guard let store else { throw TrackerHistorySyncError.revocationFailed }
+                if let controller = self.historySyncControllers[scope.trackerID],
+                   controller.contextScope.profileID == scope.profileID {
+                    controller.disable()
+                    if let error = controller.error { throw error }
+                } else {
+                    try TrackerHistorySyncController.revokePermission(
+                        store: store, profileID: scope.profileID, trackerID: scope.trackerID
+                    )
+                }
+                self.pendingHistorySyncRevocations.remove(scope)
+            } catch {
+                throw TrackerHistorySyncError.revocationFailed
+            }
+        }
+    }
+
+    public func stopTrackerHistorySync() {
+        for controller in historySyncControllers.values { controller.stop() }
+    }
+
+    public func setTrackerHistorySyncForeground(_ foreground: Bool) {
+        trackerHistorySyncIsForeground = foreground
+        if !foreground { stopTrackerHistorySync() }
+    }
+
+    public func makeTrackerHistoryImportSession(
+        reconciler: WatchStateReconciler,
+        scope selectedScope: WatchMutationServerScope? = nil,
+        readSnapshot: @escaping @MainActor @Sendable () async throws -> TrackerHistorySnapshot,
+        index: @escaping @MainActor @Sendable () -> IdentityIndexSnapshot,
+        isPlexIdentityResolved: @escaping @MainActor @Sendable (String) -> Bool,
+        isAuthorized: @escaping @MainActor @Sendable () -> Bool
+    ) -> TrackerHistoryImportSession {
+        let scope = selectedScope ?? watchMutationServerScope
+        let contextScope = watchMutationServerScope
+        let destinations = scope.accounts.compactMap { identity -> TrackerHistoryImportSession.Destination? in
+            guard let account = accounts.first(where: { $0.id == identity.accountID }) else { return nil }
+            let homeName = profilesModel.activeProfile.homeUserBinding(forPlexAccount: account.id)?.name
+            return .init(id: account.id, serverName: account.server.name, userName: homeName ?? account.userName)
+        }
+        let current: @MainActor @Sendable () -> Bool = { [weak self] in
+            guard let self, isAuthorized(), self.watchMutationServerScope == contextScope else { return false }
+            return self.isCurrentWatchMutationServerScope(scope, isPlexIdentityResolved: isPlexIdentityResolved)
+        }
+        return TrackerHistoryImportSession(
+            scope: scope, destinations: destinations, reconciler: reconciler, readSnapshot: readSnapshot,
+            index: index,
+            resolveProvider: { [weak self] accountID in
+                guard let self, current(), scope.accounts.contains(where: { $0.accountID == accountID }),
+                      let provider = self.provider(forAccountID: accountID) else { throw TrackerHistoryError.scopeChanged }
+                return provider
+            },
+            isAuthorized: current
+        )
+    }
+
+    public func makeTrackerServerHistorySource(
+        reconciler: WatchStateReconciler,
+        isPlexIdentityResolved: @escaping @MainActor @Sendable (String) -> Bool,
+        isAuthorized: @escaping @MainActor @Sendable () -> Bool
+    ) -> TrackerServerHistorySource {
+        let scope = watchMutationServerScope
+        let authorizationID = liveTVAuthorizationID
+        let identities = scope.accounts.compactMap { identity -> TrackerHistoryImportSession.Destination? in
+            guard let account = accounts.first(where: { $0.id == identity.accountID }) else { return nil }
+            let homeName = profilesModel.activeProfile.homeUserBinding(forPlexAccount: account.id)?.name
+            return .init(id: account.id, serverName: account.server.name, userName: homeName ?? account.userName)
+        }
+        let current: @MainActor @Sendable () -> Bool = { [weak self] in
+            guard let self, isAuthorized(), self.watchMutationServerScope == scope,
+                  self.liveTVAuthorizationID == authorizationID else { return false }
+            return self.isCurrentWatchMutationServerScope(scope, isPlexIdentityResolved: isPlexIdentityResolved)
+        }
+        return TrackerServerHistorySource(
+            scope: scope, accounts: identities,
+            resolveProvider: { [weak self] accountID in
+                guard let self, current(), scope.accounts.contains(where: { $0.accountID == accountID }),
+                      let provider = self.provider(forAccountID: accountID) else { throw TrackerHistoryError.scopeChanged }
+                return provider
+            },
+            isAuthorized: current,
+            isPlaying: { accountID, itemID in
+                await reconciler.isLiveSession(accountID: accountID, itemID: itemID, serverScope: scope)
+            }
+        )
     }
 
     public func isCurrentWatchMutationServerScope(

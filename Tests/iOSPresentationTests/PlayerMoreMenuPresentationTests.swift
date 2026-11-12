@@ -17,6 +17,67 @@ final class PlayerMoreMenuPresentationTests: XCTestCase {
         XCTAssertEqual(PlayerMenuLayout(size: CGSize(width: 507, height: 768)), .consolidated)
     }
 
+    func testCommunityTimestampsAreOptInAndUseTheSharedDestination() throws {
+        let model = controls()
+        XCTAssertFalse(PlayerMoreMenu.sections(model, availability: .init()).contains(.timestamps))
+        let unavailable = PlayerMoreMenu.make(model: model, availability: .init(), actions: .init())
+        XCTAssertFalse(visible(unavailable).contains { $0.title == "Community timestamps" })
+
+        let availability = PlayerMoreMenuAvailability(timestamps: true)
+        XCTAssertEqual(PlayerMoreMenu.sections(model, availability: availability).last, .timestamps)
+        XCTAssertEqual(PlayerMenuSection.timestamps.destination, .timestamps)
+        var requested: PlayerMenuDestination?
+        var actions = PlayerMoreMenuActions()
+        actions.request = { requested = $0 }
+        let menu = PlayerMoreMenu.make(
+            model: model, availability: availability, locale: .init(identifier: "en"), actions: actions
+        )
+        let command = try XCTUnwrap(visible(menu).first { $0.title == "Community timestamps" } as? UIAction)
+        XCTAssertNil(command.image)
+        XCTAssertEqual(command.state, .off)
+        perform(command)
+        XCTAssertEqual(requested, .timestamps)
+    }
+
+    func testCommunityTimestampSheetWaitsForDismissalAndAvailabilityLossInvalidatesOldActions() async throws {
+        let state = FixtureState(controls: controls())
+        state.timestampsAvailable = true
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive })
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        let host = UIHostingController(rootView: Fixture(state: state))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer {
+            state.presentation.reset()
+            host.dismiss(animated: false)
+            window.isHidden = true
+            window.rootViewController = nil
+            previous?.makeKeyAndVisible()
+        }
+        try await waitUntil { self.button(in: host.view) != nil }
+        let button = try XCTUnwrap(button(in: host.view))
+        button.performPrimaryAction()
+        try await waitUntil { button.presentedMenu != nil }
+        let command = try XCTUnwrap(visible(try XCTUnwrap(button.presentedMenu))
+            .first { $0.title == "Community timestamps" } as? UIAction)
+        perform(command)
+        XCTAssertTrue(state.presentation.isPresented)
+        XCTAssertNil(state.sheet)
+        XCTAssertNil(state.presentation.destination)
+        try XCTUnwrap(button.contextMenuInteraction).dismissMenu()
+        try await waitUntil { state.sheet == .timestamps && host.presentedViewController != nil }
+        state.sheet = nil
+        try await waitUntil { host.presentedViewController == nil }
+        let generation = state.presentation.generation
+        state.timestampsAvailable = false
+        try await waitUntil { state.presentation.generation > generation && !state.presentation.isBusy }
+        perform(command)
+        XCTAssertNil(state.sheet)
+        XCTAssertNil(state.presentation.destination)
+    }
+
     func testCommandRowsHaveNeitherIconsNorSelectionAndCustomSpeedIsOutsidePresets() throws {
         let model = controls()
         model.playbackSpeed = 1.3
@@ -545,6 +606,7 @@ final class PlayerMoreMenuPresentationTests: XCTestCase {
         var audioSelections: [Int] = []
         var layout = PlayerMenuLayout.consolidated
         var qualityAvailable = false
+        var timestampsAvailable = false
         init(controls: PlayerControlsModel) { self.controls = controls }
     }
 
@@ -555,7 +617,9 @@ final class PlayerMoreMenuPresentationTests: XCTestCase {
             var actions = PlayerMoreMenuActions()
             actions.selectAudio = { state.audioSelections.append($0) }
             return PlayerMoreMenuButton(
-                model: state.controls, availability: .init(maximumSpeed: 2, quality: state.qualityAvailable),
+                model: state.controls, availability: .init(
+                    maximumSpeed: 2, quality: state.qualityAvailable, timestamps: state.timestampsAvailable
+                ),
                 presentation: state.presentation, layout: state.layout, actions: actions
             )
             .environment(\.locale, .init(identifier: "en"))

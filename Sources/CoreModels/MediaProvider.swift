@@ -24,6 +24,10 @@ public protocol MediaProvider: Sendable {
     /// `MediaItem.catalogIdentityIsComplete`; inferred IDs alone cannot.
     var catalogIdentityRequiresEnrichment: Bool { get }
 
+    /// Catalog cards omit resume positions. History discovery must supplement
+    /// them with the complete, library-scoped Continue Watching feed.
+    var catalogResumeRequiresEnrichment: Bool { get }
+
     /// Browsing metadata may omit lazily resolved files. Offer explicit source
     /// discovery when opening the version picker; never preload it while browsing.
     var playbackInventoryRequiresEnrichment: Bool { get }
@@ -510,6 +514,7 @@ public extension MediaProvider {
         throw AppError.unknown("This source does not support external title links.")
     }
     var catalogIdentityRequiresEnrichment: Bool { false }
+    var catalogResumeRequiresEnrichment: Bool { false }
     var playbackInventoryRequiresEnrichment: Bool { false }
     var sharesLibraryInventoryAcrossProfiles: Bool { true }
 

@@ -38,12 +38,58 @@ final class WatchProgressReporterTests: XCTestCase {
             scrobbler: scrobbler,
             checkpointInterval: checkpointInterval,
             scrobblesLibraryItem: scrobblesLibraryItem,
-            onCheckpoint: { position, percent in recorder.record(position: position, percent: percent) }
+            onCheckpoint: { position, percent in recorder.record(position: position, percent: percent) },
+            onTrackerPlayback: { recorder.record(sample: $0) }
         )
         return (sut, host, provider, scrobbler, recorder)
     }
 
     // MARK: helpers
+
+    func testTrackerSamplesRequireActualEngineDurationNotMetadata() async {
+        let (sut, host, _, _, recorder) = makeSUT()
+        host.engineDuration = 0
+        host.resumePosition = 950
+        await sut.reportStart(isPaused: false, positionOverride: 0)
+        sut.emitCheckpoint()
+        await sut.report(event: .stop, isPaused: true, positionOverride: 950, durationOverride: 1_000)
+        XCTAssertTrue(recorder.samples.isEmpty)
+        XCTAssertEqual(recorder.positions, [950])
+    }
+
+    func testTrackerViewingIdentitySurvivesEngineHandoffAndFinalClockTeardown() async throws {
+        let (sut, host, _, _, recorder) = makeSUT()
+        await sut.reportStart(isPaused: false, positionOverride: 0)
+        host.resumePosition = 800
+        sut.emitCheckpoint()
+        await sut.finishSession(position: 800, duration: 1_000, scrobble: false)?.value
+        XCTAssertEqual(recorder.samples.count, 1)
+        sut.beginSession()
+        host.request?.playSessionID = "replacement"
+        await sut.reportStart(isPaused: false, positionOverride: 800)
+        host.engineDuration = 0
+        await sut.report(event: .stop, isPaused: true, positionOverride: 900, durationOverride: 2_000)
+        await sut.report(event: .stop, isPaused: true, positionOverride: 900)
+        let samples = recorder.samples
+        XCTAssertEqual(samples.count, 2)
+        XCTAssertEqual(Set(samples.map(\.sessionID)).count, 1)
+        XCTAssertEqual(Set(samples.map(\.startedAt)).count, 1)
+        XCTAssertEqual(samples.map(\.duration), [1_000, 1_000])
+        XCTAssertEqual(samples.map(\.isFinal), [false, true])
+        XCTAssertEqual(samples.map(\.isComplete), [false, true])
+    }
+
+    func testNewPlayerCreatesDistinctViewingIdentity() async throws {
+        var samples: [TrackerPlaybackSample] = []
+        for _ in 0..<2 {
+            let (sut, _, _, _, recorder) = makeSUT()
+            await sut.reportStart(isPaused: false, positionOverride: 0)
+            await sut.report(event: .stop, isPaused: true, positionOverride: 900)
+            samples += recorder.samples
+        }
+        XCTAssertEqual(samples.count, 2)
+        XCTAssertEqual(Set(samples.map(\.sessionID)).count, 2)
+    }
 
     private func waitForEvents(
         _ provider: RecordingProvider,
@@ -63,14 +109,18 @@ final class WatchProgressReporterTests: XCTestCase {
     // MARK: report + scrobble fan-out
 
     func testOriginalTrailerClassificationSurvivesUnmarkedPlaybackMetadata() async {
-        let (sut, _, provider, scrobbler, _) = makeSUT(scrobblesLibraryItem: false)
+        let (sut, host, provider, scrobbler, recorder) = makeSUT(scrobblesLibraryItem: false)
         await sut.reportStart(isPaused: false, positionOverride: 0)
+        host.resumePosition = 120
+        sut.checkpointNow()
         await sut.finishSession(position: 120, duration: 1_000)?.value
         let events = await provider.events
         let calls = await scrobbler.calls
         XCTAssertEqual(events.map(\.event), [.start, .stop])
         XCTAssertEqual(events.last?.position, 120)
         XCTAssertTrue(calls.isEmpty)
+        XCTAssertEqual(recorder.positions, [120])
+        XCTAssertTrue(recorder.samples.isEmpty)
     }
 
     func testBriefPlaybackStillSavesProgressIndependentlyOfHomeEligibility() async {
@@ -125,12 +175,13 @@ final class WatchProgressReporterTests: XCTestCase {
         XCTAssertEqual(recorder.positions, [20])
     }
 
-    func testTrailerRetainsOwnProgressButNeverScrobblesParentIdentity() async {
-        let trailers = [
+    func testExtrasRetainOwnProgressButNeverReportParentIdentity() async {
+        let items = [
             MediaItem(id: "item-1", title: "Movie", kind: .movie, isTrailer: true, resumePosition: 90),
+            MediaItem(id: "item-1", title: "Featurette", kind: .movie, isExtra: true, resumePosition: 90),
             MediaItem.youTubeTrailer(videoID: "abcdefghijk", title: "Movie")
         ]
-        for item in trailers {
+        for item in items {
             let (sut, host, provider, scrobbler, recorder) = makeSUT(item: item)
             host.engineCurrentTime = 1_000
             host.resumePosition = 1_000
@@ -145,6 +196,7 @@ final class WatchProgressReporterTests: XCTestCase {
             XCTAssertEqual(events.last?.position, 1_000)
             XCTAssertTrue(scrobbles.isEmpty)
             XCTAssertEqual(recorder.positions, [1_000])
+            XCTAssertTrue(recorder.samples.isEmpty)
         }
     }
 
@@ -179,6 +231,7 @@ final class WatchProgressReporterTests: XCTestCase {
         XCTAssertTrue(events.isEmpty)
         XCTAssertTrue(scrobbles.isEmpty)
         XCTAssertTrue(recorder.positions.isEmpty)
+        XCTAssertTrue(recorder.samples.isEmpty)
     }
 
     func testReportSendsToProviderAndScrobbler() async {
@@ -542,6 +595,9 @@ private actor RecordingScrobbler: TraktScrobbling {
 private final class CheckpointRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var _positions: [TimeInterval] = []
+    private var _samples: [TrackerPlaybackSample] = []
+    var samples: [TrackerPlaybackSample] { lock.withLock { _samples } }
+    func record(sample: TrackerPlaybackSample) { lock.withLock { _samples.append(sample) } }
 
     var positions: [TimeInterval] {
         lock.lock(); defer { lock.unlock() }

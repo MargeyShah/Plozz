@@ -1720,7 +1720,7 @@ extension LiveChannelOverlay {
         case .multiview:
             if let onMultiview { onMultiview() }
             else { PlozzLog.playback.debug("Ignoring unavailable live multiview menu selection.") }
-        case .subtitleSearch, .speed, .quality, .versions:
+        case .subtitleSearch, .speed, .quality, .versions, .timestamps:
             PlozzLog.playback.error("Live menu requested an unavailable destination.")
         }
     }

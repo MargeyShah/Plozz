@@ -216,7 +216,7 @@ final class ItemDetailViewModelTests: XCTestCase {
         provider.serverRatingsHandler = { _ in await release.wait(); return nil }
         let external = CapturingDiscoveryRatingsProvider()
         let vm = ItemDetailViewModel(
-            provider: provider, itemID: item.id, ratingsProvider: external,
+            provider: provider, itemID: item.id, ratingsProvider: external, sourceAccountID: "ratings-account",
             onlineTrailerResolver: { _ in [] }, playableVideoIDResolver: { _ in nil },
             trailerCache: TrailerResolutionCache()
         )
@@ -229,6 +229,7 @@ final class ItemDetailViewModelTests: XCTestCase {
         await load.value
         await vm.waitForServerRatings()
         XCTAssertEqual(external.seenItem?.id, item.id)
+        XCTAssertEqual(external.seenItem?.sourceAccountID, "ratings-account")
         XCTAssertFalse(vm.state.value?.item.ratings.isEmpty ?? true)
         vm.suspendEnrichment()
     }

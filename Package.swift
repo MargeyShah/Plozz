@@ -50,6 +50,7 @@ let package = Package(
         .library(name: "TraktService", targets: ["TraktService"]),
         .library(name: "CoreTrackerAuth", targets: ["CoreTrackerAuth"]),
         .library(name: "WetrakrService", targets: ["WetrakrService"]),
+        .library(name: "PublicMetaDBService", targets: ["PublicMetaDBService"]),
         .library(name: "SeerService", targets: ["SeerService"]),
         .library(name: "SimklService", targets: ["SimklService"]),        .library(name: "AniListService", targets: ["AniListService"]),
         .library(name: "MALService", targets: ["MALService"]),
@@ -415,6 +416,10 @@ let package = Package(
             dependencies: ["CoreModels", "CoreNetworking", "CoreSecureStore", "CoreTrackerAuth"]
         ),
         .target(
+            name: "PublicMetaDBService",
+            dependencies: ["CoreModels", "CoreNetworking", "CoreSecureStore"]
+        ),
+        .target(
             name: "SeerService",
             dependencies: ["CoreModels", "CoreNetworking"]
         ),
@@ -509,7 +514,7 @@ let package = Package(
         ),
         .target(
             name: "FeatureSettings",
-            dependencies: ["CoreModels", "CoreUI", "CoreNetworking", "CrashReporting", "FeatureProfiles", "TraktService", "WetrakrService", "SeerService", "SimklService", "AniListService", "MALService", "LastFmService"]
+            dependencies: ["CoreModels", "CoreUI", "CoreNetworking", "CrashReporting", "FeatureProfiles", "TraktService", "WetrakrService", "PublicMetaDBService", "SeerService", "SimklService", "AniListService", "MALService", "LastFmService"]
         ),
         .target(
             name: "FeatureProfiles",
@@ -867,6 +872,8 @@ let package = Package(
                 "ProviderShare",
                 "CoreSecureStore",
                 "TraktService",
+                "RatingsService",
+                "PublicMetaDBService",
                 "SeerService",
                 "FeatureSyncCloud"
             ]
@@ -922,6 +929,7 @@ let package = Package(
                 "SeerService",
                 "SimklService",
                 "WetrakrService",
+                "PublicMetaDBService",
                 "AniListService",
                 "MALService",
                 "LastFmService",
@@ -978,6 +986,7 @@ let package = Package(
                 "TraktService",
                 "SimklService",
                 "WetrakrService",
+                "PublicMetaDBService",
                 "AniListService",
                 "MALService",
                 "FeatureSyncSetup",
@@ -1037,7 +1046,7 @@ let package = Package(
             dependencies: [
                 "AppRuntime", "CoreModels", "FeatureAuthCore", "CrashReporting", "FeatureHomeCore",
                 .target(name: "FeatureHome", condition: .when(platforms: [.tvOS])),
-                "FeatureSyncCloud", "TestSupportPerformance"
+                "FeatureSyncCloud", "TestSupportPerformance", "TestSupportNetworking"
             ]
         ),
         .testTarget(
@@ -1054,7 +1063,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CoreNetworkingTests",
-            dependencies: ["CoreNetworking", "CoreModels"]
+            dependencies: ["CoreNetworking", "CoreModels", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "MetadataKitTests",
@@ -1097,6 +1106,10 @@ let package = Package(
             dependencies: ["WetrakrService", "CoreTrackerAuth", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
         .testTarget(
+            name: "PublicMetaDBServiceTests",
+            dependencies: ["PublicMetaDBService", "CoreModels", "CoreNetworking", "CoreSecureStore", "FeatureWatchlistCore", "TestSupportNetworking"]
+        ),
+        .testTarget(
             name: "SimklServiceTests",
             dependencies: ["SimklService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
@@ -1107,6 +1120,10 @@ let package = Package(
         .testTarget(
             name: "MALServiceTests",
             dependencies: ["MALService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
+        ),
+        .testTarget(
+            name: "LastFmServiceTests",
+            dependencies: ["LastFmService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "SeerServiceTests",
@@ -1166,7 +1183,7 @@ let package = Package(
         ),
         .testTarget(
             name: "FeatureSettingsTests",
-            dependencies: ["FeatureSettings", "CoreModels"]
+            dependencies: ["FeatureSettings", "CoreModels", "PublicMetaDBService", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "MediaTransportCoreTests",
