@@ -1518,14 +1518,14 @@ final class PlozziOSAppModel {
 
     /// Whether the Settings sheet is on screen. Set by the sheet itself.
     private(set) var isSettingsPresented = false
-    private var pendingProfileCreation: (draft: ProfileDraft, isKids: Bool)?
+    private let pendingProfileCreation = PendingProfileCreation()
 
-    var hasPendingProfileCreation: Bool { pendingProfileCreation != nil }
+    var hasPendingProfileCreation: Bool { pendingProfileCreation.request != nil }
 
     func completePendingProfileCreation() {
-        guard !isSettingsPresented, let pendingProfileCreation else { return }
-        self.pendingProfileCreation = nil
-        saveProfile(pendingProfileCreation.draft, isKids: pendingProfileCreation.isKids)
+        guard !isSettingsPresented, let request = pendingProfileCreation.request else { return }
+        pendingProfileCreation.request = nil
+        saveProfile(request.draft, isKids: request.isKids)
     }
 
     /// The exact request owned by an on-screen Plex user chooser, not another modal.
@@ -2978,7 +2978,7 @@ final class PlozziOSAppModel {
             profiles.update(profile)
         } else {
             if isSettingsPresented {
-                pendingProfileCreation = (draft, isKids)
+                pendingProfileCreation.request = .init(draft: draft, isKids: isKids)
                 return
             }
             // Created AWAITING SETUP, exactly as on tvOS. A new profile inherits
