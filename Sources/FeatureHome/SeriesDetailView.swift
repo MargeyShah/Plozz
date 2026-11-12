@@ -1091,6 +1091,8 @@ struct SeriesDetailView: View {
 
     /// Selects `season`: marks it active and kicks off (cached) episode loading
     /// so the rail and Play target are ready as focus settles on the tab.
+    private func select(_ season: MediaItem, explicit: Bool = true) {
+        if explicit { hasExplicitSeasonSelection = true }
         selectedSeasonID = season.id
         Task {
             await viewModel.loadEpisodes(for: season.id)

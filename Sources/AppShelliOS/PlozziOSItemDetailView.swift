@@ -134,7 +134,10 @@ struct PlozziOSItemDetailView: View {
         let language = locale.identifier
         return DetailOpenEnvironment(
             resolveProvider: { accountID in
-                guard let accountID else { return provider }
+                guard let accountID else {
+                    guard let provider else { throw AppError.unauthorized }
+                    return provider
+                }
                 guard let resolved = appModel.accountsProviders.provider(forAccountID: accountID) else {
                     throw AppError.unauthorized
                 }
@@ -232,7 +235,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
 
     init(
         appModel: PlozziOSAppModel,
-        provider: any MediaProvider,
+        provider: (any MediaProvider)?,
         viewModel: ItemDetailViewModel,
         seerService: SeerService? = nil,
         playlistOrigin: VideoPlaylistPlaybackOrigin? = nil,
