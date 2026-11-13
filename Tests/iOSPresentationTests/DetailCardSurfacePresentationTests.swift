@@ -382,11 +382,8 @@ final class DetailCardSurfacePresentationTests: XCTestCase {
                         add(attachment)
                         let revealsGradient = gradientEnabled
                         host.rootView = AnyView(
-                            Group {
-                                if revealsGradient { background }
-                                else { palette.backgroundBase }
-                            }
-                            .environment(\.colorScheme, palette.isLight ? .light : .dark)
+                            background
+                                .environment(\.colorScheme, palette.isLight ? .light : .dark)
                         )
                         window.layoutIfNeeded()
                         try await Task.sleep(for: .milliseconds(100))

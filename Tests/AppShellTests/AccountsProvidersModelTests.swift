@@ -6,6 +6,29 @@ import FeatureAuth
 import AppRuntime
 @testable import AppShell
 
+@MainActor
+private final class AccountsHistoryReader: TrackerHistorySyncReading {
+    let historySyncTrackerID = "fixture"
+    var historySyncNamespace: String?
+    var historySyncCategories: Set<TrackerHistorySyncCategory> = [.watched, .resume]
+    var onHistorySyncDisconnect: (@MainActor () throws -> Void)?
+    var connection: String? = "original"
+    var reads = 0
+    var historyConnectionID: String? { connection }
+    var historySyncIdentity: TrackerHistorySyncIdentity? {
+        connection.map { .init(trackerID: "fixture", connectionID: $0) }
+    }
+    func snapshot() throws -> TrackerHistorySnapshot {
+        guard let connection else { throw TrackerHistoryError.scopeChanged }
+        return try .init(trackerID: "fixture", connectionID: connection, observations: [], expectedCount: 0)
+    }
+    func historySnapshot(expectedConnectionID: String) async throws -> TrackerHistorySnapshot {
+        guard connection == expectedConnectionID else { throw TrackerHistoryError.scopeChanged }
+        reads += 1
+        return try snapshot()
+    }
+}
+
 /// Unit tests for ``AccountsProvidersModel`` — the accounts + providers hub split
 /// out of ``AppState``. Cover the hub's own behavior over in-memory stores:
 /// `reloadAccounts` loads accounts and recomputes the active set, the
@@ -192,6 +215,124 @@ final class AccountsProvidersModelTests: XCTestCase {
 
         model.reloadAccounts()
         XCTAssertTrue(model.homeAccounts.isEmpty, "Explicitly choosing nothing must survive a full reload.")
+    }
+
+    func testOngoingHistoryFactoryFencesForegroundConnectionAndProfile() async throws {
+        let (model, _, profiles) = try makeModel(accountIDs: [("a", "a.test")])
+        model.reloadAccounts()
+        let tracker = AccountsHistoryReader()
+        let store = try DurableLocalStateStore(secureStore: InMemorySecureStore())
+        let reconciler = WatchStateReconciler(
+            store: InMemoryWatchMutationStore(),
+            applier: AppShellWatchMutationApplier(
+                resolveProvider: { _ in XCTFail("Empty history must not resolve a writer"); return nil },
+                applyTrakt: { _ in XCTFail("Unexpected tracker write") },
+                applySimkl: { _ in XCTFail("Unexpected tracker write") },
+                applyAniList: { _ in XCTFail("Unexpected tracker write") },
+                applyMAL: { _ in XCTFail("Unexpected tracker write") }
+            )
+        )
+        let index = IdentityIndexSnapshot(byIdentity: [
+            .external(source: "tmdb", value: "550"): [.init(accountID: "a", itemID: "movie", kind: .movie)]
+        ])
+        func makeSession() -> TrackerHistoryImportSession {
+            model.makeTrackerHistoryImportSession(
+                tracker: tracker, reconciler: reconciler, syncStore: store,
+                index: { index }, isPlexIdentityResolved: { _ in true }, isAuthorized: { true }
+            )
+        }
+        let first = makeSession()
+        let sync = try XCTUnwrap(first.ongoingSync)
+        XCTAssertTrue(sync === makeSession().ongoingSync)
+        let reviewed = TrackerHistoryImportPlan(
+            snapshot: try tracker.snapshot(), serverScope: first.scope, candidates: []
+        )
+        await sync.enable(afterReview: reviewed, accountIDs: ["a"], categories: [.watched])
+        XCTAssertFalse(sync.isEnabled)
+        XCTAssertEqual(tracker.reads, 0, "An inactive app cannot start tracker reads")
+        model.setTrackerHistorySyncForeground(true)
+        await sync.enable(afterReview: reviewed, accountIDs: ["a"], categories: [.watched])
+        XCTAssertTrue(sync.isEnabled)
+        first.cancel()
+        await sync.synchronize(manual: false)
+        XCTAssertNil(sync.error, "Durable consent does not depend on the original comparison remaining open")
+        let reads = tracker.reads
+        await sync.synchronize(manual: false)
+        XCTAssertEqual(tracker.reads, reads, "Repeated foreground/index callbacks obey the interval")
+        let (coldModel, _, _) = try makeModel(accountIDs: [("a", "a.test")])
+        defer { withExtendedLifetime(coldModel) {} }
+        coldModel.reloadAccounts()
+        coldModel.bindTrackerHistorySync(tracker, store: store)
+        tracker.historySyncNamespace = "another-profile"
+        try XCTUnwrap(tracker.onHistorySyncDisconnect)()
+        sync.reload()
+        XCTAssertTrue(sync.isEnabled, "Disconnect must use the credential's namespace, not the visible profile")
+        tracker.historySyncNamespace = nil
+        try XCTUnwrap(tracker.onHistorySyncDisconnect)()
+        sync.reload()
+        XCTAssertFalse(sync.isEnabled, "Disconnect before opening comparison must revoke the persisted grant")
+        tracker.connection = nil
+        tracker.connection = "original"
+        XCTAssertFalse(try XCTUnwrap(makeSession().ongoingSync).isEnabled,
+                       "Restoring the old credential cannot restore revoked permission")
+        model.setTrackerHistorySyncForeground(false)
+        await sync.synchronize()
+        XCTAssertEqual(tracker.reads, reads)
+        model.setTrackerHistorySyncForeground(true)
+        tracker.connection = nil
+        XCTAssertNil(makeSession().ongoingSync)
+        await sync.synchronize()
+        XCTAssertEqual(tracker.reads, reads)
+        tracker.connection = "replacement"
+        let replacement = try XCTUnwrap(makeSession().ongoingSync)
+        XCTAssertFalse(replacement === sync)
+        XCTAssertFalse(replacement.isEnabled)
+        let another = profiles.add(name: "Another", activeAccountIDs: ["a"])
+        profiles.select(another.id)
+        model.reloadAccounts()
+        XCTAssertNil(makeSession().ongoingSync, "A tracker still scoped to the previous profile cannot enroll")
+        tracker.historySyncNamespace = another.id
+        let otherProfile = try XCTUnwrap(makeSession().ongoingSync)
+        XCTAssertFalse(otherProfile.isEnabled)
+        await sync.synchronize()
+        XCTAssertEqual(tracker.reads, reads)
+    }
+
+    func testUnavailableRevocationStoreBlocksNewControllersUntilRevocationSucceeds() async throws {
+        let (model, _, _) = try makeModel(accountIDs: [("a", "a.test")])
+        model.reloadAccounts()
+        model.setTrackerHistorySyncForeground(true)
+        let tracker = AccountsHistoryReader()
+        model.bindTrackerHistorySync(tracker, store: nil)
+        XCTAssertThrowsError(try XCTUnwrap(tracker.onHistorySyncDisconnect)()) {
+            XCTAssertEqual($0 as? TrackerHistorySyncError, .revocationFailed)
+        }
+        let store = try DurableLocalStateStore(secureStore: InMemorySecureStore())
+        let session = model.makeTrackerHistoryImportSession(
+            tracker: tracker,
+            reconciler: WatchStateReconciler(
+                store: InMemoryWatchMutationStore(),
+                applier: AppShellWatchMutationApplier(
+                    resolveProvider: { _ in XCTFail("Unexpected provider access"); return nil },
+                    applyTrakt: { _ in XCTFail("Unexpected tracker write") },
+                    applySimkl: { _ in XCTFail("Unexpected tracker write") },
+                    applyAniList: { _ in XCTFail("Unexpected tracker write") },
+                    applyMAL: { _ in XCTFail("Unexpected tracker write") }
+                )
+            ),
+            syncStore: store, index: { IdentityIndexSnapshot(byIdentity: [:]) },
+            isPlexIdentityResolved: { _ in true }, isAuthorized: { true }
+        )
+        let sync = try XCTUnwrap(session.ongoingSync)
+        let reviewed = TrackerHistoryImportPlan(
+            snapshot: try tracker.snapshot(), serverScope: session.scope, candidates: []
+        )
+        await sync.enable(afterReview: reviewed, accountIDs: ["a"], categories: [.watched])
+        XCTAssertFalse(sync.isEnabled)
+        XCTAssertEqual(tracker.reads, 0)
+        try XCTUnwrap(tracker.onHistorySyncDisconnect)()
+        await sync.enable(afterReview: reviewed, accountIDs: ["a"], categories: [.watched])
+        XCTAssertTrue(sync.isEnabled)
     }
 
     func testAddressOnlyReloadUpdatesRetainedProviderWithoutEvictingOtherSignIns() throws {

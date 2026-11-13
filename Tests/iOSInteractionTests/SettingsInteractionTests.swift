@@ -2791,7 +2791,7 @@ final class SettingsInteractionTests: XCTestCase {
             XCTAssertEqual(add.frame.width, page.width - 48, accuracy: 2,
                            "Add row must fill the page's content width.")
             add.tap()
-            XCTAssertEqual(app.buttons["home-add-collection"].label, "From a collection")
+            XCTAssertEqual(app.buttons["home-add-collection"].label, "Custom row")
             XCTAssertTrue(app.staticTexts["Available rows"].exists)
             let option = app.buttons["home-add-home-continueWatching"]
             XCTAssertTrue(option.waitForExistence(timeout: 3), app.debugDescription)

@@ -79,6 +79,11 @@ final class PlexCompletionVersusDismissalTests: XCTestCase {
 
     func testCompletingAnEpisodeScrobblesAndClearsProgressWithoutDismissingTheShow() async throws {
         let http = PlexCompletionHTTPClient()
+        await http.respond(to: "/library/metadata/42", json: """
+        {"MediaContainer":{"size":1,"Metadata":[
+          {"ratingKey":"42","type":"episode","viewCount":0,"viewOffset":2500000}
+        ]}}
+        """)
         let reconciler = reconciler(http: http)
         let episode = MediaItem(id: "42", title: "Episode", kind: .episode, sourceAccountID: "plex")
         let mutation = try XCTUnwrap(WatchMutationFactory.playbackStop(
@@ -88,7 +93,7 @@ final class PlexCompletionVersusDismissalTests: XCTestCase {
         await reconciler.enqueue(mutation)
         await reconciler.drain()
         let requests = await http.requests
-        XCTAssertEqual(requests.map(\.path), ["/:/scrobble", "/:/progress"])
+        XCTAssertEqual(requests.map(\.path), ["/library/metadata/42", "/:/scrobble", "/:/progress"])
         XCTAssertEqual(requests.last?.queryItems.first { $0.name == "time" }?.value, "0")
     }
 
@@ -108,8 +113,15 @@ final class PlexCompletionVersusDismissalTests: XCTestCase {
             await reconciler.enqueue(mutation)
             await reconciler.drain()
             let requests = await http.requests
+            // Every played write converges on the current ratingKey before scrobbling,
+            // so containers take that read too; movies and episodes add the shared
+            // freshness read from the runtime.
             let freshnessReads = kind == .movie || kind == .episode ? ["/library/metadata/42"] : []
-            XCTAssertEqual(requests.map(\.path), freshnessReads + ["/:/scrobble", "/:/progress"], "\(kind)")
+            XCTAssertEqual(
+                requests.map(\.path),
+                freshnessReads + ["/library/metadata/42", "/:/scrobble", "/:/progress"],
+                "\(kind)"
+            )
             let pending = await reconciler.pendingCount
             XCTAssertEqual(pending, 0)
         }

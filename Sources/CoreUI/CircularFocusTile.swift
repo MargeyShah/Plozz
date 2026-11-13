@@ -164,6 +164,9 @@ public struct CircularFocusTile<Avatar: View, Caption: View>: View {
                 diameter: diameter, focus: $isFocused, action: action
             )
             .focused($isFocused.focusState)
+            // tvOS's default lockup focus effect paints a square plate behind the
+            // round portrait. The tile draws its own circular halo instead.
+            .focusEffectDisabled()
             .background {
                 avatar()
                     .environment(\.artworkResolutionState, nativeArtwork)

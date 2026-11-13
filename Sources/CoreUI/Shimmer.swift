@@ -29,6 +29,7 @@ private struct ShimmerModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.plozzShimmerEnabled) private var shimmerEnabled
+    @Environment(\.shimmerAnimationsEnabled) private var animationsEnabled
     @State private var phase: CGFloat = -1
 
     private var intensity: Double {
@@ -36,7 +37,7 @@ private struct ShimmerModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        guard active else { return AnyView(content) }
+        guard active && animationsEnabled else { return AnyView(content) }
         if reduceMotion {
             return AnyView(content.opacity(0.65))
         }
@@ -78,6 +79,18 @@ private struct ShimmerModifier: ViewModifier {
                 }
                 .onDisappear { phase = -1 }
         )
+    }
+}
+
+private struct ShimmerAnimationsEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+public extension EnvironmentValues {
+    /// Covered pages retain placeholder geometry without offscreen shimmer rendering.
+    var shimmerAnimationsEnabled: Bool {
+        get { self[ShimmerAnimationsEnabledKey.self] }
+        set { self[ShimmerAnimationsEnabledKey.self] = newValue }
     }
 }
 

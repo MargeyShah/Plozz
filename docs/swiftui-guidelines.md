@@ -39,25 +39,16 @@ docs/ tools/
   `@MainActor` unless they are intentionally background services or actors.
 - Use `@State` for ownership, `@Bindable` for bindings, and `@Environment` for
   passing shared dependencies.
-- Do not add new `ObservableObject`, `@Published`, `@StateObject`,
-  `@ObservedObject`, or `@EnvironmentObject`. Existing uses in AVKit/PiP or
-  legacy navigation may remain until the surrounding architecture is changed.
-- Prefer async/await and structured concurrency. Do not add GCD work. Use
-  `Task.sleep(for:)`, and respect cancellation.
 - Avoid force unwraps and force `try` except at documented unrecoverable
   boundaries.
 - Use modern Foundation where it fits: `FormatStyle` for user-facing dates and
   numbers, `URL.documentsDirectory`, `appending(path:)`, and
   `localizedStandardContains` for user-entered filtering.
-- `String(format:)` remains acceptable for technical encodings (hex digests) and
-  diagnostics; it must not format user-facing copy.
 - Do not introduce third-party frameworks without asking first.
 - Never commit secrets.
 
 ## SwiftUI
 
-- Use `foregroundStyle`, `clipShape(.rect(cornerRadius:))`, `Tab`,
-  `NavigationStack`, and `navigationDestination(for:)`.
 - Use the two-parameter `onChange` variant.
 - Use `Button` instead of `onTapGesture` unless tap location/count is required.
 - Use `scrollIndicators(.hidden)` and modern ScrollView positioning APIs where
@@ -68,8 +59,6 @@ docs/ tools/
   single-use private computed fragments are acceptable.
 - Avoid new `AnyView` unless a documented type-erasure/module boundary requires
   it.
-- Prefer `ImageRenderer` over `UIGraphicsImageRenderer`, and `bold()` over
-  `fontWeight(.bold)`.
 - Avoid `GeometryReader` when a newer layout primitive works. Do not refactor
   existing uses gratuitously.
 - Add `#Preview` where the target is previewable and the view renders in
@@ -80,8 +69,6 @@ docs/ tools/
 
 ## State and lifecycle
 
-Cross-platform state coordination must follow
-[state management](state-management.md):
 
 - a pure policy/profile for platform differences,
 - a named coordinator/state machine for decisions,
@@ -96,12 +83,6 @@ Do not add ad-hoc foreground/background refresh logic to view bodies.
 - Use named constants or shared fixtures for repeated test values, thresholds,
   surface IDs, item IDs, and expected actions.
 - Keep shared fixtures in `TestSupport*`; do not copy them per target.
-- The owner of a formatted value owns the literal assertion. Other tests consume
-  the formatter or a shared fixture constant.
-- Do not derive an expected value from production code when the production
-  behavior is what the test is verifying; use an independent named constant in
-  that case.
-- Unit tests first. Hosted tests only where rendering or focus is the risk.
 
 ## Comments
 

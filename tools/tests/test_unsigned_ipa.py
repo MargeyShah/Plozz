@@ -145,8 +145,18 @@ class UnsignedIPATests(unittest.TestCase):
 
     def test_binary_verification_covers_device_architecture_links_and_signatures(self):
         app = self.make_app()
-        receipt = ipa.verify_and_unsign(app, "ios", self.fake_run())
+        calls = []
+        run = self.fake_run()
+        def recording(args):
+            calls.append(args)
+            return run(args)
+        receipt = ipa.verify_and_unsign(app, "ios", recording)
         self.assertEqual(len(receipt["binaries"]), 2)
+        self.assertEqual(
+            [Path(arg[-1]).name for arg in calls if arg[:2] == ["codesign", "--remove-signature"]],
+            ["Plozz"],
+            "Only the app executable is stripped; nested vendor framework signatures stay intact",
+        )
         for arguments in [
             {"platform": "IOSSIMULATOR"}, {"archs": "arm64 x86_64"},
             {"link": "@rpath/Missing.framework/Missing"}, {"link": "/private/build/lib.dylib"},

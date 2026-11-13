@@ -233,12 +233,26 @@ public actor LocalMediaWatchStore {
 
     /// Mark an item played / unplayed. Either way the resume point is cleared
     /// (a finished item resumes from the start; an explicitly-unwatched one too).
+    /// Keep the measured duration for later resume compatibility checks.
     /// Ignored when an existing record is *newer* than `capturedAt`.
     public func setPlayed(_ played: Bool, itemID: String, capturedAt: Date) {
+        setPlayed(played, itemIDs: [itemID], capturedAt: capturedAt)
+    }
+
+    /// Apply a container action in one persistence operation, retaining the
+    /// timestamp guard and learned duration independently for every episode file.
+    public func setPlayed(_ played: Bool, itemIDs: [String], capturedAt: Date) {
         Self.persistenceLock.withLock {
             var all = loaded()
-            if let existing = all[itemID], capturedAt < existing.updatedAt { return }
-            all[itemID] = Record(position: 0, played: played, updatedAt: capturedAt)
+            var changed = false
+            for itemID in itemIDs {
+                if let existing = all[itemID], capturedAt < existing.updatedAt { continue }
+                all[itemID] = Record(
+                    position: 0, played: played, updatedAt: capturedAt, duration: all[itemID]?.duration
+                )
+                changed = true
+            }
+            guard changed else { return }
             persist(all)
         }
     }

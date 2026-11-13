@@ -17,6 +17,11 @@ public struct ContentRefreshLifecycleReader: View {
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
             .allowsHitTesting(false)
+            .onAppear {
+                if UIApplication.shared.applicationState != .active {
+                    coordinator.applicationWillResignActive()
+                }
+            }
             .onReceive(
                 NotificationCenter.default.publisher(
                     for: UIApplication.willResignActiveNotification

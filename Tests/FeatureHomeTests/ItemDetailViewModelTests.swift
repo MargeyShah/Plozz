@@ -216,7 +216,7 @@ final class ItemDetailViewModelTests: XCTestCase {
         provider.serverRatingsHandler = { _ in await release.wait(); return nil }
         let external = CapturingDiscoveryRatingsProvider()
         let vm = ItemDetailViewModel(
-            provider: provider, itemID: item.id, ratingsProvider: external,
+            provider: provider, itemID: item.id, ratingsProvider: external, sourceAccountID: "ratings-account",
             onlineTrailerResolver: { _ in [] }, playableVideoIDResolver: { _ in nil },
             trailerCache: TrailerResolutionCache()
         )
@@ -229,6 +229,7 @@ final class ItemDetailViewModelTests: XCTestCase {
         await load.value
         await vm.waitForServerRatings()
         XCTAssertEqual(external.seenItem?.id, item.id)
+        XCTAssertEqual(external.seenItem?.sourceAccountID, "ratings-account")
         XCTAssertFalse(vm.state.value?.item.ratings.isEmpty ?? true)
         vm.suspendEnrichment()
     }
@@ -5473,21 +5474,23 @@ final class ThemeMusicSourceResolutionTests: XCTestCase {
         var season2 = MediaItem(id: "s2", title: "Season 2", kind: .season)
         season2.seriesID = series.id
         season2.seasonNumber = 2
-        func episode(_ id: String) -> MediaItem {
+        func episode(_ id: String, number: Int = 1) -> MediaItem {
             var episode = MediaItem(id: id, title: id, kind: .episode)
             episode.seriesID = series.id
             episode.seasonID = season2.id
             episode.seasonNumber = 2
-            episode.episodeNumber = 1
+            episode.episodeNumber = number
             return episode
         }
         let firstResume = episode("s2e1")
-        let secondResume = episode("s2e2")
-        let provider = SeriesResumeFakeProvider(allItems: [series, season1, season2, firstResume])
+        let secondResume = episode("s2e2", number: 2)
+        let provider = SeriesResumeFakeProvider(
+            allItems: [series, season1, season2, firstResume, secondResume]
+        )
         provider.childrenByParent = [
             series.id: [season1, season2],
             season1.id: [],
-            season2.id: [firstResume]
+            season2.id: [firstResume, secondResume]
         ]
         provider.resumeHandler = { _ in firstResume }
 
@@ -5502,7 +5505,10 @@ final class ThemeMusicSourceResolutionTests: XCTestCase {
         XCTAssertEqual(vm.preselectedSeasonID, season1.id)
         XCTAssertEqual(vm.serverResumeEpisode?.id, firstResume.id)
 
+        // The server's resume point advanced while the page was away, so the
+        // refresh must observe the newer episode rather than the opening seed.
         provider.resumeHandler = { _ in secondResume }
+
         await vm.refreshSeriesContextAfterReturn()
 
         XCTAssertEqual(vm.serverResumeEpisode?.id, secondResume.id)

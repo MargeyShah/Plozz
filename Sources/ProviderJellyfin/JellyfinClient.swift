@@ -393,12 +393,12 @@ public struct JellyfinClient: Sendable {
     /// the provider fold both classes into one Continue Watching feed, matching
     /// Plex parity.
     ///
-    /// `EnableResumable=false` keeps NextUp complementary rather than overlapping:
-    /// in-progress episodes already come back from `/Items/Resume`, so NextUp is
-    /// scoped to the next-after-completed episode. `EnableRewatching=false` avoids
-    /// resurfacing fully-watched series. A series-specific resume lookup includes
-    /// resumable candidates because compatible servers may not scope Resume to a
-    /// series; the provider still prefers Resume when both return the same episode.
+    /// `EnableResumable=true` matches Jellyfin's own clients and avoids a gap
+    /// where a series disappears from both feeds: the server omits a series from
+    /// NextUp when its next episode has any resume position, while Plozz's own
+    /// brief-play threshold can hide that same episode from Resume. The combined
+    /// Continue Watching feed dedupes Resume-first, so overlap is harmless.
+    /// `EnableRewatching=false` avoids resurfacing fully-watched series.
     func nextUpItems(
         userID: String, limit: Int, parentID: String? = nil, seriesID: String? = nil
     ) async throws -> [BaseItemDto] {
@@ -433,8 +433,9 @@ public struct JellyfinClient: Sendable {
             URLQueryItem(name: "UserId", value: userID),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "MediaTypes", value: "Video"),
-            URLQueryItem(name: "EnableResumable", value: seriesID == nil ? "false" : "true"),
+            URLQueryItem(name: "EnableResumable", value: "true"),
             URLQueryItem(name: "EnableRewatching", value: "false"),
+            URLQueryItem(name: "EnableUserData", value: "true"),
             URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let startIndex {

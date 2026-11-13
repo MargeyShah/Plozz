@@ -50,6 +50,7 @@ let package = Package(
         .library(name: "TraktService", targets: ["TraktService"]),
         .library(name: "CoreTrackerAuth", targets: ["CoreTrackerAuth"]),
         .library(name: "WetrakrService", targets: ["WetrakrService"]),
+        .library(name: "PublicMetaDBService", targets: ["PublicMetaDBService"]),
         .library(name: "SeerService", targets: ["SeerService"]),
         .library(name: "SimklService", targets: ["SimklService"]),        .library(name: "AniListService", targets: ["AniListService"]),
         .library(name: "MALService", targets: ["MALService"]),
@@ -91,8 +92,8 @@ let package = Package(
         // Powers the native HLS-fMP4 remux path for MKV → DoVi + Atmos + seek.
         // See docs/playback-engines.md for integration and fork corrections.
         //
-        // Pinned to the playback-corrected fork integrating upstream 7.53.1
-        // (0839aeee18dd0818c5c307a3c5ecba8ea3161b22). This retains Plozz's
+        // Pinned to the playback-corrected fork integrating upstream 7.61.0
+        // (d612bedb3e60f8bc403c646fe44c0a852ee8a995). This retains Plozz's
         // AAC timing, ASS duration, dynamic linkage, frame/cache APIs and privacy manifest,
         // plus bounded position-aware compressed-source preparation and older-runtime cleanup.
         //
@@ -247,7 +248,7 @@ let package = Package(
         // bridge; the engine's legacy SMB URL product is not linked.
         // 7.48.0 adds VP9 hardware decoding where available, AV1 Dolby Vision,
         // software-path spatial audio, and bounded MPEG-DASH VOD support.
-        // FFmpegBuild 3.11.1 is owned by the engine.
+        // FFmpegBuild version alignment is owned by the engine.
         // New host-controlled Now Playing and background retention remain opt-in.
         // 7.51.0 includes route-selected lossless PCM spatial beds from 7.50.0.
         // The fork retains Plozz's timing, subtitle, diagnostics and linkage fixes.
@@ -258,9 +259,12 @@ let package = Package(
         // Resume preroll backfill no longer opens a false native-scrub landing watch.
         // Native media-selection IPC uses bounded off-main readers during media-service stalls.
         // Profile 7-only HDR10 fallback preserves other Dolby Vision routes.
+        // 7.61.0 advances FFmpegBuild to 3.13.0 and LibDovi to 2.2.0.
+        // It includes native startup/display-gate, teardown, subtitle and live-seam fixes.
+        // The new FEL curve-fold trait remains disabled alongside all optional components.
         .package(
             url: "https://github.com/brandomoore/AetherEngine",
-            revision: "55430e28df74ba11b36fea367ad22af0d685a68b",
+            revision: "568120847b64029c4e7948f7492d5d210d62305f",
             traits: []
         ),
         // NOTE: FFmpegBuild (FFmpeg n8.1.x media libraries) and LibDovi (Dolby Vision
@@ -412,6 +416,10 @@ let package = Package(
             dependencies: ["CoreModels", "CoreNetworking", "CoreSecureStore", "CoreTrackerAuth"]
         ),
         .target(
+            name: "PublicMetaDBService",
+            dependencies: ["CoreModels", "CoreNetworking", "CoreSecureStore"]
+        ),
+        .target(
             name: "SeerService",
             dependencies: ["CoreModels", "CoreNetworking"]
         ),
@@ -506,7 +514,7 @@ let package = Package(
         ),
         .target(
             name: "FeatureSettings",
-            dependencies: ["CoreModels", "CoreUI", "CoreNetworking", "CrashReporting", "FeatureProfiles", "TraktService", "WetrakrService", "SeerService", "SimklService", "AniListService", "MALService", "LastFmService"]
+            dependencies: ["CoreModels", "CoreUI", "CoreNetworking", "CrashReporting", "FeatureProfiles", "TraktService", "WetrakrService", "PublicMetaDBService", "SeerService", "SimklService", "AniListService", "MALService", "LastFmService"]
         ),
         .target(
             name: "FeatureProfiles",
@@ -864,6 +872,8 @@ let package = Package(
                 "ProviderShare",
                 "CoreSecureStore",
                 "TraktService",
+                "RatingsService",
+                "PublicMetaDBService",
                 "SeerService",
                 "FeatureSyncCloud"
             ]
@@ -919,6 +929,7 @@ let package = Package(
                 "SeerService",
                 "SimklService",
                 "WetrakrService",
+                "PublicMetaDBService",
                 "AniListService",
                 "MALService",
                 "LastFmService",
@@ -975,6 +986,7 @@ let package = Package(
                 "TraktService",
                 "SimklService",
                 "WetrakrService",
+                "PublicMetaDBService",
                 "AniListService",
                 "MALService",
                 "FeatureSyncSetup",
@@ -1034,7 +1046,7 @@ let package = Package(
             dependencies: [
                 "AppRuntime", "CoreModels", "FeatureAuthCore", "CrashReporting", "FeatureHomeCore",
                 .target(name: "FeatureHome", condition: .when(platforms: [.tvOS])),
-                "FeatureSyncCloud", "TestSupportPerformance"
+                "FeatureSyncCloud", "TestSupportPerformance", "TestSupportNetworking"
             ]
         ),
         .testTarget(
@@ -1051,7 +1063,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CoreNetworkingTests",
-            dependencies: ["CoreNetworking", "CoreModels"]
+            dependencies: ["CoreNetworking", "CoreModels", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "MetadataKitTests",
@@ -1094,6 +1106,10 @@ let package = Package(
             dependencies: ["WetrakrService", "CoreTrackerAuth", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
         .testTarget(
+            name: "PublicMetaDBServiceTests",
+            dependencies: ["PublicMetaDBService", "CoreModels", "CoreNetworking", "CoreSecureStore", "FeatureWatchlistCore", "TestSupportNetworking"]
+        ),
+        .testTarget(
             name: "SimklServiceTests",
             dependencies: ["SimklService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
@@ -1104,6 +1120,10 @@ let package = Package(
         .testTarget(
             name: "MALServiceTests",
             dependencies: ["MALService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
+        ),
+        .testTarget(
+            name: "LastFmServiceTests",
+            dependencies: ["LastFmService", "CoreModels", "CoreNetworking", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "SeerServiceTests",
@@ -1163,7 +1183,7 @@ let package = Package(
         ),
         .testTarget(
             name: "FeatureSettingsTests",
-            dependencies: ["FeatureSettings", "CoreModels"]
+            dependencies: ["FeatureSettings", "CoreModels", "PublicMetaDBService", "TestSupportNetworking"]
         ),
         .testTarget(
             name: "MediaTransportCoreTests",

@@ -886,7 +886,7 @@ final class PlayerViewModelEOFTests: XCTestCase {
     }
 
     func testCommunityCreditsReplaceEmptyServerAndStaySingle() async {
-        let item = MediaItem(id: "movie", title: "Movie", kind: .movie)
+        let item = MediaItem(id: "movie", title: "Movie", kind: .movie, providerIDs: ["Imdb": "tt1234567"])
         let provider = RecordingPlaybackProvider(
             request: .init(item: item, streamURL: URL(string: "https://fixture.invalid/video.mp4")!)
         )
@@ -906,8 +906,8 @@ final class PlayerViewModelEOFTests: XCTestCase {
             await Task.yield()
         }
         XCTAssertEqual(viewModel.controls.skipSegments.segments.count, 1)
-        XCTAssertEqual(viewModel.controls.skipSegments.segments[0].start, 12)
-        XCTAssertEqual(viewModel.controls.skipSegments.segments[0].end, 20)
+        XCTAssertEqual(viewModel.controls.skipSegments.segments.map(\.start), [12])
+        XCTAssertEqual(viewModel.controls.skipSegments.segments.map(\.end), [20])
         await viewModel.stop()
     }
 

@@ -1,11 +1,13 @@
 #if os(iOS)
 import AniListService
+import CoreModels
 import CoreUI
 import MALService
 import SimklService
 import SwiftUI
 import TraktService
 import WetrakrService
+import FeatureSettings
 
 struct PlozziOSTrackerSettingsView: View {
     let appModel: PlozziOSAppModel
@@ -15,7 +17,7 @@ struct PlozziOSTrackerSettingsView: View {
             Text(
                 """
                 Connections are stored separately for each Plozz profile. \
-                Playback progress is sent to every connected tracker.
+                Existing trackers keep their playback settings. Connecting PublicMetaDB does not import history to your servers.
                 """
             )
             .font(.footnote)
@@ -25,24 +27,29 @@ struct PlozziOSTrackerSettingsView: View {
             .listRowSeparator(.hidden)
 
             SettingsSectionGroup(verbatim: "Trakt") {
-                TraktSettingsContent(service: appModel.traktService)
+                TraktSettingsContent(service: appModel.traktService, makeHistoryImport: appModel.makeTraktHistoryImport)
             }
 
             SettingsSectionGroup(verbatim: "Simkl") {
-                SimklSettingsContent(service: appModel.simklService)
+                SimklSettingsContent(service: appModel.simklService, makeHistoryImport: appModel.makeSimklHistoryImport)
             }
             if appModel.wetrakrService.isConfigured {
                 SettingsSectionGroup(verbatim: "WeTrakr") {
-                    WetrakrSettingsContent(service: appModel.wetrakrService)
+                    WetrakrSettingsContent(service: appModel.wetrakrService, makeHistoryImport: appModel.makeWetrakrHistoryImport)
                 }
             }
 
             SettingsSectionGroup(verbatim: "AniList") {
-                AniListSettingsContent(service: appModel.anilistService)
+                AniListSettingsContent(service: appModel.anilistService, makeHistoryImport: appModel.makeAniListHistoryImport)
             }
 
             SettingsSectionGroup(verbatim: "MyAnimeList") {
-                MALSettingsContent(service: appModel.malService)
+                MALSettingsContent(service: appModel.malService, makeHistoryImport: appModel.makeMALHistoryImport)
+            }
+            SettingsSectionGroup(verbatim: "PublicMetaDB") {
+                PublicMetaDBSettingsContent(
+                    service: appModel.publicMetaDBService, makeHistoryImport: appModel.makePublicMetaDBHistoryImport
+                )
             }
         }
         .settingsPageSurface()
@@ -60,9 +67,12 @@ struct PlozziOSTrackerSettingsView: View {
 
 private struct TraktSettingsContent: View {
     let service: TraktService
+    let makeHistoryImport: @MainActor () -> TrackerHistoryImportSession
     @Environment(\.openURL) private var openURL
     @State private var browser = TrackerBrowserAuthorization()
     @State private var confirmingReconnect = false
+    @State private var showingHistory = false
+    @State private var showingExport = false
 
     var body: some View {
         Group {
@@ -76,6 +86,14 @@ private struct TraktSettingsContent: View {
         }
         .onChange(of: service.phase) { _, _ in
             confirmingReconnect = false
+            if service.historyConnectionID == nil { showingHistory = false }
+        }
+        .sheet(isPresented: $showingHistory) {
+            NavigationStack { TrackerHistoryImportView(makeSession: makeHistoryImport) }
+        }
+        .onChange(of: service.historyConnectionID) { _, _ in showingExport = false }
+        .sheet(isPresented: $showingExport) {
+            NavigationStack { TraktHistoryExportView(service: service) }
         }
     }
 
@@ -112,6 +130,12 @@ private struct TraktSettingsContent: View {
             .settingsActionRow()
         case let .connected(username):
             connectedStatus(username: username)
+            Button("Compare with server history") { showingHistory = true }
+                .accessibilityIdentifier("trakt.compare-history")
+            if service.makeHistoryExport != nil {
+                Button("Export server history") { showingExport = true }
+                    .accessibilityIdentifier("trakt.export-history")
+            }
             Button("Disconnect", role: .destructive) {
                 Task { await service.disconnect() }
             }
@@ -151,9 +175,12 @@ private struct TraktSettingsContent: View {
 
 private struct WetrakrSettingsContent: View {
     let service: WetrakrService
+    let makeHistoryImport: @MainActor () -> TrackerHistoryImportSession
     @Environment(\.openURL) private var openURL
     @State private var browser = TrackerBrowserAuthorization()
     @State private var confirmingReconnect = false
+    @State private var showingHistory = false
+    @State private var showingExport = false
 
     var body: some View {
         Group { content }
@@ -163,7 +190,17 @@ private struct WetrakrSettingsContent: View {
             } message: {
                 Text("Try Retry first. Reconnecting replaces this profile's WeTrakr connection on all your Plozz devices. Other profiles are not affected.")
             }
-            .onChange(of: service.phase) { _, _ in confirmingReconnect = false }
+            .onChange(of: service.phase) { _, _ in
+                confirmingReconnect = false
+                if service.historyConnectionID == nil { showingHistory = false }
+            }
+            .sheet(isPresented: $showingHistory) {
+                NavigationStack { TrackerHistoryImportView(makeSession: makeHistoryImport) }
+            }
+            .onChange(of: service.historyConnectionID) { _, _ in showingExport = false }
+            .sheet(isPresented: $showingExport) {
+                NavigationStack { WetrakrHistoryExportView(service: service) }
+            }
     }
 
     @ViewBuilder private var content: some View {
@@ -193,6 +230,12 @@ private struct WetrakrSettingsContent: View {
                 .settingsActionRow()
         case let .connected(username):
             connectedStatus(username: username)
+            Button("Compare with server history") { showingHistory = true }
+                .accessibilityIdentifier("wetrakr.compare-history")
+            if service.makeHistoryExport != nil {
+                Button("Export server history") { showingExport = true }
+                    .accessibilityIdentifier("wetrakr.export-history")
+            }
             Button("Disconnect", role: .destructive) { Task { await service.disconnect() } }
                 .settingsActionRow()
         case let .error(message):
@@ -221,9 +264,26 @@ private struct WetrakrSettingsContent: View {
 
 private struct SimklSettingsContent: View {
     let service: SimklService
+    let makeHistoryImport: @MainActor () -> TrackerHistoryImportSession
     @Environment(\.openURL) private var openURL
+    @State private var showingHistory = false
+    @State private var showingExport = false
 
     var body: some View {
+        Group { content }
+            .onChange(of: service.phase) { _, _ in
+                if service.historyConnectionID == nil { showingHistory = false }
+            }
+            .sheet(isPresented: $showingHistory) {
+                NavigationStack { TrackerHistoryImportView(makeSession: makeHistoryImport) }
+            }
+            .onChange(of: service.historyConnectionID) { _, _ in showingExport = false }
+            .sheet(isPresented: $showingExport) {
+                NavigationStack { SimklHistoryExportView(service: service) }
+            }
+    }
+
+    @ViewBuilder private var content: some View {
         switch service.phase {
         case .unknown:
             loadingStatus
@@ -249,6 +309,12 @@ private struct SimklSettingsContent: View {
             .settingsActionRow()
         case let .connected(username):
             connectedStatus(username: username)
+            Button("Compare with server history") { showingHistory = true }
+                .accessibilityIdentifier("simkl.compare-history")
+            if service.makeHistoryExport != nil {
+                Button("Export server history") { showingExport = true }
+                    .accessibilityIdentifier("simkl.export-history")
+            }
             Button("Disconnect", role: .destructive) {
                 Task { await service.disconnect() }
             }
@@ -269,10 +335,27 @@ private struct SimklSettingsContent: View {
 
 private struct AniListSettingsContent: View {
     let service: AniListService
+    let makeHistoryImport: @MainActor () -> TrackerHistoryImportSession
     @Environment(\.openURL) private var openURL
     @State private var code = ""
+    @State private var showingHistory = false
+    @State private var showingExport = false
 
     var body: some View {
+        Group { content }
+            .onChange(of: service.phase) { _, _ in
+                if service.historyConnectionID == nil { showingHistory = false }
+            }
+            .sheet(isPresented: $showingHistory) {
+                NavigationStack { TrackerHistoryImportView(makeSession: makeHistoryImport) }
+            }
+            .onChange(of: service.historyConnectionID) { _, _ in showingExport = false }
+            .sheet(isPresented: $showingExport) {
+                NavigationStack { AniListHistoryExportView(service: service) }
+            }
+    }
+
+    @ViewBuilder private var content: some View {
         switch service.phase {
         case .unknown:
             loadingStatus
@@ -290,6 +373,12 @@ private struct AniListSettingsContent: View {
             }
         case let .connected(username):
             connectedStatus(username: username)
+            Button("Compare with server history") { showingHistory = true }
+                .accessibilityIdentifier("anilist.compare-history")
+            if service.makeHistoryExport != nil {
+                Button("Export server history") { showingExport = true }
+                    .accessibilityIdentifier("anilist.export-history")
+            }
             Button("Disconnect", role: .destructive) {
                 Task { await service.disconnect() }
             }
@@ -338,10 +427,27 @@ private struct AniListSettingsContent: View {
 
 private struct MALSettingsContent: View {
     let service: MALService
+    let makeHistoryImport: @MainActor () -> TrackerHistoryImportSession
     @Environment(\.openURL) private var openURL
     @State private var code = ""
+    @State private var showingHistory = false
+    @State private var showingExport = false
 
     var body: some View {
+        Group { content }
+            .onChange(of: service.phase) { _, _ in
+                if service.historyConnectionID == nil { showingHistory = false }
+            }
+            .sheet(isPresented: $showingHistory) {
+                NavigationStack { TrackerHistoryImportView(makeSession: makeHistoryImport) }
+            }
+            .onChange(of: service.historyConnectionID) { _, _ in showingExport = false }
+            .sheet(isPresented: $showingExport) {
+                NavigationStack { MALHistoryExportView(service: service) }
+            }
+    }
+
+    @ViewBuilder private var content: some View {
         switch service.phase {
         case .unknown:
             loadingStatus
@@ -372,6 +478,12 @@ private struct MALSettingsContent: View {
             .settingsActionRow()
         case let .connected(username):
             connectedStatus(username: username)
+            Button("Compare with server history") { showingHistory = true }
+                .accessibilityIdentifier("mal.compare-history")
+            if service.makeHistoryExport != nil {
+                Button("Export server history") { showingExport = true }
+                    .accessibilityIdentifier("mal.export-history")
+            }
             Button("Disconnect", role: .destructive) {
                 Task { await service.disconnect() }
             }
@@ -405,8 +517,7 @@ private var unavailableStatus: some View {
 }
 
 private func connectedStatus(username: String) -> some View {
-    Label("Connected as \(username)", systemImage: "checkmark.circle.fill")
-        .foregroundStyle(.green)
+    TrackerConnectedStatus(username: username)
 }
 
 private func errorStatus(_ message: LocalizedStringResource) -> some View {

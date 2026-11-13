@@ -912,7 +912,9 @@ public struct HomeView: View {
                     for: visibility.visibility,
                     trigger: request.reason.diagnosticTrigger
                 )
-            case .reloadSeriesContext, .refreshWatchStateOnly, .reloadDetail, .none:
+                break
+            case .reloadSeriesContext, .refreshWatchStateOnly:
+                // Owned by the detail surfaces; the Home rule never emits them.
                 break
             }
         }

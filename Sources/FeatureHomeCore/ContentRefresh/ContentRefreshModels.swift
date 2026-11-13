@@ -7,7 +7,6 @@ public enum ContentRefreshSurfaceKind: String, Sendable, Equatable {
     case seriesDetail
     case episodeDetail
     case movieDetail
-    case library
 }
 
 /// The work a surface should perform for a refresh request.
@@ -15,12 +14,10 @@ public enum ContentRefreshAction: String, Sendable, Equatable {
     case reloadHome
     case reloadSeriesContext
     case refreshWatchStateOnly
-    case reloadDetail
-    case none
 }
 
 /// Why a refresh is being considered.
-public enum ContentRefreshReason: Sendable, Equatable {
+public enum ContentRefreshReason: Sendable, Hashable {
     case foreground(awayFor: TimeInterval)
     case surfaceReturn(after: TimeInterval)
     case manual
@@ -34,8 +31,8 @@ public enum ContentRefreshReason: Sendable, Equatable {
     }
 }
 
-/// Stable identity for a refresh surface. Account and item ids keep two
-/// profiles, servers, or detail pages from consuming each other's requests.
+/// Content identity. Registration identity distinguishes repeated navigation;
+/// the root resets the coordinator when the profile changes.
 public struct ContentRefreshSurfaceID: Hashable, Sendable {
     public let kind: ContentRefreshSurfaceKind
     public let accountID: String?
@@ -54,19 +51,22 @@ public struct ContentRefreshSurfaceID: Hashable, Sendable {
 
 /// A single structured refresh request. `generation` is monotonic so a view can
 /// reject work that was superseded while it was still starting.
-public struct ContentRefreshRequest: Equatable, Sendable {
+public struct ContentRefreshRequest: Hashable, Sendable {
     public let surface: ContentRefreshSurfaceID
+    public let registrationID: UUID
     public let action: ContentRefreshAction
     public let reason: ContentRefreshReason
     public let generation: UInt64
 
     public init(
         surface: ContentRefreshSurfaceID,
+        registrationID: UUID,
         action: ContentRefreshAction,
         reason: ContentRefreshReason,
         generation: UInt64
     ) {
         self.surface = surface
+        self.registrationID = registrationID
         self.action = action
         self.reason = reason
         self.generation = generation
@@ -97,20 +97,17 @@ public struct ContentRefreshProfile: Sendable, Equatable {
     public let seriesDetail: ContentRefreshRule
     public let episodeDetail: ContentRefreshRule
     public let movieDetail: ContentRefreshRule
-    public let library: ContentRefreshRule
 
     public init(
         home: ContentRefreshRule,
         seriesDetail: ContentRefreshRule,
         episodeDetail: ContentRefreshRule,
-        movieDetail: ContentRefreshRule,
-        library: ContentRefreshRule
+        movieDetail: ContentRefreshRule
     ) {
         self.home = home
         self.seriesDetail = seriesDetail
         self.episodeDetail = episodeDetail
         self.movieDetail = movieDetail
-        self.library = library
     }
 
     public static let tvOS = ContentRefreshProfile(
@@ -133,11 +130,6 @@ public struct ContentRefreshProfile: Sendable, Equatable {
             foregroundAfter: 300,
             surfaceReturnAfter: 300,
             action: .refreshWatchStateOnly
-        ),
-        library: .init(
-            foregroundAfter: 300,
-            surfaceReturnAfter: 300,
-            action: .none
         )
     )
 
@@ -149,7 +141,6 @@ public struct ContentRefreshProfile: Sendable, Equatable {
         case .seriesDetail: seriesDetail
         case .episodeDetail: episodeDetail
         case .movieDetail: movieDetail
-        case .library: library
         }
     }
 }
