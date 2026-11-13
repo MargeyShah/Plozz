@@ -220,6 +220,13 @@ to thin XcodeGen app targets. Start with the relevant module or guide:
 Keep cross-view/platform state in core or runtime modules, not app shells.
 See the [architecture roadmap](../docs/architecture-roadmap.md) for proposed work.
 
+Stateful behavior that crosses views or platforms belongs in `CoreModels`, the
+relevant `Feature*Core`, or `AppRuntime`; app shells stay wiring-only. Follow the
+[state-management scaffold](../docs/state-management.md) for policies,
+coordinators, surface registration, and deterministic harnesses. Follow the
+[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
+conventions.
+
 ## The dual-provider invariant
 
 **Jellyfin and Plex are co-equal backends.** Changes to data, playback, auth,
@@ -230,6 +237,20 @@ implementation; Subsonic support is music-only and currently development/TestFli
 
 ## Coding norms
 
-Follow the [Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) and existing
-module ownership. Keep changes focused, add relevant regression coverage, and
-update the documentation that owns the changed behavior.
+Keep changes focused and match the surrounding style. Follow the
+[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md).
+
+- State/lifecycle behavior uses the shared coordinator/profile scaffold, not
+  ad-hoc foreground refresh logic in views.
+- Tests use named constants or shared fixtures. The owner of a formatted value
+  owns the literal assertion; unrelated tests reference the owner instead of
+  duplicating the literal.
+- Comments explain why and invariants. Do not restate current formatted output;
+  reference the owning symbol (for example `MediaItem.seasonEpisodeLabel`).
+- A shared format/helper change should touch the owner and call sites, not
+  unrelated comments or tests.
+- Split rules/documentation work from feature work, and keep generated project
+  files out of the diff.
+
+Open an issue if you're unsure whether something's a good fit before investing a
+lot of time.
