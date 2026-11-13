@@ -237,6 +237,45 @@ final class NativeFocusRequestHostedTests: XCTestCase {
         XCTAssertFalse(presented)
     }
 
+    func testNativeMenuDismantleInvalidatesActionsWithoutNotifyingRemovedContent() throws {
+        for presented in [false, true] {
+            let coordinator = NativeMediaItemMenuCoordinator()
+            let button = UIButton(type: .custom)
+            let container = UIView()
+            container.addSubview(button)
+            var nativeEvents: [Bool] = []
+            var contentEvents: [Bool] = []
+            var actions = 0
+            coordinator.onPresentationChanged = { nativeEvents.append($0) }
+            coordinator.update(.init(
+                item: MediaItem(id: "episode", title: "Episode", kind: .episode),
+                actions: [.markWatched], perform: { _ in actions += 1 },
+                onPresentationChanged: { contentEvents.append($0) }
+            ), locale: .current, button: button, interactionView: container)
+            let interaction = try XCTUnwrap(coordinator.interaction)
+            let action = try XCTUnwrap(coordinator.menu?.children.first as? UIAction)
+            let configuration = UIContextMenuConfiguration(identifier: nil, previewProvider: nil, actionProvider: nil)
+            let dismissal = MenuDismissalAnimator()
+            if presented {
+                coordinator.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: nil)
+                coordinator.contextMenuInteraction(interaction, willEndFor: configuration, animator: dismissal)
+            }
+            let previousNativeEvents = nativeEvents
+            let previousContentEvents = contentEvents
+            coordinator.dismantle()
+            dismissal.complete()
+            XCTAssertEqual(nativeEvents, previousNativeEvents)
+            XCTAssertEqual(contentEvents, previousContentEvents)
+            XCTAssertNil(coordinator.menu)
+            XCTAssertNil(coordinator.interaction)
+            XCTAssertFalse(container.interactions.contains { $0 === interaction })
+            let activation = UIButton(type: .custom)
+            activation.addAction(action, for: .primaryActionTriggered)
+            activation.sendActions(for: .primaryActionTriggered)
+            XCTAssertEqual(actions, 0)
+        }
+    }
+
     private final class MenuDismissalAnimator: NSObject, UIContextMenuInteractionAnimating {
         var previewViewController: UIViewController? { nil }
         private var completion: (() -> Void)?

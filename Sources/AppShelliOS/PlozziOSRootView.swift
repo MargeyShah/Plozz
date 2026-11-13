@@ -343,6 +343,7 @@ public struct PlozziOSRootView: View {
 
     private var appContent: some View {
         setupPresentationContent
+        .plozzOpaqueNavigationChrome()
         .environment(contentRefreshCoordinator)
         .background(ContentRefreshLifecycleReader(coordinator: contentRefreshCoordinator))
         .environment(\.familyGuidanceProvider, appModel.familyGuidance)
@@ -986,15 +987,20 @@ private struct PlozziOSScreenshotTabRouter: View {
     }
 }
 
-struct PlozziOSMacNavigationBackground: ViewModifier {
+struct PlozziOSNavigationBackground: ViewModifier {
     @Environment(\.plozziOSIsRunningOnMac) private var isRunningOnMac
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.plozzReduceTransparency) private var reduceTransparency
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
+            let opaqueChrome = systemReduceTransparency || reduceTransparency
             content
-                .toolbarBackground(isRunningOnMac ? .hidden : .automatic, for: .tabBar)
-                .scrollEdgeEffectHidden(isRunningOnMac, for: .top)
+                .toolbarBackground(isRunningOnMac || opaqueChrome ? .hidden : .automatic, for: .tabBar)
+                // Hide only the full-width edge backdrop; native controls keep their opaque treatment.
+                .scrollEdgeEffectHidden(isRunningOnMac || opaqueChrome, for: .top)
+                .scrollEdgeEffectHidden(opaqueChrome, for: .bottom)
         } else {
             content
                 .toolbarBackground(isRunningOnMac ? .hidden : .automatic, for: .tabBar)
@@ -1004,6 +1010,8 @@ struct PlozziOSMacNavigationBackground: ViewModifier {
 
 struct PlozziOSTabShell: View {
     @Environment(\.themePalette) private var palette
+    @Environment(\.plozzReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.plozziOSUsesVerticalToolbar) private var usesVerticalToolbar
     @Environment(PlozziOSSidebarGeometryModel.self)
     private var sidebarGeometry
@@ -1218,6 +1226,7 @@ struct PlozziOSTabShell: View {
         } ?? false
         if destination == .music {
             destinationContent(for: destination, keepsNavigationBar: isOverflow)
+                .plozzOpaqueNavigationChrome()
                 .environment(\.plozziOSIsOverflowDestination, isOverflow)
                 .environment(\.plozziOSOverflowNavigation, overflowNavigation)
         } else {
@@ -1231,6 +1240,7 @@ struct PlozziOSTabShell: View {
                     .environment(\.plozziOSIsOverflowDestination, isOverflow)
                     .environment(\.plozziOSOverflowNavigation, overflowNavigation)
             }
+            .plozzOpaqueNavigationChrome()
             .id(destination == .downloads ? downloadNavigationID : nil)
         }
     }
@@ -1411,7 +1421,8 @@ struct PlozziOSTabShell: View {
     private static func makeHomeViewModel(
         appModel: PlozziOSAppModel
     ) -> HomeViewModel {
-        HomeViewModel(
+        let scope = appModel.navigationLibrariesScopeKey
+        return HomeViewModel(
             accounts: appModel.accountsProviders.homeAccounts,
             profileNamespace: appModel.profiles.activeNamespace,
             contentStore: appModel.isOfflineMode
@@ -1429,6 +1440,10 @@ struct PlozziOSTabShell: View {
             },
             isLoadingAllowed: { [weak appModel] in
                 appModel?.allowsHomeContentLoading == true
+            },
+            isSnapshotAccessAllowed: { [weak appModel] in
+                guard let appModel else { return false }
+                return appModel.allowsHomeContentAccess && appModel.navigationLibrariesScopeKey == scope
             },
             sectionDiagnostics: appModel.settings.homeVisibility.sectionDiagnostics,
             pendingWatchMutations: { [weak appModel] in
@@ -1449,36 +1464,27 @@ struct PlozziOSTabShell: View {
                     Tab(value: PlozziOSDestination.search, role: .search) {
                         tabContent(for: destination)
                     } label: {
-                        Label { destinationTitle(destination) } icon: { Image(systemName: "magnifyingglass") }
-                    }
-                } else if destination == .downloads {
-                    Tab(value: destination) {
-                        tabContent(for: destination)
-                    } label: {
-                        PlozziOSDownloadsTabLabel(model: appModel.downloads)
+                        tabLabel(for: destination)
                     }
                 } else {
                     Tab(value: destination) {
                         tabContent(for: destination)
                     } label: {
-                        Label {
-                            destinationTitle(destination)
-                        } icon: {
-                            if destination == .settings {
-                                ProfileAvatarView(
-                                    profile: appModel.profiles.activeProfile, size: 28, rendersAsImage: true
-                                )
-                            } else {
-                                Image(systemName: destinationSystemImage(destination))
-                            }
-                        }
+                        tabLabel(for: destination)
                     }
                 }
             }
         }
 
         .tabViewStyle(.sidebarAdaptable)
-        .modifier(PlozziOSMacNavigationBackground())
+        .modifier(PlozziOSNavigationBackground())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if usesOpaqueBottomBar {
+                PlozzOpaqueTabBar(items: tabDestinations, selection: destinationSelection) {
+                    tabLabel(for: $0)
+                }
+            }
+        }
         .background {
             PlozziOSSettingsTabAction(
                 tabIndex: tabDestinations.firstIndex(of: .settings),
@@ -1489,15 +1495,18 @@ struct PlozziOSTabShell: View {
                 reservesMusicDockSpace: appModel.music?.authorizationID != nil
                     && appModel.music?.player.controller.hasActivePlayback == true,
                 musicDockUsesBottomBar: !usesVerticalToolbar,
+                hasOpaqueBottomBar: usesOpaqueBottomBar,
                 overflowNavigation: overflowNavigation
             )
             .frame(width: 0, height: 0)
         }
         .environment(sharedHomeViewModel)
+        .environment(\.homeContentSnapshot, sharedHomeViewModel)
         .onChange(of: appModel.allowsHomeContentLoading, initial: true) { _, allowed in
             if !allowed { sharedHomeViewModel.cancelPendingLoad() }
         }
-        .environment(\.hasVisibleSettingsNavigationEntry, hasVisibleSettingsNavigationEntry)
+        .environment(\.hasVisibleSettingsNavigationEntry,
+                     hasVisibleSettingsNavigationEntry || (usesOpaqueBottomBar && tabDestinations.contains(.settings)))
         .onAppear { refreshWatchlistNavigation() }
         .onReceive(NotificationCenter.default.publisher(for: .universalWatchlistDidChange)) { _ in
             refreshWatchlistNavigation()
@@ -1515,6 +1524,31 @@ struct PlozziOSTabShell: View {
         }
         .task(id: homeContentIdentity, priority: .utility) {
             await refreshNavigationLibraries()
+        }
+    }
+
+    private var usesOpaqueBottomBar: Bool {
+        if #available(iOS 26.0, *) {
+            return reduceTransparency && !systemReduceTransparency
+                && !usesVerticalToolbar && !sidebarGeometry.isVisible
+        }
+        return false
+    }
+
+    @ViewBuilder
+    private func tabLabel(for destination: PlozziOSDestination) -> some View {
+        if destination == .downloads {
+            PlozziOSDownloadsTabLabel(model: appModel.downloads)
+        } else {
+            Label {
+                destinationTitle(destination)
+            } icon: {
+                if destination == .settings {
+                    ProfileAvatarView(profile: appModel.profiles.activeProfile, size: 28, rendersAsImage: true)
+                } else {
+                    Image(systemName: destinationSystemImage(destination))
+                }
+            }
         }
     }
 
@@ -1725,6 +1759,7 @@ struct PlozziOSTabShell: View {
                 onSwitchTo: { pendingSwitchProfileID = $0 },
                 systemColorScheme: systemColorScheme
             )
+            .environment(\.homeContentSnapshot, sharedHomeViewModel)
             .environment(\.themeMusicPreviewResolver, {
                 try await ThemeMusicPreviewResolver.resolve(
                     content: homeViewModelBox.existingValue(forKey: homeContentIdentity)?.state.value,
@@ -1882,6 +1917,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
     var onBottomBarVisibilityChange: ((Bool) -> Void)?
     var reservesMusicDockSpace = false
     var musicDockUsesBottomBar = true
+    var hasOpaqueBottomBar = false
     var overflowNavigation: PlozziOSOverflowNavigation?
 
     func makeUIViewController(context: Context) -> Controller { Controller() }
@@ -1894,6 +1930,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         controller.onBottomBarVisibilityChange = onBottomBarVisibilityChange
         controller.reservesMusicDockSpace = reservesMusicDockSpace
         controller.musicDockUsesBottomBar = musicDockUsesBottomBar
+        controller.hasOpaqueBottomBar = hasOpaqueBottomBar
         controller.overflowNavigation = overflowNavigation
         controller.install()
     }
@@ -1915,6 +1952,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         var onBottomBarVisibilityChange: ((Bool) -> Void)?
         var reservesMusicDockSpace = false
         var musicDockUsesBottomBar = true
+        var hasOpaqueBottomBar = false
         private final class MusicInset {
             weak var controller: UIViewController?
             var amount: CGFloat = 0
@@ -1930,6 +1968,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         private var reportedSettingsVisibility: Bool?
         private var reportedBottomBarVisibility: Bool?
         private var reportedOverflowVisibility: Bool?
+        private var previousTabBarHidden: Bool?
         private weak var owner: UITabBarController?
         private weak var previousDelegate: (any UITabBarControllerDelegate)?
         private weak var overflowTable: UITableView?
@@ -2022,6 +2061,10 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         }
 
         func restore() {
+            if let previousTabBarHidden {
+                owner?.setTabBarHidden(previousTabBarHidden, animated: false)
+            }
+            previousTabBarHidden = nil
             restoreMusicInset()
             musicContentObserver.onChange = nil
             musicContentObserver.removeFromSuperview()
@@ -2050,6 +2093,13 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
             guard let owner, owner.isViewLoaded else { return }
             Task { @MainActor [weak self, weak owner] in
                 guard let self, let owner, self.owner === owner, owner.isViewLoaded else { return }
+                if self.hasOpaqueBottomBar {
+                    if self.previousTabBarHidden == nil { self.previousTabBarHidden = owner.isTabBarHidden }
+                    if !owner.isTabBarHidden { owner.setTabBarHidden(true, animated: false) }
+                } else if let hidden = self.previousTabBarHidden {
+                    self.previousTabBarHidden = nil
+                    owner.setTabBarHidden(hidden, animated: false)
+                }
                 if self.reservesMusicDockSpace,
                    let content = owner.selectedViewController?.view,
                    self.musicContentObserver.superview !== content {
@@ -2063,10 +2113,11 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
                 // The parent can move or detach its tab bar after this child's layout callback.
                 let bar = owner.tabBar
                 let frame = bar.convert(bar.bounds, to: owner.view)
-                let visible = !owner.isTabBarHidden && !bar.isHidden && bar.alpha > 0
+                let nativeVisible = !owner.isTabBarHidden && !bar.isHidden && bar.alpha > 0
                     && bar.window != nil && frame.height > 0
                     && frame.minY >= owner.view.bounds.midY
                     && frame.intersects(owner.view.bounds)
+                let visible = nativeVisible || self.hasOpaqueBottomBar
                 self.updateMusicInset(in: owner, hasBottomBar: visible && self.musicDockUsesBottomBar)
                 guard self.reportedBottomBarVisibility != visible else { return }
                 self.reportedBottomBarVisibility = visible

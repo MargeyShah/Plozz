@@ -380,10 +380,7 @@ final class DetailCardSurfacePresentationTests: XCTestCase {
                         attachment.name = "detail-band-\(width)-\(palette)-\(gradientEnabled)-\(reduceTransparency)"
                         attachment.lifetime = .keepAlways
                         add(attachment)
-                        // The band sits below the artwork, so it must reveal
-                        // whatever the page paints behind it — gradient or base.
-                        // Reduce Transparency no longer turns it into an opaque
-                        // rectangle laid across that background.
+                        let revealsGradient = gradientEnabled
                         host.rootView = AnyView(
                             background
                                 .environment(\.colorScheme, palette.isLight ? .light : .dark)

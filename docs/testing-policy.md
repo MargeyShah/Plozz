@@ -108,6 +108,41 @@ The broker endpoint must use an unguessable run-specific path and bind only to
 
 ## Live watch-state verification
 
+`LiveHomeContentTests` in `AppRuntimeTests` uses the same private broker contract
+with `TEST_RUNNER_PLOZZ_LIVE_HOME_BROKER`. It is read-only and does not enable the
+watch-history tests. It checks production Plex/Jellyfin/Emby custom-row loading:
+small successive pages for libraries, recommendations, populated collections and
+playlists, then combined preview/browse pages with a real history snapshot.
+It also combines all three providers' libraries and checks retained playback
+references across merged titles. Page timings are recorded as live-server
+observations, not repeatable benchmark thresholds or physical-device UI evidence.
+Discovery samples one movie library and up to two recommendations, and requires
+two discoverable populated collections and two video playlists per provider.
+Missing required containers fail acceptance rather than silently dropping a
+source type. Collection-only, playlist-only, and mixed-container rows check
+deduplication and retained native member identities without a library feed
+masking missing content. Fixtures must be provisioned separately with permission;
+the tests never create or modify server content.
+
+Native Silo coverage uses the broker's `/silo` response with the common fields
+plus ephemeral `siloTokens` and `siloProfile` objects. It validates library and
+native server-row composition through the production provider, not the Jellyfin
+compatibility port. It does not claim Silo collection, video-playlist, or
+file-share coverage. Fresh Silo credentials must outlive the bounded run; an
+unexpected rotation fails rather than changing the broker-owned login.
+The broker owns temporary logins and must close and revoke them after the run.
+
+The opt-in performance scenarios `home-live-{jellyfin,emby,plex,silo,combined}-queries`
+use that same broker via `PLOZZ_LIVE_HOME_BROKER`. Each sample starts a fresh
+production provider/pager, completes one movie and one TV library per account,
+and includes two populated collections and playlists for Plex/Jellyfin/Emby.
+Traversal is capped at 600 source-page calls per sample. They verify all four
+saved sort fields in both directions, media/watch filters, preview/grid agreement,
+cancelled query replacement and zero warm page refetches. Timings distinguish
+fresh client inventory loading from eight warm query projections; the server's
+own caches are not cleared. Main-actor wake-up gaps are simulator scheduling
+observations, not rendered-frame or physical-iPhone evidence.
+
 `LiveWatchProgressTests` in `AppRuntimeTests` exercises production Jellyfin,
 Emby and Plex resume writers, metadata reads, Continue Watching feeds and the
 shared Home admission policy. Set `TEST_RUNNER_PLOZZ_LIVE_WATCH_BROKER` to a
@@ -1639,12 +1674,20 @@ tests. Run `39857697957` also exhausted a full 40-minute execution window while
 still progressing through the expanded hosted suite. Both attempts of run
 `41421118241` reached the 40-minute compilation deadline before tests could
 start; the retry was still compiling the hosted test target. CI now allows
-60 minutes for compilation and 90 minutes for hosted execution, within a
-170-minute job limit including setup and evidence retention. This changes only
-the cold-build budget, not test assertions, performance thresholds, or the
-execution deadline. Local build and execution defaults remain 40 minutes unless
+60 minutes for compilation and 120 minutes for hosted execution, within a
+200-minute job limit including setup and evidence retention. Run `43265633256`
+completed 966 of 1,131 hosted methods before the former 90-minute execution
+limit interrupted a still-progressing streaming test. Its completed methods
+alone consumed 88.4 minutes; the native-reopen case completed rather than
+hanging. The longer suite budget does not change individual-test allowances,
+test assertions, or performance thresholds. Local build and execution defaults remain 40 minutes unless
 `PLOZZ_FOCUS_BUILD_TIMEOUT` or `PLOZZ_FOCUS_TEST_TIMEOUT` is set;
 test failures, timeouts, and unreadable `xcresult` summaries still fail closed.
+Individual hosted tests also have a ten-minute XCTest execution allowance,
+with failure diagnostics enabled. This exceeds the 330-second rolling-playback
+scenario while preventing one blocked AVFoundation call from consuming the
+entire suite deadline without a test verdict. It does not replace the outer
+build/execution deadlines or turn a timed-out test into a pass.
 Each lane uploads
 uniquely named diagnostics on success or failure, retained for seven days.
 The simulator app build also retains its raw log without replacing a build

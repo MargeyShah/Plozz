@@ -166,7 +166,7 @@ enum PlozziOSPageLayout {
     static func horizontalInset(
         for sizeClass: UserInterfaceSizeClass?, usesDesktopSizing: Bool = false
     ) -> CGFloat {
-        usesDesktopSizing ? DesktopMediaRailLayout.pageInset : (sizeClass == .compact ? 22 : 36)
+        PlozziOSMediaRailLayout.pageInset(for: sizeClass, usesDesktopSizing: usesDesktopSizing)
     }
 
     static func horizontalInset(for style: HeroArtworkStyle) -> CGFloat {
@@ -588,6 +588,8 @@ struct PlozziOSHeroStage<Foreground: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.plozziOSHeroContainerHeight) private var containerHeight
     @Environment(\.plozziOSIsRunningOnMac) private var isRunningOnMac
+    @Environment(\.themePalette) private var palette
+    @Environment(\.gradientBackgroundsEnabled) private var gradientEnabled
     @State private var artworkAppearanceID = UUID().uuidString
 
     let item: MediaItem
@@ -735,6 +737,7 @@ struct PlozziOSHeroStage<Foreground: View>: View {
                         )
                         .padding(.bottom, 8)
                         .frame(maxWidth: .infinity)
+                        .background(gradientEnabled ? Color.clear : palette.backgroundBase)
                 }
             } else {
                 ZStack {
