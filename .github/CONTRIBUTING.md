@@ -131,10 +131,15 @@ They retain the source, logs, products, IPA, and provenance receipt under
 `.build/unsigned-ipa/<platform>/run-*` without changing the checkout's project,
 plists, or private configuration. They do not sign, install, upload, or release.
 
-Alternatively, enable Actions in your fork and run [Unsigned IPA](workflows/unsigned-ipa.yml)
-from its default branch. Select an available macOS runner with Xcode 27 or later;
-the default `xcode-27` image is not available to every fork. No signing or App Store
-Connect secrets are required. Artifacts are retained for seven days.
+When a GitHub release is published, the **Unsigned IPA** workflow builds the iOS
+(iPhone and iPad) and tvOS apps in parallel and attaches both IPAs to that
+release automatically. The workflow must be present on the repository's default
+branch, and the release job requests `contents: write`; enable read/write workflow
+permissions if the repository restricts the default token. It uses the
+repository's `xcode-27` runner and needs no signing or App Store Connect secrets.
+The checksum/provenance receipts remain in the run artifacts (retained for seven
+days), not in the release assets. A fork can test the workflow by publishing a
+release in the fork; its IPAs attach to that fork's release.
 
 **Unsigned IPAs are not directly installable.** Sign the app, embedded frameworks,
 and tvOS Top Shelf extension with compatible provisioning. Device availability and
