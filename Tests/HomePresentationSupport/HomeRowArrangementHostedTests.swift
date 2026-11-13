@@ -2036,7 +2036,7 @@ final class HomeRowArrangementHostedTests: XCTestCase {
             let lines = try await self.capture(window, name: "Create or add a Home section")
             let text = lines.map(\.0).joined(separator: " ")
             XCTAssertFalse(text.contains("Start with a library collection"), text)
-            XCTAssertGreaterThan(try self.y("From a collection", in: lines), try self.y("Available rows", in: lines))
+            XCTAssertGreaterThan(try self.y("Custom row", in: lines), try self.y("Available rows", in: lines))
             XCTAssertGreaterThan(try self.y("Available rows", in: lines), try self.y("Recently Added", in: lines))
             XCTAssertFalse(text.contains("Choose the titles"), text)
             XCTAssertTrue(visibility.visibility.collectionSections.isEmpty)
@@ -2059,7 +2059,7 @@ final class HomeRowArrangementHostedTests: XCTestCase {
         } inspect: { window in
             let lines = try await self.capture(window, name: "Home Add row empty state")
             let text = lines.map(\.0).joined(separator: " ")
-            XCTAssertTrue(text.contains("From a collection"), text)
+            XCTAssertTrue(text.contains("Custom row"), text)
             XCTAssertTrue(text.contains("No additional rows available."), text)
             XCTAssertFalse(text.contains("Available rows"), text)
             XCTAssertTrue(text.contains("Next Up is included in Continue Watching."), text)

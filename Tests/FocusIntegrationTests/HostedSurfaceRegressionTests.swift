@@ -28,13 +28,14 @@ final class HostedSurfaceRegressionTests: XCTestCase {
         XCTAssertEqual(PlayerControls.timeLabel(.infinity), "0:00")
     }
 
-    func testTimelineRemainingLabelIsNegativeOfTheCurrentTime() {
-        // The transport renders a leading minus plus the remaining time. A scrub
-        // at 600s of a 3600s item must read "-1:00:00", not "-50:00".
+    func testTimelineRemainingLabelReflectsTheUnplayedDuration() {
+        // The transport renders a leading minus plus the time left:
+        // "-" + timeLabel(max(0, duration - displaySeconds)) (PlayerControlsSupport).
+        // Scrubbing to 600s of a 3600s item leaves 50 minutes, so it reads "-50:00".
         let duration = 3_600.0
         let scrub = 600.0
-        let remaining = "-" + PlayerControls.timeLabel(duration - scrub)
-        XCTAssertEqual(remaining, "-1:00:00")
+        let remaining = "-" + PlayerControls.timeLabel(max(0, duration - scrub))
+        XCTAssertEqual(remaining, "-50:00")
     }
 
     func testTimelineScanGlyphIsEmptyWhenNotScrubbing() {

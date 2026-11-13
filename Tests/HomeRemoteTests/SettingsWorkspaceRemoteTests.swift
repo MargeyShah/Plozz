@@ -2086,7 +2086,7 @@ final class SettingsWorkspaceRemoteTests: XCTestCase {
             capture(identifier, in: app)
             XCUIRemote.shared.press(.select)
             XCTAssertTrue(app.staticTexts["Add row"].waitForExistence(timeout: 5), app.debugDescription)
-            XCTAssertEqual(app.buttons["home-add-collection"].label, "From a collection")
+            XCTAssertEqual(app.buttons["home-add-collection"].label, "Custom row")
             XCTAssertFalse(app.buttons["home-section-reorder"].exists)
             if identifier == "home-section-add" {
                 try focus(app.buttons["home-add-collection"], in: app)
