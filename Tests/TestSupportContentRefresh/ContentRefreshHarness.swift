@@ -7,6 +7,7 @@ import FeatureHomeCore
 public final class ContentRefreshHarness {
     public let coordinator: ContentRefreshCoordinator
     private let clock: TestClock
+    private var registrations: [ContentRefreshSurfaceID: ContentRefreshRegistration] = [:]
 
     public init(profile: ContentRefreshProfile = .tvOS) {
         let clock = TestClock()
@@ -14,24 +15,30 @@ public final class ContentRefreshHarness {
         self.coordinator = ContentRefreshCoordinator(profile: profile, now: { clock.now })
     }
 
-    public var now: Date { clock.now }
+    public var now: ContinuousClock.Instant { clock.now }
 
     public func advance(by interval: TimeInterval) {
-        clock.now = clock.now.addingTimeInterval(interval)
+        clock.now = clock.now.advanced(by: .seconds(interval))
     }
 
     public func show(_ surface: ContentRefreshSurfaceID) {
-        coordinator.register(surface)
-        coordinator.surfaceDidBecomeVisible(surface)
+        let registration = registration(for: surface)
+        coordinator.surfaceDidBecomeVisible(registration)
     }
 
     public func hide(_ surface: ContentRefreshSurfaceID) {
-        coordinator.surfaceDidDisappear(surface)
-        coordinator.unregister(surface)
+        coordinator.surfaceDidDisappear(registration(for: surface))
+    }
+
+    public func registration(for surface: ContentRefreshSurfaceID) -> ContentRefreshRegistration {
+        if let registration = registrations[surface] { return registration }
+        let registration = ContentRefreshRegistration(surface: surface)
+        registrations[surface] = registration
+        return registration
     }
 }
 
 @MainActor
 private final class TestClock {
-    var now = Date(timeIntervalSince1970: 1_700_000_000)
+    var now = ContinuousClock.now
 }

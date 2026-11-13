@@ -160,7 +160,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertIn("    needs: guards\n", block)
                 self.assertEqual(block.count("needs:"), 1)
                 self.assertIn("    runs-on: xcode-27\n", block)
-                timeout = {"app-build": 60, "package-tests": 80, "hosted-focus": 200}[lane]
+                timeout = {"app-build": 60, "package-tests": 80, "hosted-focus": 240}[lane]
                 self.assertIn(f"    timeout-minutes: {timeout}\n", block)
                 self.assertIn(f"          lane: {lane}\n", block)
                 self.assertIn("uses: ./.github/actions/ci-prepare", block)
@@ -209,7 +209,7 @@ class WorkflowTests(unittest.TestCase):
         )
         self.assertEqual(
             re.findall(r"PLOZZ_FOCUS_BUILD_TIMEOUT:\s*([^\n]+)", WORKFLOW + PREPARE),
-            ['"3600"'],
+            ['"5400"'],
         )
         hosted_deadlines = [
             int(re.search(rf'{name}:\s*"(\d+)"', JOBS["hosted-focus"])[1])
@@ -324,7 +324,7 @@ class WorkflowTests(unittest.TestCase):
         for fragment in (
             'configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES"',
             '"${PACKAGE_RESOLUTION_ARGS[@]}"',
-            '-derivedDataPath "$PLOZZ_DERIVED_DATA"',
+            'configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES" "$PLOZZ_DERIVED_DATA"',
             "-scheme Plozz",
             "'generic/platform=tvOS Simulator'",
             "ARCHS=arm64",

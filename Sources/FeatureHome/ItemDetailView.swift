@@ -283,7 +283,10 @@ public struct ItemDetailView: View {
         // still fetch the full detail AND its children (seasons/episodes). Skipping
         // it for seeded opens stranded series pages with no seasons/episodes/Play
         // button. load() guards against flashing `.loading` over a seeded hero.
-        .task { await viewModel.load() }
+        .task(id: locale.identifier) {
+            viewModel.updateMetadataLanguage(locale.identifier)
+            await viewModel.load()
+        }
         .contentRefreshSurface(
             id: contentRefreshSurfaceID,
             isVisible: contentRefreshSurfaceIsVisible
@@ -293,9 +296,9 @@ public struct ItemDetailView: View {
                 await viewModel.refreshSeriesContextAfterReturn()
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
-            case .reloadDetail:
-                await viewModel.reload()
-            case .reloadHome, .none:
+                break
+            case .reloadHome:
+                // Owned by the Home surface; the detail rules never emit it.
                 break
             }
         }
@@ -635,33 +638,6 @@ public struct ItemDetailView: View {
     }
 
     /// Whether another detail page is pushed on top of this one.
-    private var contentRefreshSurfaceID: ContentRefreshSurfaceID {
-        guard let item = viewModel.state.value?.item else {
-            return ContentRefreshSurfaceID(kind: .home)
-        }
-        let kind: ContentRefreshSurfaceKind
-        switch item.kind {
-        case .series: kind = .seriesDetail
-        case .episode: kind = .episodeDetail
-        case .movie, .video: kind = .movieDetail
-        default: kind = .home
-        }
-        return ContentRefreshSurfaceID(
-            kind: kind,
-            accountID: item.sourceAccountID,
-            itemID: item.id
-        )
-    }
-
-    private var contentRefreshSurfaceIsVisible: Bool {
-        guard isPageVisible, !hasChildOnTop,
-              let kind = viewModel.state.value?.item.kind else { return false }
-        switch kind {
-        case .series, .episode, .movie, .video: return true
-        default: return false
-        }
-    }
-
     private var hasChildOnTop: Bool {
         coveredBy > 0
     }

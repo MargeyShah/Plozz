@@ -84,15 +84,14 @@ fi
 #
 # Two defenses, both here:
 #   1. A per-worktree DerivedData dir (PLOZZ_DERIVED_DATA) so this checkout never
-#      contends with another worktree's build DB, and so a wedge can be cleared
-#      by nuking just this dir — never the shared cache.
+#      contends with another worktree's build DB.
 #   2. A no-progress watchdog: if the build log stops growing for
-#      PLOZZ_HANG_SECS, the xcodebuild process tree is killed, this worktree's
-#      DerivedData is cleared, and the invocation is retried ONCE from clean.
+#      PLOZZ_HANG_SECS, only the owned process tree is stopped. Build data and
+#      result evidence remain intact; a timeout never triggers a clean rebuild.
 PLOZZ_DERIVED_DATA="${PLOZZ_DERIVED_DATA:-$PWD/.build/test-derived-data}"
 PLOZZ_TEST_RESULTS_DIR="${PLOZZ_TEST_RESULTS_DIR:-$PWD/.build/test-results}"
 PLOZZ_CLONED_SOURCE_PACKAGES="${PLOZZ_CLONED_SOURCE_PACKAGES:-$PLOZZ_DERIVED_DATA/SourcePackages}"
-configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES"
+configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES" "$PLOZZ_DERIVED_DATA"
 PLOZZ_HANG_SECS="${PLOZZ_HANG_SECS:-180}"
 # How long to let xcodebuild wind down AFTER every test bundle has reported its
 # result. Surviving tests can report success after a crash/restart, so these
@@ -109,6 +108,30 @@ kill_tree() {
   local pid="$1" child
   for child in $(pgrep -P "$pid" 2>/dev/null || true); do kill_tree "$child"; done
   kill "$pid" 2>/dev/null || true
+}
+
+# Sum CPU time (centiseconds) of a process and all its descendants. A build that
+# prints no log lines for a long time can still be compiling a single large file
+# (e.g. a slow Swift/UIKit file), so the watchdog must distinguish "no output and
+# no CPU" (wedged) from "no output but CPU active" (slow but progressing).
+process_tree_cpu_time() {
+  local pid="$1" child total=0
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+    total=$(( total + $(process_tree_cpu_time "$child") ))
+  done
+  local t
+  t="$(ps -o time= -p "$pid" 2>/dev/null | tr -d ' ')"
+  if [[ -n "$t" ]]; then
+    local parts hours=0 minutes=0 seconds=0
+    IFS=':' read -r -a parts <<< "$t"
+    case "${#parts[@]}" in
+      3) hours="${parts[0]}"; minutes="${parts[1]}"; seconds="${parts[2]}" ;;
+      2) minutes="${parts[0]}"; seconds="${parts[1]}" ;;
+      1) seconds="${parts[0]}" ;;
+    esac
+    total=$(( total + 10#$hours * 360000 + 10#$minutes * 6000 + 10#${seconds%.*} * 100 ))
+  fi
+  echo "$total"
 }
 
 
@@ -336,9 +359,8 @@ reported_bundles_count() {
 }
 
 # True when xcodebuild has printed its terminal verdict for this run, i.e. the
-# tests actually executed and produced an answer. Used to distinguish "wedged
-# before producing a result" (a from-clean rebuild may genuinely help) from
-# "answered, then stalled in teardown" (a rebuild cannot change the answer).
+# tests actually executed and produced an answer. Distinguishes a timeout before
+# results from stalled teardown, whose structured results still need checking.
 has_verdict() {
   grep -qE '^[[:space:]]*\*\* TEST[A-Z ]* (SUCCEEDED|FAILED) \*\*' "$1" 2>/dev/null
 }
@@ -406,7 +428,7 @@ _xcb_once() {
   #
   # Console summaries start the grace period, not a success verdict. Do not
   # interrupt result finalization: only reap teardown once xcresult is readable.
-  local last_size=-1 stalled=0 hung=0 size verdict_wait=0 reported_at=-1 reaped_after_verdict=0
+  local last_size=-1 last_cpu=-1 stalled=0 hung=0 size cpu_time verdict_wait=0 reported_at=-1 reaped_after_verdict=0
   while kill -0 "$xcb_pid" 2>/dev/null; do
     sleep "$POLL_SECS"
     if [[ ${EXPECTED_BUNDLES:-0} -gt 0 ]] \
@@ -435,10 +457,11 @@ _xcb_once() {
       fi
     fi
     size=$(stat -f%z "$log" 2>/dev/null || echo 0)
-    if [[ "$size" == "$last_size" ]]; then
+    cpu_time=$(process_tree_cpu_time "$xcb_pid")
+    if [[ "$size" == "$last_size" && "$cpu_time" == "$last_cpu" ]]; then
       stalled=$(( stalled + POLL_SECS ))
       if [[ $stalled -ge $PLOZZ_HANG_SECS ]]; then
-        echo "" ; echo "run-tests.sh: WATCHDOG — no build output for ${PLOZZ_HANG_SECS}s; xcodebuild is wedged. Killing it." >&2
+        echo "" ; echo "run-tests.sh: WATCHDOG — no build output and no CPU for ${PLOZZ_HANG_SECS}s; xcodebuild is wedged. Killing it." >&2
         kill_tree "$xcb_pid"
         hung=1
         break
@@ -446,6 +469,7 @@ _xcb_once() {
     else
       stalled=0
       last_size="$size"
+      last_cpu="$cpu_time"
     fi
   done
 
@@ -478,32 +502,15 @@ _xcb_once() {
   return $status
 }
 
-# xcodebuild_test <log> <xcb-arg>...  -> returns xcodebuild's exit status. Self-
-# heals a wedged build once: on a watchdog kill, clears this worktree's
-# DerivedData and retries from clean.
+# xcodebuild_test <log> <xcb-arg>... preserves build data on every outcome.
 xcodebuild_test() {
   local log="$1"; shift
-  local attempt status
-  for attempt in 1 2; do
-    set +e
-    _xcb_once "$log" "$@"
-    status=$?
-    set -e
-    if [[ $status -eq 124 && $attempt -eq 1 ]]; then
-      # Only a wedge that produced NO verdict is worth a from-clean retry. If the
-      # tests already ran and reported, rebuilding cannot change the outcome — it
-      # just pays the full compile cost again to reprint the same failures.
-      if has_verdict "$log" || [[ $(reported_bundles_count "$log") -gt 0 ]]; then
-        echo "run-tests.sh: xcodebuild stalled after reporting results — not rebuilding an incomplete run." >&2
-        return 1
-      fi
-      echo "run-tests.sh: clearing DerivedData ($PLOZZ_DERIVED_DATA) and retrying the build once from clean." >&2
-      rm -rf "$PLOZZ_DERIVED_DATA"
-      continue
-    fi
-    [[ $status -eq 124 ]] && echo "run-tests.sh: FAILURE — xcodebuild wedged twice; the simulator/toolchain likely needs attention." >&2
-    return $status
-  done
+  local status=0
+  _xcb_once "$log" "$@" || status=$?
+  if [[ $status -eq 124 ]]; then
+    echo "run-tests.sh: FAILURE — xcodebuild timed out; preserving DerivedData and results without a clean retry." >&2
+  fi
+  return "$status"
 }
 
 # --- Decide the build strategy ------------------------------------------------

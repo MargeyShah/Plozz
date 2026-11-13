@@ -172,7 +172,7 @@ final class ExternalPlayerTests: XCTestCase {
         source.password = "fixture:secret"
         let rawColon = try XCTUnwrap(source.url)
         for player in [ExternalPlayer.nativePlayer, .infuse] {
-            XCTAssertFalse(ExternalPlayerURL.isSupportedMediaURL(colonPassword, player: player, allowPassword: true))
+            XCTAssertFalse(ExternalPlayerURL.isSupportedMediaURL(rawColon, player: player, allowPassword: true))
         }
     }
 

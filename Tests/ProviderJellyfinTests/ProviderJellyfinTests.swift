@@ -379,8 +379,53 @@ final class JellyfinProviderMappingTests: XCTestCase {
                        "Continue Watching must fold NextUp after the in-progress Resume items (Plex On Deck parity)")
 
         let query = try XCTUnwrap(stub.queryItems(forPathSuffix: "/Shows/NextUp"))
-        XCTAssertEqual(query.first(where: { $0.name == "EnableResumable" })?.value, "false",
-                       "NextUp must exclude resumable items so it complements, not duplicates, Resume")
+        XCTAssertEqual(query.first(where: { $0.name == "EnableResumable" })?.value, "true",
+                       "NextUp must match Jellyfin's own clients and include resumable suggestions")
+        XCTAssertEqual(query.first(where: { $0.name == "EnableUserData" })?.value, "true",
+                       "A resumable NextUp-only card must retain its saved progress")
+    }
+
+    func testContinueWatchingKeepsNextUpWhenResumeOmitsResumableEpisode() async throws {
+        let stub = StubHTTPClient()
+        stub.stub(pathSuffix: "/Users/u1/Items/Resume", json: #"{"Items":[],"TotalRecordCount":0}"#)
+        stub.stub(pathSuffix: "/Shows/NextUp", json: """
+        {"Items":[{"Id":"next-resumable","Name":"Episode 7","Type":"Episode","SeriesId":"series",
+        "IndexNumber":7,"UserData":{"PlaybackPositionTicks":100000000,"Played":false}}],
+        "TotalRecordCount":1}
+        """)
+        stub.stub(pathSuffix: "/Users/u1/Items", json: #"{"Items":[],"TotalRecordCount":0}"#)
+        let provider = JellyfinProvider(session: makeSession(), http: stub)
+
+        let items = try await provider.continueWatching(limit: 10)
+
+        XCTAssertEqual(items.map(\.id), ["next-resumable"])
+        XCTAssertEqual(items.first?.resumePosition, 10)
+    }
+
+    func testUnlimitedNextUpPagingFallsBackToBoundedRequest() async throws {
+        let stub = StubHTTPClient()
+        stub.stub(pathSuffix: "/Users/u1/Items/Resume", json: #"{"Items":[],"TotalRecordCount":0}"#)
+        let firstPage = (0..<100).map {
+            #"{"Id":"next-\#($0)","Name":"Episode \#($0)","Type":"Episode","SeriesId":"series-\#($0)","UserData":{"LastPlayedDate":"2026-01-01T00:00:00Z"}}"#
+        }.joined(separator: ",")
+        stub.stubSequence(pathSuffix: "/Shows/NextUp", jsons: [
+            #"{"Items":[\#(firstPage)],"TotalRecordCount":101}"#,
+            #"{"Items":[\#(firstPage)],"TotalRecordCount":101}"#,
+            #"{"Items":[{"Id":"fallback","Name":"Fallback","Type":"Episode","SeriesId":"series-fallback","UserData":{"LastPlayedDate":"2026-01-01T00:00:00Z"}}],"TotalRecordCount":1}"#
+        ])
+        let provider = JellyfinProvider(session: makeSession(), http: stub)
+
+        let items = try await provider.continueWatching(limit: .max)
+
+        XCTAssertEqual(items.map(\.id), ["fallback"])
+        let nextUpQueries = zip(stub.sentPaths, stub.sentQueryItems)
+            .filter { $0.0.hasSuffix("/Shows/NextUp") }
+            .map(\.1)
+        XCTAssertEqual(nextUpQueries.count, 3)
+        let fallbackQuery = try XCTUnwrap(nextUpQueries.last)
+        XCTAssertEqual(fallbackQuery.first { $0.name == "Limit" }?.value, "100")
+        XCTAssertNil(fallbackQuery.first { $0.name == "StartIndex" },
+                     "The fallback must be one bounded request, not another paged attempt")
     }
 
     func testContinueWatchingDedupesItemPresentInBothResumeAndNextUp() async throws {

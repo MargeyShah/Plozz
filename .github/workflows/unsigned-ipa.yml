@@ -38,6 +38,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload unsigned build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Plozz-${{ matrix.platform }}-unsigned-diagnostics
+          path: .build/unsigned-ipa/${{ matrix.platform }}/run-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   release:
     name: Attach unsigned IPAs to release
     needs: build

@@ -116,7 +116,84 @@ retain their Retry-After deadline across relaunch.
 Provider-supported idempotency would be needed to eliminate that failure window.
 Older app versions must be upgraded to honor coordination.
 
-History sync is outbound; server resume state remains server-owned.
+Playback reporting remains outbound; server resume state remains server-owned.
+Settings also offers an explicit, one-time history comparison on TV and mobile.
+It reads every page of `/users/me/history` and `/sync/playback`, requiring stable
+pagination totals, exact page sizes and unique record IDs. The relevant
+`/sync/last_activities` timestamps must remain unchanged across the read. Missing,
+capped, malformed or changing results fail the comparison instead of becoming a
+partial import. Reads reuse coordinated OAuth refresh and retain profile/grant
+fences before and after each request.
+
+The shared importer previews exact server users and requires selected-row
+confirmation before writing through the existing watch outbox. It rechecks server
+state and authorization, excludes current playback, and never enables ongoing
+sync or creates a new tracker scrobble. Rewatches collapse to a watched-state
+change; individual play dates/counts are not written to media servers.
+Episode imports require matching episode and parent IDs in the same namespace,
+with the episode ID distinct from the parent's and a single matching episode
+coordinate. Trakt coordinates alone do not establish a server's episode order.
+Unconfirmed identities remain unmatched. Trakt percentages remain visible,
+non-importable observations: catalog runtimes do not establish the played file's
+runtime, and neither 0% nor 100% implies an explicit clear or completed watch.
+
+The separate **Ongoing sync** enrollment can authorize new watched-state imports
+for selected server users; it does not backfill the reviewed history. Its
+connection identity survives coordinated refresh/relaunch and changes on each
+new sign-in, including identical returned tokens. Disconnect revokes device-local
+permission before coordinated credential removal. Percentage-only resume remains
+unavailable. See the [shared consent lifecycle](../FeatureSettings/README.md).
+
+API shape references: Trakt's
+[history client](https://github.com/trakt/trakt-rippple/blob/282a49fa049bcf325e126b4932e6c8d91d580860/Rippple/Trakt%20API/TraktAPIService.swift)
+and [sync contracts](https://github.com/trakt/trakt-api/blob/dab7797de4e30bdd3fa0f98c0f8b5d8509845991/projects/api/src/contracts/sync/index.ts).
+Playback pagination is explicitly requested; a headerless response is not a
+complete snapshot. These contracts and fixture checks are not authenticated
+round-trip acceptance evidence.
+
+## Guarded historical export
+
+**Export server history** uses the shared read-only preview, explicit server-user/
+library selection and separate confirmation on TV, iPhone and iPad. It exports
+only watched movies and individually identified episodes with a known server watch
+date. Unknown dates remain unsupported until their readback semantics are verified;
+an existing watch with an unavailable date still prevents duplicate export, but
+cannot verify a dated write. No current-time substitute, repeat-play count,
+scrobble backfill, show/season expansion, rating change or server write is made.
+
+Public external-ID lookup and fresh canonical detail must agree with the source.
+Episodes also require corroborated parent IDs and exact season/episode coordinates.
+The immutable authenticated `user.ids.uuid`, native media ID and kind form the
+receipt target; titles and mutable source metadata do not. Complete history,
+watchlists, paused playback and current watching protect existing state.
+Movie, show, season and episode watchlist entries are all protected; a planned
+season protects only episodes in that season, not unrelated seasons.
+Activity checks include `watchlist.updated_at` so removals invalidate cached
+protection. Missing pagination, changing owners/activity and malformed evidence
+fail closed.
+
+An export-only serial gate leaves at least 1.01 seconds after each operation
+before admitting the next. Full source/tracker authorization runs after that wait,
+then coordinated access-token retrieval and the profile/grant guard run immediately
+before dispatch. Reads do not enter this writer gate. A 429 stops delivery without
+automatic retry; its bounded cooldown survives relaunch. This does not claim to
+coordinate other applications or every existing realtime request.
+
+Each `/sync/history` request contains exactly one native movie or episode and an
+explicit UTC `watched_at`. The current OpenAPI acknowledgement requires HTTP 200,
+with redirects left unfollowed to prevent automatic resubmission,
+exactly one addition, zero updates and empty not-found buckets. Independent
+item-history readback must confirm the same native identity and date. Known
+non-delivery clears only the current attempt's receipt; ambiguous transport,
+cancellation after dispatch or malformed acknowledgements retain the replay
+fence. Presence after an uncertain reply does not establish authorship. Trakt
+does not deduplicate item/date submissions, and local receipts are not remote
+idempotency or distributed atomicity.
+
+Contract: [Trakt API](https://trakt.docs.apiary.io/), external-ID lookup,
+user settings/watching, activity and history endpoints. Synthetic service and
+native fixtures do not replace authenticated account round-trip acceptance.
+
 External-player callbacks use the same durable watch outbox as in-app playback.
 Returning before completion sends `/scrobble/pause` with the reported percentage
 for Trakt's paused playback data, as well as saving server resume state. This is

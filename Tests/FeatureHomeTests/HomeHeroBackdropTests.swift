@@ -488,6 +488,33 @@ final class HomeHeroBackdropTests: XCTestCase {
         XCTAssertFalse(HeroBackdropArtworkPolicy.isUsable(ultraWide))
     }
 
+    func testFullSizeBackdropResidencyIgnoresPreviewOnlyFrames() {
+        let reference = ArtworkReference.remote(URL(string: "https://example.test/hero.jpg")!)
+        let preview = image(.blue)
+        let full = image(.red)
+
+        XCTAssertFalse(
+            HeroBackdropArtworkPolicy.hasUsableCachedBackdrop(
+                for: [reference],
+                cachedImage: { _, variant in variant == .heroPreview ? preview : nil }
+            ),
+            "A warmed 768px preview must not count as a resident full-size backdrop."
+        )
+        XCTAssertFalse(
+            HeroBackdropArtworkPolicy.hasUsableCachedBackdrop(
+                for: [reference],
+                cachedImage: { _, variant in variant == .landscapeCard ? preview : nil }
+            ),
+            "A warmed landscape card must not count as a resident full-size backdrop."
+        )
+        XCTAssertTrue(
+            HeroBackdropArtworkPolicy.hasUsableCachedBackdrop(
+                for: [reference],
+                cachedImage: { _, variant in variant == .heroBackdrop ? full : nil }
+            )
+        )
+    }
+
     private func image(_ color: UIColor) -> UIImage {
         UIGraphicsImageRenderer(size: CGSize(width: 16, height: 9)).image { context in
             color.setFill()

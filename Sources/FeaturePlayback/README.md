@@ -78,6 +78,8 @@ bounded language-match/accessibility flags without track titles or URLs.
     Plex trailers and special features additionally retain a device-local,
     profile/account/server-viewer-scoped resume fallback; ordinary movies and
     episodes remain server-managed. See ProviderPlex's extra resume contract.
+    Tracker playback samples honor the same original-item and resolved-extra
+    exclusions as scrobbling, without suppressing provider progress reports.
   - `PlayerView` + `CustomPlayerContainer` host the engine's vended
     bare video surface and overlay the shared transport chrome.
   - `PlayerCardMetrics` scales touch-player typography to a wide-tablet maximum
@@ -506,7 +508,9 @@ On iPhone and iPad, VOD and Live TV share adaptive native `PlayerMoreMenuButton`
 controls. Portrait uses one ellipsis; landscape exposes the available menus as
 separate controls, with Version and Multiview opening their existing destinations
 directly. Audio, Subtitles and Video reuse the existing player-category icons
-(waveform, captions and adjustment sliders) in both VOD and Live TV. Video combines
+(waveform, captions and adjustment sliders) in both VOD and Live TV. Community
+timestamps follow the same menu/destination lifecycle for supported VOD items
+with an available timestamp source; they remain absent from Live TV. Video combines
 zoom choices with Quality in both layouts; Quality opens its existing editor and
 never acts as a selectable zoom mode. The standalone Video popup omits its redundant
 category heading; portrait retains the named Video entry. Quality remains
@@ -742,6 +746,26 @@ Double-tap skip, speed, and unavailable-level feedback are Plozz components
 using native media glass and SF Symbols, not stock AVKit HUDs. They share the
 transport's foreground pairing: light ink on native media glass in either theme,
 theme-aware ink on the reduced-glass fallback.
+
+## Manual community timestamps
+
+Connected PublicMetaDB accounts can browse community timestamps from the existing
+TV Playback menu and mobile options menu. Browsing is on demand, read-only, and
+does not enable playback reporting or automatic skipping. Highlights are fetched
+only after a separate spoiler toggle.
+
+The shared browser preserves individual contributions, source-release labels and
+attribution. A timestamp must fit the current finite runtime, but that alone does
+not verify release compatibility. Each start/end jump therefore needs explicit
+confirmation and uses the normal seek coordinator; server markers and chapters
+are never replaced. Jumping directly to the runtime's end is unavailable. The
+confirmation explains that normal progress reporting can follow a seek.
+
+Reads and selections are fenced by the active key/profile connection and player
+load generation. Stop, reload, background recovery, cancellation and changed
+runtime prevent stale selections. A failed lookup remains an error rather than
+a successful empty list. No automatic PublicMetaDB fallback is enabled without
+the missing upstream file/release compatibility evidence.
 
 ## Skip-marker timeline
 

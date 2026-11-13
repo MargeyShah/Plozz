@@ -141,6 +141,11 @@ The checksum/provenance receipts remain in the run artifacts (retained for seven
 days), not in the release assets. A fork can test the workflow by publishing a
 release in the fork; its IPAs attach to that fork's release.
 
+Alternatively, enable Actions in your fork and run [Unsigned IPA](workflows/unsigned-ipa.yml)
+from its default branch. Select an available macOS runner with Xcode 27 or later;
+the default `xcode-27` image is not available to every fork. No signing or App Store
+Connect secrets are required. Artifacts are retained for seven days.
+
 **Unsigned IPAs are not directly installable.** Sign the app, embedded frameworks,
 and tvOS Top Shelf extension with compatible provisioning. Device availability and
 expiration depend on your signing tool and Apple account. The separate app is
@@ -196,6 +201,61 @@ version/build selection, fastlane commands, and partial-upload recovery.
 Local credentials use the gitignored `.env.fastlane` described by
 [`.env.fastlane.example`](../.env.fastlane.example).
 
+```bash
+PLOZZ_RELEASE_ID=release/NNN fastlane beta --env fastlane
+fastlane build --env fastlane   # archive a signed .ipa locally, no upload
+PLOZZ_RELEASE_ID=release/NNN fastlane release --env fastlane
+```
+
+**Versioning:** [release identity and delivery](../docs/release-versioning.md)
+defines the public date, the separate Apple marketing version, and the selected
+build number (including dotted hotfix builds). The committed
+`App/Resources/ReleaseNotes.json` entry owns that identity. Obtain approval for
+the exact rendered platform notes and candidate before running a distribution
+lane.
+
+**Package resolution:** Fastlane's supported `build_app` options carry the same
+package paths and locked-version policy through dependency resolution, build
+settings, and archive. Do not duplicate package flags in `xcargs` or bypass
+resolution. `PLOZZ_FASTLANE_CLONED_SOURCE_PACKAGES` overrides the package workspace
+**root**; each invocation and platform gets a private child directory. The
+download cache remains shared (`PLOZZ_PACKAGE_CACHE_PATH`, defaulting to the
+standard SwiftPM cache). The lane preserves the host's git configuration and
+appends `safe.bareRepository=all`.
+
+**TestFlight concurrency:** both signed archives finish and both exported IPAs
+pass version/build/platform checks before either upload starts. Two isolated Ruby
+processes then upload, wait for Apple processing, set their platform-specific
+notes, and submit to **Plozz External**, with notifications enabled. No previous
+builds are expired or rejected. Successful submission is not approval: the final
+report includes Apple's observed internal/external state, which may still be
+`WAITING_FOR_BETA_REVIEW`. The App Store `release` uploads remain serial.
+
+The enclosing shared release lease stays held through both workers, descendant
+cleanup, and tagging. Workers inherit its descriptors and receive the current
+API key only through anonymous pipes. Each worker uses Fastlane's normal
+altool/Java transporter rather than the shell transporter's shared key directory.
+Archives, IPAs, dSYMs and separate platform logs survive worktree removal under
+`~/Library/Developer/Plozz/Releases/<checkout-path-hash>/`; upload evidence is in
+its `testflight-uploads/` subdirectory. See [build-data lifecycle](../docs/disk-reclaim.md).
+
+**Partial failure or cancellation:** both workers are reaped; a platform failure
+does not stop the other platform's processing. Cancellation terminates both owned
+process groups, with a bounded grace period before forced termination. No tag or
+GitHub release is created unless both workers succeed. Preserve the signed IPAs,
+logs, and `summary.json`; inspect the exact platform/version/build in App Store
+Connect before recovery. An interrupted upload may already have reached Apple.
+Do not blindly rerun `beta`, increment the build, rebuild, or retry an upload.
+There is no automatic retry or distribution-only lane.
+Known validation failures report fixed safe codes (`external_group_missing`,
+`uploaded_build_mismatch`); invalid worker output reports `invalid_worker_result`.
+Arbitrary exception messages and credentials are not copied into the summary.
+
+App icons, in-app logos, and tvOS **Brand Assets** are generated from
+`App/Resources/Assets.xcassets/PlozzLogo.imageset/plozz_logo.svg` with
+`python3 tools/generate_brand_assets.py`. The tvOS App Store and Top Shelf
+assets live under `App/Resources/Assets.xcassets/…brandassets`.
+
 A main merge is not a release, and an upload is not external tester availability.
 Preserve release evidence and inspect both platforms before retrying an
 interrupted distribution.
@@ -220,27 +280,6 @@ to thin XcodeGen app targets. Start with the relevant module or guide:
 Keep cross-view/platform state in core or runtime modules, not app shells.
 See the [architecture roadmap](../docs/architecture-roadmap.md) for proposed work.
 
-Stateful behavior that crosses views or platforms belongs in `CoreModels`, the
-relevant `Feature*Core`, or `AppRuntime`; app shells stay wiring-only. Follow the
-[state-management scaffold](../docs/state-management.md) for policies,
-coordinators, surface registration, and deterministic harnesses. Follow the
-[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
-conventions.
-
-Stateful behavior that crosses views or platforms belongs in `CoreModels`, the
-relevant `Feature*Core`, or `AppRuntime`; app shells stay wiring-only. Follow the
-[state-management scaffold](../docs/state-management.md) for policies,
-coordinators, surface registration, and deterministic harnesses. Follow the
-[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
-conventions.
-
-Stateful behavior that crosses views or platforms belongs in `CoreModels`, the
-relevant `Feature*Core`, or `AppRuntime`; app shells stay wiring-only. Follow the
-[state-management scaffold](../docs/state-management.md) for policies,
-coordinators, surface registration, and deterministic harnesses. Follow the
-[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
-conventions.
-
 ## The dual-provider invariant
 
 **Jellyfin and Plex are co-equal backends.** Changes to data, playback, auth,
@@ -251,20 +290,6 @@ implementation; Subsonic support is music-only and currently development/TestFli
 
 ## Coding norms
 
-Keep changes focused and match the surrounding style. Follow the
-[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md).
-
-- State/lifecycle behavior uses the shared coordinator/profile scaffold, not
-  ad-hoc foreground refresh logic in views.
-- Tests use named constants or shared fixtures. The owner of a formatted value
-  owns the literal assertion; unrelated tests reference the owner instead of
-  duplicating the literal.
-- Comments explain why and invariants. Do not restate current formatted output;
-  reference the owning symbol (for example `MediaItem.seasonEpisodeLabel`).
-- A shared format/helper change should touch the owner and call sites, not
-  unrelated comments or tests.
-- Split rules/documentation work from feature work, and keep generated project
-  files out of the diff.
-
-Open an issue if you're unsure whether something's a good fit before investing a
-lot of time.
+Follow the [Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) and existing
+module ownership. Keep changes focused, add relevant regression coverage, and
+update the documentation that owns the changed behavior.

@@ -1,5 +1,26 @@
 # FeatureSettings
 
+PublicMetaDB catalog labels load verified title names, retaining the exact TMDB
+ID and child coordinates as a fallback when lookup is unavailable. **Open title
+in Plozz** uses the shell's normal detail route rather than a second playback or
+request implementation. Child history uses **Open show in Plozz** because server
+episode numbering must be resolved by the normal show page.
+
+PublicMetaDB confirmations compose every paragraph into one localized `Text`
+through `publicMetaDBConfirmationMessage`. Native dialogs can omit sibling
+message views, hiding visibility, propagation or publication disclosures.
+Keep the reviewed date, vote or timestamp details in that same message.
+
+PublicMetaDB contribution reads belong to the enclosing page's
+`publicMetaDBRead` modifier, never to the lazy rows emitted by
+`PublicMetaDBReadContent`. Result-row appearance must not start another request.
+The shared read model fences connection, selection, refresh and disabled scopes;
+each action remains a separate native row. Rating browsing can show an explicitly
+capped collection, but contribution changes still require complete readback.
+Single and batch rating scores use native menu pickers with explicit accessible
+labels and values. Do not rely on the automatic tvOS picker style: it compresses
+all 101 scores into an unreadable segmented control.
+
 Mobile customization choice groups use the same Settings cards and content
 insets, including contained groups such as Hero content sources. TV row sizing
 does not select a different mobile section style. Enabled switches keep the

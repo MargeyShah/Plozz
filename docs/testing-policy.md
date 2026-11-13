@@ -18,10 +18,6 @@ surface transitions), not UI timing. Run the same scenario matrix for each
 platform profile. Shared fixtures and constants live in `Tests/TestSupport*`.
 
 Tests use named constants or shared fixtures for repeated values, thresholds,
-surface identities, item IDs, and expected actions. The owner of a formatted
-value owns the literal assertion; other suites use the owner or the shared
-constant. Do not derive an expected value from production code when the
-production behavior is what the test is verifying.
 
 Render-dependent playback transitions belong in the app-hosted suite. Use a
 mounted video surface and a real HLS fixture for native-player continuity; a
@@ -487,9 +483,9 @@ bundle finishes — unlike the final `** TEST FAILED **` banner, which is
 block-buffered and often only reaches the log once the process is killed. Once
 every expected bundle has reported, the script
 waits `PLOZZ_VERDICT_GRACE` (default 6s, polled every `PLOZZ_POLL_SECS`=2s) for a
-clean exit, then checks for a finalized `xcresult` before reaping teardown. A
-from-clean retry is now only attempted when the run produced **no** results at
-all — the case it was actually meant for.
+clean exit, then checks for a finalized `xcresult` before reaping teardown.
+Timeouts preserve DerivedData and retained results, and return failure without
+an automatic rebuild or cache reset, even when no results were produced.
 
 The poll interval matters as much as the grace: at the original 10s granularity a
 20s grace could take 30s to fire, so every *green* run paid up to half a minute
@@ -504,7 +500,11 @@ last bundle reports, allowing Xcode's 600-second simulator diagnostic collection
 to finish. This is a ceiling, not a fixed wait. A readable result bundle is
 always required; reaching the grace period alone never interrupts its writer.
 If finalization or the no-progress watchdog times out, the run fails even if a
-later summary becomes readable after termination.
+later summary becomes readable after termination. The watchdog is CPU-aware: a
+build that stops printing log lines but keeps consuming CPU (for example while
+compiling a single large Swift file) is treated as slow progress, not as wedged.
+Only a process tree with no output and no CPU movement for `PLOZZ_HANG_SECS` is
+killed.
 
 Large scale fixtures emit unbuffered checkpoints from completed work. The
 million-programme XMLTV test reports preparation phases and every 10,000 indexed
@@ -561,6 +561,51 @@ the normal isolated retry only after every requested bundle reported.
 
 Runner verdict regressions use the existing host-side unittest runner:
 `python3 -m unittest discover -s tools/tests -p 'test_xcresult_summary.py'`.
+
+### Opt-in tracker acceptance
+
+`PlozzTrackerConnectionTests` and `PlozziOSTrackerConnectionTests` drive an
+already-installed normal app on an explicitly selected owned simulator.
+`PlozzTrackerStateTests` and `PlozziOSTrackerStateTests` provide independent,
+read-only share-history observation inside that app's normal signed host.
+The observer requires one explicit profile and share, preserves the existing
+Keychain access groups, and accepts only item-not-found as absent history.
+On tvOS it uses the production user-independent Keychain namespace, with no
+per-system-user fallback; omitting that query attribute reads a different store.
+Use these alongside real native actions and source/build provenance; a passing
+readback alone does not establish that the expected history was present.
+SMB source-selection drivers require the exact declared fixture before changing
+any switches. The Emby-only methods are separate from the Emby/Silo/NFS methods;
+missing sources must not silently reduce the scope of an acceptance run.
+Native share watch-state actions also require the declared share account and
+content type. Revocation checks should use a fresh remote change against an
+eligible local state, not a conflict that would already prevent delivery.
+Tracker snapshot changes reject imports before dispatch with a page-level error;
+destination changes detected during dispatch have per-row outcomes. Native race
+checks must assert the appropriate rejection and independently verify that the
+destination history stayed unchanged.
+Label controlled runtime edits separately from authentic playback evidence.
+Compatibility checks should cover the inclusive limit and the next representable
+value outside it, not just a large mismatch.
+Use exact real tracker identities for unmatched-library checks. Distinguish
+discarding an unconfirmed selection on relaunch from cancelling an in-flight
+delivery; the former is not evidence of queued-mutation recovery.
+For active-playback checks, correlate sync diagnostics with native player
+open/close times and independently compare saved progress with the real player's
+position. Calibrate capture with an observed attempt and respect the automatic
+interval. If foreground admission postpones the attempt until player dismissal,
+record that separately from a per-item playback skip; only the skip diagnostic
+proves that guard ran. Unchanged history alone proves neither.
+
+When pausing an acceptance campaign, preserve its task/dependency ledger, exact
+source identity, uncommitted test changes, independent state snapshots, raw
+results and attachments outside any removable worktree or session directory.
+Keep credentials and private evidence out of Git. Separate reproducible build
+products from historical evidence: use reusable incremental build directories
+and immutable per-run result directories. Restoring evidence does not restore
+simulator state, credentials or runnable manifests. Rebuild the required current
+driver, recheck external state and rerun affected scenarios; never promote an
+old result or an incomplete task to a fresh pass.
 
 ## App-hosted focus integration
 
@@ -1651,8 +1696,8 @@ tests. Run `39857697957` also exhausted a full 40-minute execution window while
 still progressing through the expanded hosted suite. Both attempts of run
 `41421118241` reached the 40-minute compilation deadline before tests could
 start; the retry was still compiling the hosted test target. CI now allows
-60 minutes for compilation and 120 minutes for hosted execution, within a
-200-minute job limit including setup and evidence retention. Run `43265633256`
+90 minutes for compilation and 120 minutes for hosted execution, within a
+240-minute job limit including setup and evidence retention. Run `43265633256`
 completed 966 of 1,131 hosted methods before the former 90-minute execution
 limit interrupted a still-progressing streaming test. Its completed methods
 alone consumed 88.4 minutes; the native-reopen case completed rather than

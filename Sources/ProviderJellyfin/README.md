@@ -237,9 +237,12 @@ Series-specific resume lookups allow resumable `/Shows/NextUp` candidates.
 Compatible bridges can return an empty series-scoped `/Items/Resume` even when
 their account-wide feed contains the saved episode. The existing two scoped
 requests still suffice: exact series matching and Resume-first deduplication
-remain intact. Ordinary Home Next Up requests continue excluding resumable
-episodes. This does not bypass excluded libraries or change server-owned
-minimum-resume thresholds.
+remain intact. Home Next Up requests also allow resumable candidates, matching
+Jellyfin's own clients. This prevents a series from disappearing when its next
+episode has a small saved position that the shared brief-play threshold hides
+from Resume. Resume remains the primary card and supplies its saved progress.
+This does not bypass excluded libraries or change server-owned minimum-resume
+thresholds.
 
 Global Home history is account-wide on every provider, including Jellyfin and
 Emby. Combined Continue Watching, resume-only Home, and account-wide server

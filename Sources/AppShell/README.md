@@ -52,8 +52,6 @@ registry.
 
 ## Invariants
 
-- **The root owns content-refresh coordination.** `RootView` injects the
-  profile-scoped `ContentRefreshCoordinator` and mounts
   `ContentRefreshLifecycleReader`; app shells do not decide refresh timing.
   Home/detail views register their visible surface and perform the typed action.
   Follow [state management](../../docs/state-management.md).

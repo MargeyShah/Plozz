@@ -16,7 +16,7 @@ struct PlozziOSItemDetailView: View {
     @Environment(HomeViewModel.self) private var homeViewModel: HomeViewModel?
     @Environment(\.locale) private var locale
     let appModel: PlozziOSAppModel
-    let provider: any MediaProvider
+    let provider: (any MediaProvider)?
     let item: MediaItem
     let seerService: SeerService?
     let originSourceAccountID: String?
@@ -30,7 +30,7 @@ struct PlozziOSItemDetailView: View {
 
     init(
         appModel: PlozziOSAppModel,
-        provider: any MediaProvider,
+        provider: (any MediaProvider)?,
         item: MediaItem,
         seerService: SeerService? = nil,
         originSourceAccountID: String? = nil,
@@ -63,13 +63,13 @@ struct PlozziOSItemDetailView: View {
     private var detailBody: some View {
         if let collection = CollectionBrowseRoute(
             item: item,
-            fallbackAccountID: originSourceAccountID ?? provider.session.server.id
+            fallbackAccountID: originSourceAccountID ?? provider?.session.server.id
         ) {
             PlozziOSLibraryDestinationView(
                 appModel: appModel,
                 route: PlozziOSLibraryRoute(collection: collection)
             )
-        } else if let library = MediaFolderNavigation.library(
+        } else if let provider, let library = MediaFolderNavigation.library(
             for: item,
             providerKind: provider.kind,
             sourceAccountID: originSourceAccountID ?? item.sourceAccountID ?? provider.session.server.id
@@ -134,7 +134,10 @@ struct PlozziOSItemDetailView: View {
         let language = locale.identifier
         return DetailOpenEnvironment(
             resolveProvider: { accountID in
-                guard let accountID else { return provider }
+                guard let accountID else {
+                    guard let provider else { throw AppError.unauthorized }
+                    return provider
+                }
                 guard let resolved = appModel.accountsProviders.provider(forAccountID: accountID) else {
                     throw AppError.unauthorized
                 }
@@ -224,7 +227,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
     private let initialSeasonID: String?
     private let initialEpisode: MediaItem?
     private let playlistOrigin: VideoPlaylistPlaybackOrigin?
-    private let originProvider: any MediaProvider
+    private let originProvider: (any MediaProvider)?
     /// Whether the episode is this page's own subject rather than a season/series
     /// page's fronted child — see `showsEpisodeSubjectHero`.
     private let presentsEpisodeAsSubject: Bool
@@ -232,7 +235,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
 
     init(
         appModel: PlozziOSAppModel,
-        provider: any MediaProvider,
+        provider: (any MediaProvider)?,
         viewModel: ItemDetailViewModel,
         seerService: SeerService? = nil,
         playlistOrigin: VideoPlaylistPlaybackOrigin? = nil,
@@ -273,44 +276,10 @@ private struct PlozziOSCanonicalItemDetailView: View {
         )
     }
 
-    private var contentRefreshSurfaceID: ContentRefreshSurfaceID {
-        guard let item = viewModel.state.value?.item else {
-            return ContentRefreshSurfaceID(kind: .home)
-        }
-        let kind: ContentRefreshSurfaceKind
-        switch item.kind {
-        case .series: kind = .seriesDetail
-        case .episode: kind = .episodeDetail
-        case .movie, .video: kind = .movieDetail
-        default: kind = .home
-        }
-        return ContentRefreshSurfaceID(
-            kind: kind,
-            accountID: item.sourceAccountID,
-            itemID: item.id
-        )
-    }
-
-    private var contentRefreshSurfaceID: ContentRefreshSurfaceID {
-        guard let item = viewModel.state.value?.item else {
-            return ContentRefreshSurfaceID(kind: .home)
-        }
-        let kind: ContentRefreshSurfaceKind
-        switch item.kind {
-        case .series: kind = .seriesDetail
-        case .episode: kind = .episodeDetail
-        case .movie, .video: kind = .movieDetail
-        default: kind = .home
-        }
-        return ContentRefreshSurfaceID(
-            kind: kind,
-            accountID: item.sourceAccountID,
-            itemID: item.id
-        )
-    }
-
     private var contentRefreshSurfaceIsVisible: Bool {
-        guard isPageVisible, let kind = viewModel.state.value?.item.kind else { return false }
+        guard isPageVisible, playbackRequest == nil, pendingResumeRequest == nil,
+              !presentsSeriesDownloads,
+              let kind = viewModel.state.value?.item.kind else { return false }
         switch kind {
         case .series, .episode, .movie, .video: return true
         default: return false
@@ -439,7 +408,10 @@ private struct PlozziOSCanonicalItemDetailView: View {
         .onChange(of: presentsSeriesDownloads) { _, isPresented in
             if isPresented { seasonRequestRetryToken &+= 1 }
         }
-        .task { await viewModel.load() }
+        .task(id: locale.identifier) {
+            viewModel.updateMetadataLanguage(locale.identifier)
+            await viewModel.load()
+        }
         .contentRefreshSurface(
             id: contentRefreshSurfaceID,
             isVisible: contentRefreshSurfaceIsVisible
@@ -449,9 +421,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                 await viewModel.refreshSeriesContextAfterReturn()
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
-            case .reloadDetail:
-                await viewModel.reload()
-            case .reloadHome, .none:
+            case .reloadHome:
                 break
             }
         }
@@ -977,10 +947,15 @@ private struct PlozziOSCanonicalItemDetailView: View {
             return
         }
         let origin = playlistOrigin?.containsSelection(item) == true ? playlistOrigin : nil
-        let playlist = origin.map {
-            VideoPlaylistPlaybackContext(
-                origin: $0, provider: originProvider
-            )
+        let playlist: VideoPlaylistPlaybackContext?
+        if let origin {
+            guard let originProvider else {
+                PlozzLog.app.error("Playlist playback has no authorized source provider")
+                return
+            }
+            playlist = VideoPlaylistPlaybackContext(origin: origin, provider: originProvider)
+        } else {
+            playlist = nil
         }
         // A series can't be played directly (see `playbackTarget`), so resolve
         // its next-up episode first. Every other kind plays as-is.
@@ -1794,12 +1769,7 @@ struct PlozziOSInlineSeriesBrowser: View {
                     resolvedSeasonID = nil
                     railTargetID = nil
                 }
-                if !hasExplicitSeasonSelection, initialEpisode == nil,
-                   let series = viewModel.state.value?.item,
-                   let seed = SeriesEpisodeEntry.openingSeed(
-                       for: series, initialEpisode: initialEpisode,
-                       initialSeasonID: initialSeasonID, resumeEpisode: viewModel.serverResumeEpisode
-                   ) {
+                if !hasExplicitSeasonSelection, initialEpisode == nil {
                     resolvedSeasonID = nil
                     if let series = viewModel.state.value?.item,
                        let seed = SeriesEpisodeEntry.openingSeed(
