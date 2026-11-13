@@ -435,6 +435,7 @@ public struct JellyfinClient: Sendable {
             URLQueryItem(name: "MediaTypes", value: "Video"),
             URLQueryItem(name: "EnableResumable", value: "true"),
             URLQueryItem(name: "EnableRewatching", value: "false"),
+            URLQueryItem(name: "EnableUserData", value: "true"),
             URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let startIndex {
