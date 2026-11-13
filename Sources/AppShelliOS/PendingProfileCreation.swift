@@ -1,4 +1,5 @@
 import CoreModels
+import FeatureProfiles
 import Observation
 
 /// Mobile profile creation that must wait for the Settings sheet to dismiss.

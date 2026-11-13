@@ -631,6 +631,9 @@ private actor IdentityWarmGate {
 private final class FakeIndexProvider: MediaProvider, @unchecked Sendable {
     let kind: ProviderKind
     let session: UserSession
+    /// Mirrors the real Silo provider: catalogue entries carry inferred ids only,
+    /// so each needs a fuller per-item record before its identity can be indexed.
+    var catalogIdentityRequiresEnrichment: Bool { true }
     private let movies: [MediaItem]
     private let gate: IdentityWarmGate?
     private let librariesUnavailable: Bool

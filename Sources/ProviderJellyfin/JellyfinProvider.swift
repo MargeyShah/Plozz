@@ -173,7 +173,9 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
                 localizedTitle: localizedTitle,
                 items: Array(items.prefix(limit)),
                 isHomeDefault: forHome ? false : nil,
-                browseID: "\(recommendation.RecommendationType):\(recommendation.CategoryId ?? subject ?? "")"
+                // Emby reshuffles this endpoint without a continuation cursor.
+                browseID: kind == .emby ? nil
+                    : "\(recommendation.RecommendationType):\(recommendation.CategoryId ?? subject ?? "")"
             )
         }
     }
@@ -343,6 +345,35 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
         let firstError: AppError?
     }
 
+    /// NextUp is the companion feed, so an inconsistent unbounded page should not
+    /// erase every next-up-only series from the row. Retry once with one bounded
+    /// page; a bounded request omits the paging contract that failed closed.
+    private func nextUpItemsResilient(
+        limit: Int,
+        parentID: String?,
+        seriesID: String?
+    ) async throws -> [BaseItemDto] {
+        do {
+            return try await client.nextUpItems(
+                userID: session.userID,
+                limit: limit,
+                parentID: parentID,
+                seriesID: seriesID
+            )
+        } catch let error as AppError where limit == .max && error == .invalidResponse {
+            try Task.checkCancellation()
+            PlozzLog.networking.error(
+                "Jellyfin Next Up paging was inconsistent; retrying with a bounded request."
+            )
+            return try await client.nextUpItems(
+                userID: session.userID,
+                limit: 100,
+                parentID: parentID,
+                seriesID: seriesID
+            )
+        }
+    }
+
     /// Fetches the two server-owned Continue Watching feeds independently.
     /// Resume wins duplicate ids because it carries the playback position.
     private func continueWatchingDTOs(
@@ -355,8 +386,7 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
             limit: limit,
             parentID: parentID
         )
-        async let nextUpTask = client.nextUpItems(
-            userID: session.userID,
+        async let nextUpTask = nextUpItemsResilient(
             limit: limit,
             parentID: parentID,
             seriesID: seriesID

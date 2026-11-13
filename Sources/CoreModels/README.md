@@ -220,6 +220,18 @@ checks, not an atomic transaction with either remote service.
   `CollectionPreviewLoader` shares bounded membership paging with Hero, validates
   page progress and identity, and never treats a selected library as inferred
   membership for returned titles.
+  `HomeContentPager` completes explicit sort/filter inventories with rolling
+  200-item library/collection/playlist requests, with at most three source-page
+  requests running across the entire traversal. A fresh library starts with
+  one fully enriched item to learn continuation before parallel page loading.
+  Each source bounds pending plus buffered lookahead to six pages, consuming
+  responses in cursor order rather than waiting for a whole batch.
+  `HomeRowPage.totalCountHint` and observed terminal pages constrain speculation
+  but never override actual continuation, including after server page caps or
+  visibility filtering. Changed strides drain and discard noncontiguous
+  lookahead before resuming at the actual offset. Home feeds retain sequential
+  60-item requests and ordinary browsing retains its small adaptive pages. Failure or cancellation
+  never commits a partial sorted inventory.
 
 ## Public surface, at a glance
 

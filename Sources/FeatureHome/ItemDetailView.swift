@@ -283,6 +283,10 @@ public struct ItemDetailView: View {
         // still fetch the full detail AND its children (seasons/episodes). Skipping
         // it for seeded opens stranded series pages with no seasons/episodes/Play
         // button. load() guards against flashing `.loading` over a seeded hero.
+        .task(id: locale.identifier) {
+            viewModel.updateMetadataLanguage(locale.identifier)
+            await viewModel.load()
+        }
         .contentRefreshSurface(
             id: contentRefreshSurfaceID,
             isVisible: contentRefreshSurfaceIsVisible
@@ -292,6 +296,9 @@ public struct ItemDetailView: View {
                 await viewModel.refreshSeriesContextAfterReturn()
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
+                break
+            case .reloadHome:
+                // Owned by the Home surface; the detail rules never emit it.
                 break
             }
         }

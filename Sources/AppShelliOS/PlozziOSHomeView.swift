@@ -441,6 +441,9 @@ struct PlozziOSHomeView: View {
                     trigger: request.reason.diagnosticTrigger
                 )
                 break
+            case .reloadSeriesContext, .refreshWatchStateOnly:
+                // Owned by the detail surfaces; the Home rule never emits them.
+                break
             }
         }
         .task(id: featuredStatusKey) {
@@ -705,7 +708,7 @@ struct PlozziOSHomeView: View {
             // `PlozziOSFeaturedRow(items: featuredItems, appModel: appModel)`
             // here — the view itself is left in place.
 
-            ForEach(HomePresentationRow.resolve(
+            ForEach(viewModel.presentationRows(
                 rows: rows, content: content, visibility: visibility.visibility, liveTV: liveTV,
                 presentation: appModel.settings.libraryPresentation.settings
             )) { presentation in
@@ -3108,91 +3111,69 @@ struct PlozziOSHomeMediaRail: View {
                     .plozzForeground(.secondary)
                     .padding(.horizontal, PlozziOSPageLayout.horizontalInset(for: horizontalSizeClass))
             }
-            ScrollView(.horizontal) {
-                LazyHStack(
-                    alignment: .top,
-                    spacing: PlozziOSMediaRailLayout.stackSpacing(
-                        metrics: metrics,
-                        cardStyle: cardStyle
-                    )
-                ) {
-                    ForEach(MediaRowView.presentationElements(
-                        items: items,
-                        loadingPlaceholderCount: loadingPlaceholderCount
-                    )) { element in
-                        switch element {
-                        case .item(let item):
-                            PlozziOSHomeMediaCard(
-                                item: item,
-                                isLandscape: style == .landscape,
-                                interaction: interaction,
-                                showsResumeChip: showsResumeChip,
-                                showsSeriesArtwork: showsSeriesArtwork,
-                                isPendingRemoval: pendingRemovalIDs.contains(
-                                    item.stablePresentationID
-                                ),
-                                provider: provider(for: item)
-                            )
-                            .frame(
-                                width: metrics.cardSlotWidth(
-                                    for: style,
-                                    cardStyle: cardStyle,
-                                    showsSeriesArtwork: showsSeriesArtwork
-                                )
-                            )
-                            .onAppear {
-                                if prefetchesArtwork {
-                                    prefetchArtwork(around: item)
-                                }
-                            }
-                        case .loadingPlaceholder:
-                            PlozziOSPosterCard(
-                                item: nil,
-                                style: style,
-                                showsSeriesArtwork: showsSeriesArtwork,
-                                reservesSubtitleSpace: style == .poster || showsSeriesArtwork
-                            )
-                            .frame(
-                                width: metrics.cardSlotWidth(
-                                    for: style,
-                                    cardStyle: cardStyle,
-                                    showsSeriesArtwork: showsSeriesArtwork
-                                )
-                            )
-                        }
-                    }
-                    ForEach(liveChannels) { channel in
-                        HomeLiveTVCard(
-                            channel: channel,
+            PlozziOSMediaRailScroll(
+                onLoadMore: onLoadMore,
+                trailingPlaceholderWidth: CGFloat(loadingPlaceholderCount) * (
+                    metrics.cardSlotWidth(
+                        for: style, cardStyle: cardStyle, showsSeriesArtwork: showsSeriesArtwork
+                    ) + PlozziOSMediaRailLayout.stackSpacing(metrics: metrics, cardStyle: cardStyle)
+                ),
+                onNavigationInteraction: onNavigationInteraction
+            ) {
+                ForEach(MediaRowView.presentationElements(
+                    items: items,
+                    loadingPlaceholderCount: loadingPlaceholderCount
+                )) { element in
+                    switch element {
+                    case .item(let item):
+                        PlozziOSHomeMediaCard(
+                            item: item,
+                            isLandscape: style == .landscape,
+                            interaction: interaction,
+                            showsResumeChip: showsResumeChip,
+                            showsSeriesArtwork: showsSeriesArtwork,
+                            isPendingRemoval: pendingRemovalIDs.contains(
+                                item.stablePresentationID
+                            ),
+                            provider: provider(for: item)
+                        )
+                        .frame(
                             width: metrics.cardSlotWidth(
-                                for: .landscape, cardStyle: cardStyle,
+                                for: style,
+                                cardStyle: cardStyle,
+                                showsSeriesArtwork: showsSeriesArtwork
+                            )
+                        )
+                        .onAppear {
+                            if prefetchesArtwork {
+                                prefetchArtwork(around: item)
+                            }
+                        }
+                    case .loadingPlaceholder:
+                        PlozziOSPosterCard(
+                            item: nil,
+                            style: style,
+                            showsSeriesArtwork: showsSeriesArtwork,
+                            reservesSubtitleSpace: style == .poster || showsSeriesArtwork
+                        )
+                        .frame(
+                            width: metrics.cardSlotWidth(
+                                for: style,
+                                cardStyle: cardStyle,
                                 showsSeriesArtwork: showsSeriesArtwork
                             )
                         )
                     }
                 }
-            }
-            .loadingMoreOnScroll(
-                onLoadMore,
-                trailingPlaceholderWidth: CGFloat(loadingPlaceholderCount) * (
-                    metrics.cardSlotWidth(
-                        for: style, cardStyle: cardStyle, showsSeriesArtwork: showsSeriesArtwork
-                    ) + PlozziOSMediaRailLayout.stackSpacing(metrics: metrics, cardStyle: cardStyle)
-                )
-            )
-            .contentMargins(
-                .horizontal,
-                PlozziOSMediaRailLayout.artworkAlignedInset(
-                    PlozziOSPageLayout.horizontalInset(for: horizontalSizeClass, usesDesktopSizing: metrics.usesDesktopSizing),
-                    metrics: metrics, cardStyle: cardStyle),
-                for: .scrollContent
-            )
-            .plozziOSMediaRailClearance()
-            .onScrollGeometryChange(for: CGFloat.self) {
-                $0.contentOffset.x
-            } action: { oldOffset, newOffset in
-                guard oldOffset != newOffset else { return }
-                onNavigationInteraction()
+                ForEach(liveChannels) { channel in
+                    HomeLiveTVCard(
+                        channel: channel,
+                        width: metrics.cardSlotWidth(
+                            for: .landscape, cardStyle: cardStyle,
+                            showsSeriesArtwork: showsSeriesArtwork
+                        )
+                    )
+                }
             }
         }
         .task(id: artworkPrefetchIdentity) {

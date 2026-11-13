@@ -262,12 +262,62 @@ server addresses, credentials, media IDs/titles or response bodies.
   Mobile library discovery follows the effective credential and Plex Home viewer,
   and cancelled lookups cannot restore another viewer's library choices.
   The section catalog enumerates optional recommendations only while the editor
-  is open. Authored collection rows have independent stable section identities,
-  names and poster, landscape or Featured presentation. Each references one account/viewer-qualified
-  collection through `MediaProvider`; its bounded preview preserves server order
-  and membership, showing supported movie and series cards without reconstructing
-  library membership. **See all** opens the existing collection browser using
-  the original provider ID. All card styles open title details.
+  is open. Authored custom rows have independent stable section identities,
+  names and poster, landscape or Featured presentation. `CollectionSection`
+  migrates its former singular collection reference to an ordered array of
+  `HomeContentSource` values. Sources can be collections, video playlists, video
+  libraries, recommendations, or shared Home feeds. Server sources retain their
+  account and exact viewer; provider requests always use native IDs.
+  `HomeContentPager` interleaves source order across uneven pages and merges
+  duplicates through `MediaItemMerger`. It serializes competing browse advances,
+  bounds provider fan-out to three, adapts page sizes for overlap, and caps scans
+  instead of draining a library to fill a default preview. Cancellation commits no cursor
+  changes; partial source failures retain usable cards and remain retryable.
+  Custom Home rows share one three-request lane and reuse identical preview
+  pages during a Home load. Their work does not occupy native Home feed lanes.
+  **See all** uses the same composition in the poster grid. Recently Added
+  retains native full-feed paging rather than stopping at the Home preview;
+  Watchlist and Continue Watching use profile-curated runtime snapshots.
+  Custom rows persist a shared `HomeContentQuery`: Source order (the default),
+  Name, Date Added, Release Date or Runtime with a direction, plus movie/show and
+  Unwatched/In Progress filters. Preview, Home and the initial grid use the same
+  query. Source order preserves curated playlists; the TV Shows filter includes
+  seasons and episodes in feeds that admit them. A Watchlist-only row uses its
+  saved-added dates rather than library-added dates.
+  Explicit queries read complete membership before projecting results, not just
+  the first page. Large sources consequently cost more network I/O and memory.
+  Full traversal uses bounded pages and at most three source requests, merges
+  once after collection, supports cancellation and fails visibly if any source
+  cannot complete. Changing queries in one editor reuses its scoped inventory;
+  Retry or changing credentials, sources or visibility starts a new traversal.
+  Recently Added queries expand the native feed beyond the Home preview.
+  Watch mutations reproject retained candidates and collection refreshes retain
+  full membership for queried rows. Durable Home snapshots keep only the
+  already-projected preview, never a truncated inventory posing as complete.
+  Grid changes remain temporary and do not overwrite the saved row query.
+  Browse watch-mutation projection, like ordinary sorting, runs off the main
+  actor and fences publication by scope, query generation and mutation revision.
+  Raw candidates stay unchanged so later filters can restore excluded titles.
+  Local query sorting normalizes names once and sorts indices rather than
+  repeatedly moving whole media records. Empty filters avoid building library
+  query records; filtering and ordinary sorting periodically check cancellation.
+  A traversal pins snapshots to prevent offset shifts, while Home presentation
+  reflects current shared-feed membership. All card styles open title details.
+  Recommendations from the same account/library/kind share one bounded discovery
+  response per traversal, including concurrent requests. Its shelves remain in
+  memory until the traversal ends; there is no cross-profile or global cache.
+  Failed or cancelled discovery is not cached, and unrelated libraries retain
+  independent request lanes.
+  Jellyfin additionally reuses exact recommendation responses across Home,
+  Settings discovery, previews, and browsing for up to one minute within the
+  same Home/profile owner. The authenticated provider bounds this transient
+  cache to 16 entries and 2,000 item records. Home reloads and watched/watchlist
+  mutations advance its generation; profile retirement invalidates it. Pausing
+  Home behind Settings does not retire authorized snapshot access. Detached Home
+  aggregation explicitly installs the scope, while previews and browse sessions
+  capture it. Missing-shelf and explicit editor Retry request fresh discovery
+  without replacing already pinned healthy shelves. This does not change
+  recommendation limits, cold server latency, or Emby's fixed-snapshot behavior.
   This member-row layout is separate from collection **covers**. Lists and Home
   or Recommended rows containing only collection containers use a uniform
   Auto/Posters/Landscape cover layout. Overrides are profile-scoped and keyed
@@ -283,7 +333,9 @@ server addresses, credentials, media IDs/titles or response bodies.
   failures remain distinct from empty collections.
   Successful Watchlist server writes (add **and** remove, including retries or
   reconciliation that actually writes) quietly refresh the affected profile/viewer's
-  configured collection rows. Read-only reconciliation, unchanged confirmations,
+  configured collections, including those inside mixed-source rows. Refreshing
+  one collection preserves the other sources' contents, failures and continuation.
+  Read-only reconciliation, unchanged confirmations,
   optimistic local intent, and navigation do not schedule this extra pass; normal
   Home loads retain their existing behavior. Watchlist/Watch Later/My List-like
   names are prioritized, not used to exclude custom names. Changes coalesce for 750 ms; one utility task

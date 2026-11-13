@@ -1,5 +1,13 @@
 # CoreUI
 
+`HomeRowPreviewView` renders the actual Home rail presentation, not a separately
+scaled card sample. TV uses `MediaRowView`; mobile Home and the preview share
+`PlozziOSHomeRailLayout`, `PlozziOSMediaSection` and `PlozziOSMediaRailScroll`.
+Featured Home rows and previews share `FeaturedMediaRowPresentation` and
+`FeaturedCardControl`, while HeroUI retains trailer ownership. Preview routing,
+playback and context actions are inert without disabling/dimming the cards;
+TV focus and horizontal scrolling remain available.
+
 Home row browsing uses `BrowseRowHeading` for a single accessible title/chevron
 touch target and `MediaRowBrowseCard` for a native TV rail action. Opt a rail in
 with `browsingRow`; existing collection-detail `onSeeAll` headers elsewhere keep
@@ -150,9 +158,13 @@ Ordinary Settings fields use `SettingsInputRow` inside their existing group or
 panel. It supplies a persistent, wrapping label and forwards that name to the
 native input for accessibility without speaking a second static label. Callers
 retain bindings, keyboard/content types, secure entry, focus and submit behavior.
-An optional trailing status shares the label's baseline and secondary type size
-without hiding its accessibility text. Autosaving editors own that status and its
-announcement; the input row does not imply persistence or add a focus target.
+Short form values can opt into `axis: .horizontal` for an inline label and input;
+accessibility text sizes fall back to the stacked layout. Other fields retain
+their existing stacked presentation.
+An optional secondary-sized status shares the label's baseline in the stacked
+layout or sits below the trailing input in the inline layout, without hiding its
+accessibility text. Autosaving editors own that status and its announcement; the
+input row does not imply persistence or add a focus target.
 The row owns no background or outer insets; do not nest settings surfaces around
 it. Search, code-entry, and message-composition controls are intentional exceptions.
 Composite rows use `settingsControlTarget()` inside each control label for separate,
@@ -788,9 +800,12 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   retaining its hue and brightness without desaturating the hero image. Showcase,
   detail pages, and untinted stock gradients retain their existing treatment.
   Tint saturation is page-scoped and shared with native card fills/textures.
-  Settings panels use a 5% wash; detail information cards use a stronger 12%
+  Settings panels use a 5% wash; custom detail information surfaces use a stronger 12%
   wash so grouped content remains distinct from the artwork gradient. Both use
   white in Dark/Black and black in Light without replacing the gradient's colour.
+  System-style tvOS information cards retain the native material instead of
+  matching that custom wash. Gradient Off and Reduce Transparency keep the
+  underlying information band opaque, so changes behind it cannot tint the cards.
   SwiftUI surfaces keep their
   shadow and a matching hairline edge. Gradient Off or Reduce Transparency restores the original solid
   surface and border; unrelated raised cards remain unchanged.
@@ -814,18 +829,41 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   confirmed. Its portrait stack and landscape columns scroll at constrained
   heights. Standalone PIN prompts and tvOS keep their existing presentation.
   The detail information band retains its darker 40%-opaque surface.
-  Compact mobile detail metadata and actions reveal the page background instead
-  of covering it with a solid rectangle — the ambient gradient when gradients
-  are on, or the page's base colour when they are off. This holds under Reduce
-  Transparency too, because the band sits below the artwork rather than over it;
-  an opaque band there was a grey rectangle laid across a gradient. The
-  artwork's existing readability fade stays.
-  The selected season tab uses true Liquid Glass on iOS/tvOS 26+, the same
-  material as the hero's Play and secondary action pills, and deliberately does
-  not defer to the panel-glass budget. Reduce Transparency (the viewer's in-app
-  Liquid Glass setting resolved against the system setting) keeps the tab on its
-  solid surface.
-  Native tvOS cards display their local portion of a shared page-mesh texture,
+  Compact mobile detail metadata and actions reveal the page gradient instead
+  of covering it with a solid rectangle, including with Reduce Transparency:
+  the page gradient itself is opaque, not a glass/material surface. Gradient Off
+  retains the original opaque base. The artwork's existing readability fade stays.
+  On iOS 26+, `PlozziOSNavigationBackground` removes full-width scroll-edge
+  backdrops when either system or app transparency is reduced. Native navigation
+  buttons and tabs use Apple's opaque accessibility treatment when the OS
+  reduces transparency. App-only Liquid Glass Off uses
+  `plozzOpaqueNavigationChrome()` for opaque native Back and toolbar surfaces,
+  retaining the original actions, menus and navigation gestures. Shared tab
+  shells and dialog presenters install it; toolbar updates are observed through
+  a passive UIKit update link without requesting continuous frames or replacing
+  navigation delegates. Back uses a temporary native back item; restoration also
+  refreshes UIKit's cached Back rendering, with pixel coverage for the live
+  On/Off transition in both themes. Multi-item
+  UIKit groups are temporarily separated because UIKit otherwise ignores their
+  shared-background visibility. Turning glass back on restores their grouping
+  and surfaces without replacing the navigation stack.
+  The opaque navigation fill is precomposed from the theme's decorative gradient
+  colors (or raised surface with Gradient Off), with a subtle outline. It does
+  not sample artwork or scrolling content. Selected tabs retain an accent-colored
+  label on a quiet opaque highlight, rather than inverting to a white pill.
+  `PlozzOpaqueTabBar` replaces the floating bottom controls in app-only Off mode,
+  retaining the configured destination order, labels, badges and Settings action.
+  Overflow scrolls horizontally; the underlying native TabView retains its
+  selection and navigation state. The tab bridge hides the native bar and
+  includes the replacement in music-dock clearance. Hero artwork and the page
+  background continue behind the controls. Normal iPhone
+  scroll-edge effects, older iOS navigation, and Mac's clear top edge are preserved.
+  Pushed detail scroll views apply this policy locally; the tab shell's edge
+  preference alone does not cover subsequent navigation destinations. Home and
+  detail pages add a noninteractive, page-colored status-area fade only as they
+  scroll under reduced transparency, preserving status-text readability without
+  covering the hero at rest or restoring a full-width opaque footer.
+  TVUIKit-backed tvOS cards display their local portion of a shared page-mesh texture,
   with the information band precomposed because TVUIKit replaces fill alpha.
   A background-only tint layer applies each card's wash without fading text or
   rerendering the shared texture. The texture is created only when a card needs it, its longest edge is
@@ -836,8 +874,16 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   detail page's darker information band. Nested workspace pages inherit that
   background instead of painting another gradient. Native focus,
   clipping and text remain TVUIKit-owned.
+  On iOS, reduced-transparency Settings groups reuse that page-aligned texture
+  with their normal tint and outline, instead of switching to flat charcoal.
+  `SettingsPageSurface` owns the texture for pushed pages, including pages inside
+  sheets; shared dialog presenters provide it to other presented content.
+  The texture contains only the decorative background, so foreground content
+  cannot show through a group. Rendering coverage compares On/Off pixels in dark,
+  light and pure-black themes and verifies that changing content underneath does
+  not alter the opaque fill. Gradient Off retains the theme's solid raised fill.
   Text stays opaque and native focus geometry is unchanged. Gradient Off or
-  Reduce Transparency restores both the solid band and solid card fills.
+  Reduce Transparency restores both the solid band and solid card fills on tvOS.
 - **Episode loading preview** — the tvOS entry overlay leaves gutters and caption
   spacing transparent to the owning page, including artwork-tinted gradients.
   Only the real cards' drawing is hidden while their lazy layout realizes the
@@ -883,6 +929,9 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   sibling identities, handler/router identity, or locale. Obsolete actions are
   invalidated when that context changes or the poster is dismantled. A changed
   action scope dismisses an already presented menu.
+  Dismantling clears presentation callbacks before dismissing the interaction:
+  removed SwiftUI content must not receive state writes during graph teardown.
+  Live scope changes still notify the mounted content normally.
   Custom-focus episode cards and other SwiftUI-owned controls retain their
   existing menu path; mobile menus and their artwork routing are unchanged.
   Episode-card captions collapse paragraph breaks and whitespace into one
@@ -1308,7 +1357,10 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
 - **Detail information focus** — About, ratings and family guidance use the
   standard tvOS card button style in System mode. The system owns the lift,
   highlight and enlargement; shared grid gutters must keep the painted surfaces
-  separate throughout focus transitions. Text retains the selected theme on
+  separate throughout focus transitions. System-style rating columns use the
+  same two-sided focus clearance as facts: both neighboring cards can be enlarged
+  during a handoff. Custom-focus, vertical, and mobile spacing remain unchanged.
+  Text retains the selected theme on
   Liquid Glass systems and uses dark text on the older opaque focus plate.
   Focused read-only cards and card buttons draw above their peers.
   Ordinary media cards, custom focus styles and touch layouts are unchanged.

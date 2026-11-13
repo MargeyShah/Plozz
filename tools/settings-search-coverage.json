@@ -367,7 +367,7 @@
       "reason": "Reusable preference input; coverage belongs to each configured call site. Its internal control contract is checked separately.",
       "controls": {
         "Sources/FeatureSettings/SettingsMenuRow.swift|SettingsMenuRow|body|Menu|SettingsSectionLabel( title: Text(title), icon: icon, assetIcon: nil, value: value, subtitle: subtitle.map(Text.init), accessorySymbol: \"chevron.up.chevron.down\" )": 1,
-        "Sources/FeatureSettings/SettingsMenuRow.swift|SettingsMenuRow|body|Menu|VStack(alignment: .leading, spacing: 4) { LabeledContent { HStack { if let icon { Image(systemName: icon) } SettingsMenuValue(value) } } label: { Text(title) } if let subtitle { Text(subtitle) .font(.footnote) .plozzForeground(.secondary) .fixedSize(horizontal: false, vertical: true) } }": 1
+        "Sources/FeatureSettings/SettingsMenuRow.swift|SettingsMenuRow|body|Menu|VStack(alignment: .leading, spacing: 4) { LabeledContent { HStack { if let icon { Image(systemName: icon) } SettingsMenuValue(value) } } label: { Text(title) } if let subtitle { Text(subtitle) .font(.footnote) .plozzForeground(.secondary) .fixedSize(horizontal: false, vertical: true) } } .frame(minHeight: minimumContentHeight)": 1
       }
     },
     "SettingsOptionList": {
@@ -1300,7 +1300,7 @@
       "reason": "Transient page selection within the independently indexed caption-view family.",
       "count": 1
     },
-    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|let choice = HomeRowChoice(collectionSection: draft) HomeEditorRowLabel( title: Text(\"Content\"), subtitle: choice.homeEditorSource(in: accounts), subtitleProvider: choice.homeEditorProvider(in: accounts) )": {
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|let choice = HomeRowChoice(collectionSection: draft) HomeEditorRowLabel( title: Text(\"Content\"), subtitle: draft.sources.isEmpty ? nil : choice.homeEditorSource(in: accounts), subtitleProvider: choice.homeEditorProvider(in: accounts) )": {
       "reason": "Existing choice/confirmation within an indexed editor. Search reaches the editor without selecting a runtime value or bypassing confirmation.",
       "covered_by": [
         "home-row-arrangement"
@@ -1308,7 +1308,7 @@
       "count": 1
     },
     "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|previewContent|Button|\"Retry\"": {
-      "count": 1,
+      "count": 2,
       "reason": "Explicit navigation, confirmation, reset, connection or diagnostic action; not a preference input."
     },
     "Sources/FeatureSettings/ExternalPlayerSettingsView.swift|CustomExternalPlayerControls|body|Button|Text(\"Save and use custom player\").settingsControlTarget()": {
@@ -3013,7 +3013,7 @@
       "count": 1,
       "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
     },
-    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|nameInput|TextField|\"Row name\"": {
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|nameInput|TextField|\"Name\"": {
       "count": 1,
       "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
     },
@@ -3944,6 +3944,38 @@
     "Sources/FeatureSettings/TrackerHistorySyncSettingsView.swift|TrackerHistorySyncSettingsView|body|Button|\"Cancel\"": {
       "count": 1,
       "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference."
+    },
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|SettingsMenuRow|\"Sort\"": {
+      "reason": "Contextual Home, collection or caption editor control; the owning page or its catalog entry carries search coverage.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|SettingsMenuRow|\"Filter\"": {
+      "reason": "Contextual Home, collection or caption editor control; the owning page or its catalog entry carries search coverage.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentPickerDoneButton|body|Button|\"Done\"": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentPickerView|body|Button|HomeEditorRowLabel(title: Text(\"Collections\"))": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentPickerView|body|Button|HomeEditorRowLabel(title: Text(\"Playlists\"))": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentPickerView|body|Button|\"Retry\"": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentPickerView|choice|SettingsCheckableRow|source.localizedTitle.map(Text.init) ?? Text(verbatim: source.title)": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/HomeContentPickerView.swift|HomeContentSelectionSummary|body|Button|Label(\"Remove\", systemImage: \"xmark\") .labelStyle(.iconOnly) .settingsControlTarget()": {
+      "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
     }
   }
 }

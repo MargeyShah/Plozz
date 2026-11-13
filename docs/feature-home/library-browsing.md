@@ -84,6 +84,11 @@ unrelated library. Server previews carry the continuation from their content
 response through aggregation and presentation, separately from saved layout
 discovery. This preserves Plex curated shuffle seeds across every browser page.
 Fixed server shelves end when the source has no continuation.
+Emby's movie recommendations reshuffle between requests and expose no stable
+continuation. They retain their captured items for the traversal instead of
+extending a different result set; a new Home load refreshes the suggestions.
+Custom rows capture up to 20 items per such recommendation. This does not cap
+collection, playlist, library, or independently pageable server feeds.
 Combined Recently Added also enforces its non-music library scope on returned
 items when a provider cannot scope the feed, without changing raw page offsets.
 Its hide-watched policy is reapplied after watch mutations for combined,
@@ -92,7 +97,10 @@ per-library, and server rows; retained candidates can reappear when marked unwat
 Sorting and filtering first complete the shelf, then publish the whole-row
 result. Pending or failed queries never display a partially sorted page as a
 complete answer. This can require more requests and memory than opening the
-default-order grid, especially for large collections. Work is cancelled on
+default-order grid, especially for large collections. Custom rows retain their
+previous projection when any source fails a complete query; Retry resumes the
+uncompleted source without fetching committed pages again. Default-order browsing
+still shows successful sources alongside the partial error. Work is cancelled on
 navigation/supersession, and profile/source visibility is checked again after
 asynchronous work. Watchlist reuses Home's full retained data in its existing tab;
 the preview does not reinterpret its account-wide membership. Browse controls

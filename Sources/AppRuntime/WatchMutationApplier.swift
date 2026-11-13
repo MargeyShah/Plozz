@@ -183,8 +183,8 @@ public struct AppShellWatchMutationApplier: WatchMutationAuthorizationEnforcing 
         // by the play's real time, so prefer the timestamped write — otherwise a
         // late-draining stale played write, stamped at drain time, would clobber a
         // newer resume. A server-backed provider (Plex/Jellyfin) owns recency and
-        // uses the plain write.
-        if let timestamped = provider as? PlayedStateWriting {
+        // uses the kind-aware write below, which keeps the season/series cascade.
+        if let timestamped = provider as? any PlayedStateWriting, timestamped.usesLocalWatchStateOnly {
             try await timestamped.setPlayed(played, itemID: target.itemID, capturedAt: capturedAt)
             return
         }

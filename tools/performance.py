@@ -251,6 +251,73 @@ SCENARIOS = {
         "description": "Traverse 181 posters forward/backward with repeated overlapping windows across Jellyfin, Emby, Plex, and TMDB URLs.",
         "counters": ["candidateVisits", "distinctURLChecks", "queuedPreviews"],
     },
+    "home-recommendation-navigation": {
+        "suite": "network", "target": "ProviderJellyfinTests",
+        "test": "JellyfinRecommendationPerformanceTests/testPerformanceHomeRecommendationNavigation",
+        "file": "Tests/ProviderJellyfinTests/JellyfinRecommendationPerformanceTests.swift",
+        "description": "Production recommendation decoding/mapping across Home, picker, preview and two-shelf browsing; 5-ms synthetic transport, exact ordered contents.",
+        "counters": ["requests", "bytes", "items"],
+    },
+    "home-single-collection-row": {
+        "suite": "core", "target": "FeatureHomeCoreTests",
+        "test": "CollectionSectionLoadingTests/testPerformanceSingleCollectionRow",
+        "file": "Tests/FeatureHomeCoreTests/CollectionSectionLoadingTests.swift",
+        "description": "Load a production authored Home row from a collection returning two items per page; verify twenty ordered items and bounded lookahead.",
+        "counters": ["rows", "items", "requests"],
+    },
+    "home-multi-source-row": {
+        "suite": "core", "target": "FeatureHomeCoreTests",
+        "test": "HomeContentPagerTests/testPerformanceMultipleSources",
+        "file": "Tests/FeatureHomeCoreTests/HomeContentPagerTests.swift",
+        "description": "Load 21 unique cards from 2, 8 and 32 sources of 100,000 titles, with bounded parallel requests.",
+        "counters": ["items", "requests", "fetched", "maximumConcurrent"],
+    },
+    "home-overlapping-source-browse": {
+        "suite": "core", "target": "FeatureHomeCoreTests",
+        "test": "HomeContentPagerTests/testPerformanceOverlappingSourcesBrowse",
+        "file": "Tests/FeatureHomeCoreTests/HomeContentPagerTests.swift",
+        "description": "Complete an eight-source browse of 1,600 overlapping records into 200 playable titles.",
+        "counters": ["items", "requests", "fetched", "maximumConcurrent"],
+    },
+    "home-rapid-row-queries": {
+        "suite": "network", "target": "FeatureHomeCoreTests",
+        "test": "HomeContentPagerTests/testPerformanceRapidSavedRowQueries",
+        "file": "Tests/FeatureHomeCoreTests/HomeContentPagerTests.swift",
+        "description": "Cancel and replace four 20,000-title queries, filter mixed watch states, and measure main-actor scheduling.",
+        "counters": ["items", "heartbeatTicks", "maximumMainActorGapNanoseconds"],
+    },
+    **{
+        f"home-live-{provider}-queries": {
+            "suite": "network", "target": "AppRuntimeTests", "explicitOnly": True,
+            "test": f"LiveHomeContentTests/testPerformance{provider.title()}SavedQueries",
+            "file": "Tests/AppRuntimeTests/LiveHomeContentTests.swift",
+            "description": "Authorized real-server row inventory, eight sorts, watch/media filters and cancelled query replacement.",
+            "counters": ["items", "sources", "pages", "datedItems", "releaseYearItems", "runtimeItems", "coldNanoseconds",
+                         "warmEightQueriesNanoseconds", "maximumMainActorGapNanoseconds"],
+        }
+        for provider in ("jellyfin", "emby", "plex", "silo", "combined")
+    },
+    **{
+        f"home-live-{provider}-{strategy}-inventory": {
+            "suite": "network", "target": "AppRuntimeTests", "explicitOnly": True,
+            "test": f"LiveHomeContentTests/testPerformance{provider.title()}{strategy.title()}Inventory",
+            "file": "Tests/AppRuntimeTests/LiveHomeContentTests.swift",
+            "description": "Real-server eager/deferred comparison including full card fidelity, scrolling and sort changes.",
+            "counters": ["items", "firstDisplayNanoseconds", "next180CardsNanoseconds", "eightSortsNanoseconds",
+                         "maximumSortNanoseconds", "cachedReplayNanoseconds", "firstDisplayRequests",
+                         "firstDisplayBytes", "totalRequests", "totalBytes"],
+        }
+        for provider in ("plex", "combined")
+        for strategy in ("eager", "deferred")
+    },
+    "home-saved-row-queries": {
+        "suite": "network", "target": "FeatureHomeCoreTests",
+        "test": "HomeContentPagerTests/testPerformanceSavedRowQueries",
+        "file": "Tests/FeatureHomeCoreTests/HomeContentPagerTests.swift",
+        "description": "Complete 20,000 custom-row titles, reuse inventory for four sorts, and apply a watch mutation.",
+        "counters": ["items", "requests", "fetched", "coldNanoseconds",
+                     "warmFourQueriesNanoseconds", "mutationNanoseconds"],
+    },
     "collection-discovery": {
         "suite": "network", "target": "ProviderJellyfinTests",
         "test": "CollectionDiscoveryPerformanceTests/testPerformanceCollectionDiscovery",
@@ -549,6 +616,12 @@ SCENARIOS = {
                      "stateNotifications", "continueWatchingItems", "metadataPeople",
                      "mainActorSchedulingSamples", "mainActorMaxSchedulingDelayMicroseconds",
                      "observedRowUpdates", "parentBodies", "cardInputBuilds"],
+    },
+    "home-multi-source-presentation": {
+        "suite": "ui", "test": "HomeMetadataPerformanceTests/testPerformanceMultiSourceRowPresentation",
+        "file": "Tests/PerformancePresentationSupport/HomeMetadataPerformanceTests.swift",
+        "description": "Update the mounted production row with 20 titles merged from eight sources and 640 metadata credits.",
+        "counters": ["rootUpdates", "parentBodies", "cardInputBuilds", "rowItems", "metadataPeople"],
     },
     "home-row-metadata-updates": {
         "suite": "ui", "test": "HomeMetadataPerformanceTests/testPerformanceProductionRowMetadataUpdates",
@@ -853,7 +926,7 @@ def configure_scheme(tree):
         action.remove(old)
     variables = ET.SubElement(action, "EnvironmentVariables")
     ET.SubElement(variables, "EnvironmentVariable", key="PLOZZ_PERFORMANCE", value="1", isEnabled="YES")
-    for name in ("PLOZZ_JELLYFIN_HOME_BROKER", "PLOZZ_MUSIC_BROKER"):
+    for name in ("PLOZZ_JELLYFIN_HOME_BROKER", "PLOZZ_MUSIC_BROKER", "PLOZZ_LIVE_HOME_BROKER"):
         broker = os.environ.get(name)
         if not broker:
             continue

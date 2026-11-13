@@ -29,6 +29,9 @@ public struct JellyfinClient: Sendable {
     private let playbackServerKey: String
     private let inventoryScope = UUID()
     let userViewRequests = JellyfinDiscoveryRequests<[BaseItemDto]>()
+    private let recommendationRequests = JellyfinRecommendationRequests()
+    // Emby omits release metadata unless explicitly requested, unlike Jellyfin.
+    private static let homeRowSortFields = "SortName,DateCreated,ProductionYear,PremiereDate"
 
     public init(
         baseURL: URL,
@@ -297,7 +300,7 @@ public struct JellyfinClient: Sendable {
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "EnableTotalRecordCount", value: "true"),
-            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,PrimaryImageAspectRatio,ProviderIds,DateCreated")
+            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let parentID { query.append(URLQueryItem(name: "ParentId", value: parentID)) }
         return try await http.decode(
@@ -318,7 +321,7 @@ public struct JellyfinClient: Sendable {
                 URLQueryItem(name: "Limit", value: String(limit)),
                 URLQueryItem(name: "IsInProgress", value: "true"),
                 URLQueryItem(name: "EnableTotalRecordCount", value: "false"),
-                URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,DateCreated")
+                URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
             ],
             headers: authHeaders
         )
@@ -364,7 +367,7 @@ public struct JellyfinClient: Sendable {
         var queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "MediaTypes", value: "Video"),
-            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,PrimaryImageAspectRatio,ProviderIds,DateCreated")
+            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let startIndex {
             queryItems.append(URLQueryItem(name: "StartIndex", value: String(startIndex)))
@@ -390,12 +393,12 @@ public struct JellyfinClient: Sendable {
     /// the provider fold both classes into one Continue Watching feed, matching
     /// Plex parity.
     ///
-    /// `EnableResumable=false` keeps NextUp complementary rather than overlapping:
-    /// in-progress episodes already come back from `/Items/Resume`, so NextUp is
-    /// scoped to the next-after-completed episode. `EnableRewatching=false` avoids
-    /// resurfacing fully-watched series. A series-specific resume lookup includes
-    /// resumable candidates because compatible servers may not scope Resume to a
-    /// series; the provider still prefers Resume when both return the same episode.
+    /// `EnableResumable=true` matches Jellyfin's own clients and avoids a gap
+    /// where a series disappears from both feeds: the server omits a series from
+    /// NextUp when its next episode has any resume position, while Plozz's own
+    /// brief-play threshold can hide that same episode from Resume. The combined
+    /// Continue Watching feed dedupes Resume-first, so overlap is harmless.
+    /// `EnableRewatching=false` avoids resurfacing fully-watched series.
     func nextUpItems(
         userID: String, limit: Int, parentID: String? = nil, seriesID: String? = nil
     ) async throws -> [BaseItemDto] {
@@ -430,9 +433,10 @@ public struct JellyfinClient: Sendable {
             URLQueryItem(name: "UserId", value: userID),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "MediaTypes", value: "Video"),
-            URLQueryItem(name: "EnableResumable", value: seriesID == nil ? "false" : "true"),
+            URLQueryItem(name: "EnableResumable", value: "true"),
             URLQueryItem(name: "EnableRewatching", value: "false"),
-            URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,DateCreated")
+            URLQueryItem(name: "EnableUserData", value: "true"),
+            URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let startIndex {
             queryItems.append(URLQueryItem(name: "StartIndex", value: String(startIndex)))
@@ -651,7 +655,7 @@ public struct JellyfinClient: Sendable {
     ) async throws -> [BaseItemDto] {
         var queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,ProviderIds,DateCreated")
+            URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let parentID {
             queryItems.append(URLQueryItem(name: "ParentId", value: parentID))
@@ -670,6 +674,20 @@ public struct JellyfinClient: Sendable {
     }
 
     func movieRecommendations(userID: String, parentID: String, limit: Int) async throws -> [MovieRecommendationDto] {
+        guard providerKind == .jellyfin, let scope = HomeRecommendationScope.current else {
+            return try await fetchMovieRecommendations(userID: userID, parentID: parentID, limit: limit)
+        }
+        return try await recommendationRequests.load(
+            scope: scope, user: userID, library: parentID, limit: limit,
+            refresh: HomeRecommendationScope.refreshRequested
+        ) {
+            try await fetchMovieRecommendations(userID: userID, parentID: parentID, limit: limit)
+        }
+    }
+
+    private func fetchMovieRecommendations(
+        userID: String, parentID: String, limit: Int
+    ) async throws -> [MovieRecommendationDto] {
         let endpoint = Endpoint(
             path: "/Movies/Recommendations",
             queryItems: [
@@ -677,7 +695,7 @@ public struct JellyfinClient: Sendable {
                 URLQueryItem(name: "parentId", value: parentID),
                 URLQueryItem(name: "categoryLimit", value: "5"),
                 URLQueryItem(name: "itemLimit", value: String(limit)),
-                URLQueryItem(name: "fields", value: "Overview,OriginalTitle,ProviderIds,DateCreated")
+                URLQueryItem(name: "fields", value: "Overview,OriginalTitle,ProviderIds,\(Self.homeRowSortFields)")
             ],
             headers: authHeaders
         )
@@ -698,7 +716,7 @@ public struct JellyfinClient: Sendable {
             queryItems: [
                 URLQueryItem(name: "Ids", value: requested.sorted().joined(separator: ",")),
                 URLQueryItem(name: "Limit", value: String(requested.count)),
-                URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,ProviderIds,PrimaryImageAspectRatio,DateCreated,Genres"),
+                URLQueryItem(name: "Fields", value: "Overview,OriginalTitle,ProviderIds,PrimaryImageAspectRatio,Genres,\(Self.homeRowSortFields)"),
                 URLQueryItem(name: "EnableImages", value: "true"),
                 URLQueryItem(name: "ImageTypeLimit", value: "1"),
                 URLQueryItem(name: "EnableUserData", value: "true"),
@@ -817,7 +835,7 @@ public struct JellyfinClient: Sendable {
                 URLQueryItem(name: "Limit", value: String(page.limit)),
                 URLQueryItem(name: "EnableTotalRecordCount", value: "true"),
                 URLQueryItem(name: "EnableUserData", value: "true"),
-                URLQueryItem(name: "Fields", value: "Overview,MediaStreams,MediaSources,Genres,ProviderIds,UserData,DateCreated")
+                URLQueryItem(name: "Fields", value: "Overview,MediaStreams,MediaSources,Genres,ProviderIds,UserData,\(Self.homeRowSortFields)")
             ],
             headers: authHeaders
         )
@@ -886,7 +904,7 @@ public struct JellyfinClient: Sendable {
         startIndex: Int,
         limit: Int,
         sort: CoreModels.SortDescriptor,
-        fields: String = "PrimaryImageAspectRatio,ProviderIds,SortName,DateCreated,Genres",
+        fields: String = "PrimaryImageAspectRatio,ProviderIds,Genres",
         filters: LibraryFilters = .all,
         useServerCollections: Bool = false
     ) async throws -> ItemsResponse {
@@ -900,7 +918,7 @@ public struct JellyfinClient: Sendable {
             // Minimal fields keep the first-page payload small for a fast grid;
             // ProviderIds is included so the aggregated cross-server library
             // browse can collapse a title that lives on multiple servers.
-            URLQueryItem(name: "Fields", value: fields),
+            URLQueryItem(name: "Fields", value: "\(fields),\(Self.homeRowSortFields)"),
             URLQueryItem(name: "ImageTypeLimit", value: "1"),
             URLQueryItem(name: "EnableTotalRecordCount", value: "true")
         ]
@@ -1790,7 +1808,7 @@ public struct JellyfinClient: Sendable {
     ) async throws -> ItemsResponse {
         var query = [
             URLQueryItem(name: "UserId", value: userID),
-            URLQueryItem(name: "Fields", value: "Genres,PrimaryImageAspectRatio"),
+            URLQueryItem(name: "Fields", value: "Genres,PrimaryImageAspectRatio,\(Self.homeRowSortFields)"),
             URLQueryItem(name: "EnableTotalRecordCount", value: "true")
         ]
         if let start { query.append(URLQueryItem(name: "StartIndex", value: String(start))) }
