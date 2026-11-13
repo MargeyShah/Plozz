@@ -291,6 +291,24 @@ private struct PlozziOSCanonicalItemDetailView: View {
         )
     }
 
+    private var contentRefreshSurfaceID: ContentRefreshSurfaceID {
+        guard let item = viewModel.state.value?.item else {
+            return ContentRefreshSurfaceID(kind: .home)
+        }
+        let kind: ContentRefreshSurfaceKind
+        switch item.kind {
+        case .series: kind = .seriesDetail
+        case .episode: kind = .episodeDetail
+        case .movie, .video: kind = .movieDetail
+        default: kind = .home
+        }
+        return ContentRefreshSurfaceID(
+            kind: kind,
+            accountID: item.sourceAccountID,
+            itemID: item.id
+        )
+    }
+
     private var contentRefreshSurfaceIsVisible: Bool {
         guard isPageVisible, let kind = viewModel.state.value?.item.kind else { return false }
         switch kind {
@@ -681,8 +699,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
             heroPullDistance = pullDistance
         }
         .ignoresSafeArea(.container, edges: .top)
-        .modifier(PlozziOSNavigationBackground())
-        .modifier(PlozziOSReducedTransparencyScrollFade())
+        .plozziOSHeroNavigationChrome()
         .navigationTitle(Text(verbatim: ""))
         .task(id: seasonRequestRefreshKey(for: detail)) {
             await refreshVisibleSeasonRequests(for: detail)

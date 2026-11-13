@@ -49,14 +49,14 @@ def select_candidates(
             f"No healthy tvOS simulator runtime for SDK {sdk_version}"
         )
 
-    # Prefer the newest healthy tvOS runtime. Hosted images have shipped broken
-    # older runtimes that disappear after boot; the current Xcode can run the
-    # newer simulator runtime. The SDK match remains a tiebreaker.
+    # Prefer the runtime matching the selected Xcode SDK, then the newest
+    # healthy tvOS runtime. Hosted images have shipped malformed older runtimes;
+    # Xcode can run a newer simulator runtime than its SDK.
     ordered = sorted(
         available,
         key=lambda runtime: (
-            tuple(-part for part in (runtime_version(runtime) or ())),
             runtime_version(runtime) != requested,
+            tuple(-part for part in (runtime_version(runtime) or ())),
         ),
     )
     candidates: list[tuple[str, str]] = []

@@ -159,7 +159,8 @@ registry.
 - **Mac navigation leaves the artwork uncovered.** The iOS-on-Mac tab shell
   hides the tab-bar background and, on iOS 26 and later, the top scroll-edge
   effect. Native sidebar, tab, and profile controls remain available with their
-  system appearance. iPhone/iPad backgrounds and other scroll edges are unchanged.
+  system appearance. On iPhone/iPad, only full-bleed Home and detail heroes hide
+  the same top effect; other backgrounds and scroll edges are unchanged.
 
 - **Mac rails fit complete cards plus a next-card preview.** Home, library
   recommendations, related titles, extras, episodes, and cast derive widths from
