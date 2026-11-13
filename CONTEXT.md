@@ -40,7 +40,7 @@ arrangements; Combined rows starts with cross-library rows.
 A Home card that opens a live channel. It is not a resumable movie or episode.
 
 **Refresh surface**:
-The topmost visible page that may ask its provider for fresher data after
+The topmost visible page or row that may ask its provider for fresher data after
 the app or a page becomes visible again. Only the surface receives the request.
 
 **Refresh profile**:
@@ -48,5 +48,5 @@ The tvOS/iOS timing and action policy used by the content refresh coordinator.
 Platform differences live here, not in view bodies.
 
 **Watch-state refresh**:
-A movie/episode-page return refresh that updates played/progress state only. It does
+An episode-page return refresh that updates played/progress state only. It does
 not reload children, change seasons, or navigate.

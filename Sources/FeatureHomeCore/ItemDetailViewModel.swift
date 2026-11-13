@@ -2083,92 +2083,59 @@ public final class ItemDetailViewModel {
         _ = await extras
     }
 
-    /// Refreshes resume context without restarting unrelated metadata enrichment.
+    /// Refreshes a series page after the app or the page has been away long
+    /// enough for another device to move the viewer to a new episode.
+    ///
+    /// The ordinary `reload()` deliberately preserves the previous
+    /// `serverResumeEpisode`; that is correct for a context-menu edit but wrong
+    /// here, because the season page decides which season to show from it.
     public func refreshSeriesContextAfterReturn() async {
-        guard state.value?.item.kind == .series else { return }
-        await refreshAfterReturn()
+        guard case let .loaded(detail) = state,
+              detail.item.kind == .series,
+              let provider = activeProvider else { return }
+        await reload()
+        guard case let .loaded(updated) = state,
+              updated.item.kind == .series else { return }
+        resumeResolution.isResolving = true
+        defer { resumeResolution.isResolving = false }
+        await publishServerResumeEpisode(
+            for: updated.item,
+            provider: provider,
+            sourceGeneration: sourceGeneration
+        )
     }
 
     /// Refreshes only the loaded leaf item's watch state. Used on an episode
     /// page after a return: the page must not rebuild children, change seasons,
     /// or navigate. The parent series page refreshes when it is revealed again.
     public func refreshWatchStateOnly() async {
-        switch state.value?.item.kind {
+        guard case let .loaded(detail) = state,
+              let provider = activeProvider else { return }
+        switch detail.item.kind {
         case .episode, .movie, .video:
-            await refreshAfterReturn()
+            break
         default:
             return
         }
-    }
-
-    private func refreshAfterReturn() async {
-        guard !isDiscoveryItem, !Task.isCancelled,
-              case let .loaded(detail) = state, detail.childrenLoaded,
-              let provider = activeProvider else { return }
-        let generation = sourceGeneration
-        let itemID = activeItemID
-        let accountID = activeSourceAccountID
-        returnRefreshGeneration &+= 1
-        let refreshGeneration = returnRefreshGeneration
-        let isSeries = detail.item.kind == .series
-        func isCurrent() -> Bool {
-            !Task.isCancelled && returnRefreshGeneration == refreshGeneration
-                && isCurrentSource(generation: generation, itemID: itemID, accountID: accountID)
+        guard let fetched = try? await provider.item(id: activeItemID) else { return }
+        guard !Task.isCancelled,
+              case var .loaded(current) = state,
+              current.item.id == detail.item.id else { return }
+        current.item = Self.applyingWatchState(from: fetched, to: current.item)
+        state = .loaded(current)
+        sources = sources.map { source in
+            guard source.accountID == activeSourceAccountID,
+                  source.itemID == fetched.id else { return source }
+            var copy = source
+            copy.resumePosition = fetched.resumePosition
+            copy.playedPercentage = fetched.playedPercentage
+            copy.unwatchedEpisodeCount = fetched.unwatchedEpisodeCount
+            copy.isPlayed = fetched.isPlayed
+            copy.hasBeenPlayed = fetched.hasBeenPlayed
+            copy.lastPlayedAt = fetched.lastPlayedAt
+            return copy
         }
-        if isSeries { resumeResolution.isResolving = true }
-        defer {
-            if sourceGeneration == generation, returnRefreshGeneration == refreshGeneration, isSeries {
-                resumeResolution.isResolving = false
-            }
-        }
-        do {
-            // A season route can display its parent series while activeItemID
-            // still identifies the originally requested season.
-            let fetched = try await provider.item(id: detail.item.id)
-            guard isCurrent() else { return }
-            guard fetched.id == detail.item.id, fetched.kind == detail.item.kind,
-                  fetched.sourceAccountID == nil || fetched.sourceAccountID == accountID else {
-                throw AppError.invalidResponse
-            }
-            var children = detail.children
-            var resume = detail.serverResumeEpisode
-            if isSeries {
-                async let freshChildren = provider.children(of: detail.item.id)
-                async let freshResume = requestServerResumeEpisode(for: fetched, provider: provider)
-                (children, resume) = try await (freshChildren, freshResume)
-            }
-            guard isCurrent(), case var .loaded(current) = state else { return }
-            current.item = tagged(Self.applyingWatchState(from: fetched, to: current.item))
-            if isSeries {
-                current.children = children.map(tagged)
-                current.serverResumeEpisode = resume.map(tagged)
-            }
-            state = .loaded(current)
-            sources = sources.map { source in
-                guard source.accountID == accountID, source.itemID == fetched.id else { return source }
-                var copy = source
-                copy.resumePosition = fetched.resumePosition
-                copy.playedPercentage = fetched.playedPercentage
-                copy.unwatchedEpisodeCount = fetched.unwatchedEpisodeCount
-                copy.isPlayed = fetched.isPlayed
-                copy.hasBeenPlayed = fetched.hasBeenPlayed
-                copy.lastPlayedAt = fetched.lastPlayedAt
-                return copy
-            }
-            applyUnifiedWatchState()
-            persistSnapshot()
-            if isSeries {
-                let seasonIDs = Array(seasonEpisodes.keys)
-                for seasonID in seasonIDs where children.contains(where: { $0.id == seasonID }) {
-                    guard isCurrent() else { return }
-                    await loadEpisodes(for: seasonID, forceRefresh: true)
-                }
-            }
-        } catch {
-            guard isCurrent(), !(error is CancellationError), (error as? AppError) != .cancelled else { return }
-            // Provider errors can contain credentialed URLs; log only the type.
-            PlozzLog.networking.error("Detail return refresh failed (\(String(reflecting: type(of: error))))")
-        }
+        applyUnifiedWatchState()
     }
 
     private static func applyingWatchState(from source: MediaItem, to target: MediaItem) -> MediaItem {

@@ -344,7 +344,6 @@ public struct PlozziOSRootView: View {
 
     private var appContent: some View {
         setupPresentationContent
-        .plozzOpaqueNavigationChrome()
         .environment(contentRefreshCoordinator)
         .background(ContentRefreshLifecycleReader(coordinator: contentRefreshCoordinator))
         .environment(\.familyGuidanceProvider, appModel.familyGuidance)

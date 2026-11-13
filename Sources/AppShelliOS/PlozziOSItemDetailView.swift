@@ -273,10 +273,26 @@ private struct PlozziOSCanonicalItemDetailView: View {
         )
     }
 
+    private var contentRefreshSurfaceID: ContentRefreshSurfaceID {
+        guard let item = viewModel.state.value?.item else {
+            return ContentRefreshSurfaceID(kind: .home)
+        }
+        let kind: ContentRefreshSurfaceKind
+        switch item.kind {
+        case .series: kind = .seriesDetail
+        case .episode: kind = .episodeDetail
+        case .movie, .video: kind = .movieDetail
+        default: kind = .home
+        }
+        return ContentRefreshSurfaceID(
+            kind: kind,
+            accountID: item.sourceAccountID,
+            itemID: item.id
+        )
+    }
+
     private var contentRefreshSurfaceIsVisible: Bool {
-        guard isPageVisible, playbackRequest == nil, pendingResumeRequest == nil,
-              !presentsSeriesDownloads,
-              let kind = viewModel.state.value?.item.kind else { return false }
+        guard isPageVisible, let kind = viewModel.state.value?.item.kind else { return false }
         switch kind {
         case .series, .episode, .movie, .video: return true
         default: return false
@@ -405,10 +421,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
         .onChange(of: presentsSeriesDownloads) { _, isPresented in
             if isPresented { seasonRequestRetryToken &+= 1 }
         }
-        .task(id: locale.identifier) {
-            viewModel.updateMetadataLanguage(locale.identifier)
-            await viewModel.load()
-        }
+        .task { await viewModel.load() }
         .contentRefreshSurface(
             id: contentRefreshSurfaceID,
             isVisible: contentRefreshSurfaceIsVisible
@@ -418,7 +431,9 @@ private struct PlozziOSCanonicalItemDetailView: View {
                 await viewModel.refreshSeriesContextAfterReturn()
             case .refreshWatchStateOnly:
                 await viewModel.refreshWatchStateOnly()
-            case .reloadHome:
+            case .reloadDetail:
+                await viewModel.reload()
+            case .reloadHome, .none:
                 break
             }
         }
@@ -1762,7 +1777,12 @@ struct PlozziOSInlineSeriesBrowser: View {
                     resolvedSeasonID = nil
                     railTargetID = nil
                 }
-                if !hasExplicitSeasonSelection, initialEpisode == nil {
+                if !hasExplicitSeasonSelection, initialEpisode == nil,
+                   let series = viewModel.state.value?.item,
+                   let seed = SeriesEpisodeEntry.openingSeed(
+                       for: series, initialEpisode: initialEpisode,
+                       initialSeasonID: initialSeasonID, resumeEpisode: viewModel.serverResumeEpisode
+                   ) {
                     resolvedSeasonID = nil
                     if let series = viewModel.state.value?.item,
                        let seed = SeriesEpisodeEntry.openingSeed(

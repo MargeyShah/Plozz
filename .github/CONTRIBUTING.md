@@ -227,6 +227,13 @@ coordinators, surface registration, and deterministic harnesses. Follow the
 [Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
 conventions.
 
+Stateful behavior that crosses views or platforms belongs in `CoreModels`, the
+relevant `Feature*Core`, or `AppRuntime`; app shells stay wiring-only. Follow the
+[state-management scaffold](../docs/state-management.md) for policies,
+coordinators, surface registration, and deterministic harnesses. Follow the
+[Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) for language and view
+conventions.
+
 ## The dual-provider invariant
 
 **Jellyfin and Plex are co-equal backends.** Changes to data, playback, auth,

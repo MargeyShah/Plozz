@@ -912,7 +912,7 @@ public struct HomeView: View {
                     for: visibility.visibility,
                     trigger: request.reason.diagnosticTrigger
                 )
-            case .reloadSeriesContext, .refreshWatchStateOnly:
+            case .reloadSeriesContext, .refreshWatchStateOnly, .reloadDetail, .none:
                 break
             }
         }

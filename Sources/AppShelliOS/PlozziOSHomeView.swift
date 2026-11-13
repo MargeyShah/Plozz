@@ -432,7 +432,6 @@ struct PlozziOSHomeView: View {
         .contentRefreshSurface(
             id: ContentRefreshSurfaceID(kind: .home),
             isVisible: homeIsFrontmost && homeHasAppeared && appModel.allowsHomeContentLoading
-                && playbackRequest == nil && pendingResumeRequest == nil
         ) { request in
             switch request.action {
             case .reloadHome:
@@ -440,7 +439,7 @@ struct PlozziOSHomeView: View {
                     for: appModel.settings.homeVisibility.visibility,
                     trigger: request.reason.diagnosticTrigger
                 )
-            case .reloadSeriesContext, .refreshWatchStateOnly:
+            case .reloadSeriesContext, .refreshWatchStateOnly, .reloadDetail, .none:
                 break
             }
         }
