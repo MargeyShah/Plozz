@@ -348,10 +348,9 @@ final class HomeRowBrowseTests: XCTestCase {
         let empty = LibrarySection(id: "shelf", title: "Shelf", items: [], hasMore: true)
         for (loading, failure): (Bool, AppError?) in [(true, nil), (false, .serverUnreachable)] {
             let row = HomePresentationRow(
-                choice: choice, source: .library(.init(section: empty, isLoading: loading, failure: failure))
+                choice: choice, source: .library(.init(section: section, isLoading: loading, failure: failure))
             )
             XCTAssertTrue(row.canBrowse, "Cached cards remain usable while their source refreshes or fails.")
-            let empty = LibrarySection(id: "shelf", title: "Shelf", items: [], hasMore: true)
             XCTAssertFalse(HomePresentationRow(
                 choice: choice, source: .library(.init(section: empty, isLoading: loading, failure: failure))
             ).canBrowse)

@@ -113,8 +113,15 @@ final class PlexCompletionVersusDismissalTests: XCTestCase {
             await reconciler.enqueue(mutation)
             await reconciler.drain()
             let requests = await http.requests
+            // Every played write converges on the current ratingKey before scrobbling,
+            // so containers take that read too; movies and episodes add the shared
+            // freshness read from the runtime.
             let freshnessReads = kind == .movie || kind == .episode ? ["/library/metadata/42"] : []
-            XCTAssertEqual(requests.map(\.path), freshnessReads + ["/:/scrobble", "/:/progress"], "\(kind)")
+            XCTAssertEqual(
+                requests.map(\.path),
+                freshnessReads + ["/library/metadata/42", "/:/scrobble", "/:/progress"],
+                "\(kind)"
+            )
             let pending = await reconciler.pendingCount
             XCTAssertEqual(pending, 0)
         }

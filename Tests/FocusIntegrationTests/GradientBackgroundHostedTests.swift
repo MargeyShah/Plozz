@@ -66,6 +66,9 @@ final class GradientBackgroundHostedTests: XCTestCase {
                     .environment(\.colorScheme, palette.isLight ? .light : .dark)
                     .environment(\.gradientBackgroundsEnabled, gradient)
                     .environment(\.plozzReduceTransparency, reduced)
+                    // The setup screen must not auto-enter content: the test
+                    // asserts the setup actions wait for explicit entry.
+                    .environment(\.navigationStartupFocusAllowed, false)
                     .environment(\.locale, Locale(identifier: "en"))
                     .transaction { $0.disablesAnimations = true }
                 )
@@ -401,6 +404,16 @@ final class GradientBackgroundHostedTests: XCTestCase {
         item.productionYear = 2009
         item.runtime = 5_700
         item.genres = ["Comedy", "Drama"]
+        // The detail card needs a second information group: the title's studios
+        // and its selected copy each render their own surface beside the about card.
+        item.studios = ["Fixture Studio"]
+        let selectedSource = MediaSourceRef(
+            accountID: "fixture-account", itemID: item.id, kind: .movie,
+            serverName: "Fixture Server", locality: .remote
+        )
+        let selectedVersion = MediaVersion(
+            id: "fixture-version", name: "Fixture 1080p", height: 1080, isDefault: true
+        )
         item.ratings = [
             .init(source: .rottenTomatoes, value: 64, scale: .percent),
             .init(source: .rottenTomatoesAudience, value: 80, scale: .percent),
@@ -426,7 +439,10 @@ final class GradientBackgroundHostedTests: XCTestCase {
                     let opacity = enabled && !reduceTransparency ? 0.4 : 1.0
                     host.rootView = AnyView(
                         ScrollView {
-                            DetailInformationSections(item: item, horizontalInset: 60)
+                            DetailInformationSections(
+                                item: item, horizontalInset: 60,
+                                selectedSource: selectedSource, selectedVersion: selectedVersion
+                            )
                         }
                         .background(backdrop)
                         .environment(\.themePalette, palette)
@@ -502,7 +518,10 @@ final class GradientBackgroundHostedTests: XCTestCase {
                     ScrollView {
                         VStack(spacing: 0) {
                             Color.clear.frame(height: 180)
-                            DetailInformationSections(item: item, horizontalInset: 60)
+                            DetailInformationSections(
+                                item: item, horizontalInset: 60,
+                                selectedSource: selectedSource, selectedVersion: selectedVersion
+                            )
                         }
                     }
                     .background { AmbientGradientBackground(palette: palette, tint: tinted ? previewColors : nil) }

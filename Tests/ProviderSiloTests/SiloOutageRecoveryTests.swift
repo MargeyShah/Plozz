@@ -35,6 +35,8 @@ private final class SiloCooldownClock: @unchecked Sendable {
     private var date = Date(timeIntervalSince1970: 1_800_000_000)
 
     func now() -> Date { lock.withLock { date } }
+    /// The monotonic cooldown seam, advanced with the same fake timeline as the wall clock.
+    func uptime() -> TimeInterval { lock.withLock { date.timeIntervalSince1970 } }
     func advance(_ seconds: TimeInterval) { lock.withLock { date.addTimeInterval(seconds) } }
 }
 
@@ -186,7 +188,8 @@ extension SiloProviderTests {
         let raw = try credential().encoded()
         let http = RateLimitedSiloHTTP(headers: ["Retry-After": "120"])
         let client = try SiloClient(
-            context: context(raw), store: SiloCredentialStub(raw), http: http, now: { clock.now() }
+            context: context(raw), store: SiloCredentialStub(raw), http: http,
+            uptime: { clock.uptime() }, now: { clock.now() }
         )
         do { _ = try await client.send("/catalog/items/movie1"); XCTFail("Expected rate limiting") }
         catch { XCTAssertEqual(error as? AppError, .rateLimited(retryAfter: 120)) }
@@ -229,7 +232,8 @@ extension SiloProviderTests {
             let raw = try credential().encoded()
             let http = RateLimitedSiloHTTP(headers: headers)
             let client = try SiloClient(
-                context: context(raw), store: SiloCredentialStub(raw), http: http, now: { clock.now() }
+                context: context(raw), store: SiloCredentialStub(raw), http: http,
+                uptime: { clock.uptime() }, now: { clock.now() }
             )
             do { _ = try await client.send("/user/libraries"); XCTFail("Expected rate limiting") }
             catch {

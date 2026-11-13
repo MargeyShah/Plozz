@@ -1271,6 +1271,29 @@ final class NativeFocusRequestHostedTests: XCTestCase {
             if let match = view as? T { return [match] }
             return view.subviews.flatMap { descendants(type, in: $0) }
         }
+        // Measure focus on completed artwork, not a pending placeholder composition.
+        let artworkURL = try XCTUnwrap(URL(
+            string: "https://example.invalid/caption-clearance-\(UUID()).png"
+        ))
+        let artworkSize = CGSize(width: 200, height: 300)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let data = UIGraphicsImageRenderer(size: artworkSize, format: format).pngData {
+            UIColor.blue.setFill()
+            $0.fill(CGRect(origin: .zero, size: artworkSize))
+        }
+        let cache = try XCTUnwrap(ArtworkSession.shared.configuration.urlCache)
+        let request = URLRequest(url: artworkURL)
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: artworkURL, statusCode: 200, httpVersion: nil,
+            headerFields: ["Content-Type": "image/png", "Cache-Control": "max-age=3600"]
+        ))
+        cache.storeCachedResponse(CachedURLResponse(response: response, data: data), for: request)
+        defer { cache.removeCachedResponse(for: request) }
+        for variant in [ArtworkImageVariant.posterCard, .landscapeCard] {
+            let warmed = await ArtworkImageCache.shared.image(for: artworkURL, variant: variant)
+            _ = try XCTUnwrap(warmed)
+        }
         for density in UIDensity.allCases {
             let metrics = PlozzMetrics(density: density)
             for style in [PosterCardView.Style.poster, .landscape] {
@@ -1281,7 +1304,8 @@ final class NativeFocusRequestHostedTests: XCTestCase {
                             PosterCardView(
                                 item: MediaItem(
                                     id: "caption-\(index)", title: "Media title", kind: .movie,
-                                    productionYear: 2020, allowsTitleBasedMetadataMatching: false
+                                    productionYear: 2020, posterURL: artworkURL,
+                                    allowsTitleBasedMetadataMatching: false
                                 ),
                                 style: style, enablesAsyncArtworkFallback: false,
                                 action: {}
@@ -1308,10 +1332,13 @@ final class NativeFocusRequestHostedTests: XCTestCase {
                 system.updateFocusIfNeeded()
                 try await waitUntil { posters[0].isFocused }
                 try await Task.sleep(for: .milliseconds(600))
+                try await waitUntil(timeout: .seconds(5)) {
+                    posters.allSatisfy { self.hasBlueArtwork($0.image) }
+                }
                 let poster = posters[1]
                 let caption = captions[1]
                 let slot = caption.convert(caption.bounds, to: fixture.window)
-                let bitmap = poster.image
+                let bitmap = try XCTUnwrap(poster.image)
                 let title = try XCTUnwrap(descendants(UILabel.self, in: caption.title).first)
                 let context = "\(density), \(style)"
                 for focused in [false, true, false] {

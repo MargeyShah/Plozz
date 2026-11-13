@@ -18,7 +18,7 @@ actor SiloClient {
     private let uptime: @Sendable () -> TimeInterval
     private var browseRetryAfter: TimeInterval?
     private let now: @Sendable () -> Date
-    private var requestNotBefore = Date.distantPast
+    private var requestNotBefore: TimeInterval?
     private let backgroundReadInterval: Duration
     private var lastBackgroundRead: ContinuousClock.Instant?
     private var requestsSent = 0
@@ -218,7 +218,7 @@ actor SiloClient {
         try checkBrowseCooldown(path)
         let credential = try await authorizedCredential()
         _ = try currentCredential()
-        try checkRequestCooldown()
+        try checkRequestCooldown(path)
         var endpoint = SiloAPI.endpoint(path, method: method, query: query, token: credential.accessToken,
                                         profileID: credential.profileID, profileToken: credential.profileToken)
         endpoint.body = body
@@ -227,7 +227,7 @@ actor SiloClient {
         var result = try await transmit(endpoint, path: path)
         if result.1.statusCode == 401, method == .get {
             let refreshed = try await authorizedCredential(rejectedToken: credential.accessToken)
-            try checkRequestCooldown()
+            try checkRequestCooldown(path)
             endpoint.headers["Authorization"] = "Bearer \(refreshed.accessToken)"
             result = try await transmit(endpoint, path: path)
         }
@@ -272,7 +272,7 @@ actor SiloClient {
             let current = now()
             let serverDate = result.1.value(forHTTPHeaderField: "Date").flatMap(HTTPDate.parse) ?? current
             let delay = HTTPDate.retryAfter(result.1.value(forHTTPHeaderField: "Retry-After"), now: serverDate)
-            requestNotBefore = max(requestNotBefore, current.addingTimeInterval(max(1, delay ?? 60)))
+            requestNotBefore = max(requestNotBefore ?? uptime(), uptime() + max(1, delay ?? 60))
             throw AppError.rateLimited(retryAfter: delay)
         default: throw AppError.invalidResponse
         }
@@ -281,9 +281,16 @@ actor SiloClient {
         return result
     }
 
-    private func checkRequestCooldown() throws {
-        let remaining = requestNotBefore.timeIntervalSince(now())
-        if remaining > 0 { throw AppError.rateLimited(retryAfter: remaining) }
+    private func checkRequestCooldown(_ path: String) throws {
+        // A catalog quota still refuses reads and writes on the API connection, but playback
+        // stays separate so a browsing quota cannot suppress progress or stop cleanup.
+        guard !path.hasPrefix("/playback/"), let deadline = requestNotBefore else { return }
+        let remaining = deadline - uptime()
+        guard remaining > 0 else {
+            requestNotBefore = nil
+            return
+        }
+        throw AppError.rateLimited(retryAfter: remaining)
     }
 
     private func admitBackgroundRead(method: HTTPMethod) async throws {
@@ -338,23 +345,26 @@ actor SiloClient {
         try Task.checkCancellation()
         _ = try currentCredential()
         try checkBrowseCooldown(path)
-        try checkRequestCooldown()
+        try checkRequestCooldown(path)
         try await admitBackgroundRead(method: endpoint.method)
         try Task.checkCancellation()
         _ = try currentCredential()
-        try checkRequestCooldown()
+        try checkRequestCooldown(path)
         recordRequest(path)
         let result: (Data, HTTPURLResponse)
         do {
             result = try await http.sendRaw(endpoint, baseURL: baseURL)
         } catch AppError.rateLimited(let delay) {
             recordBrowseCooldown(delay, path: path)
-            requestNotBefore = max(requestNotBefore, now().addingTimeInterval(max(1, delay ?? 60)))
+            requestNotBefore = max(requestNotBefore ?? uptime(), uptime() + max(1, delay ?? 60))
             throw AppError.rateLimited(retryAfter: delay)
         }
         if result.1.statusCode == 429 {
+            // An HTTP-date Retry-After is relative to the server's Date, never this client's clock.
+            let responseDate = result.1.value(forHTTPHeaderField: "Date").flatMap(HTTPDate.parse) ?? now()
             recordBrowseCooldown(
-                HTTPDate.retryAfter(result.1.value(forHTTPHeaderField: "Retry-After")), path: path
+                HTTPDate.retryAfter(result.1.value(forHTTPHeaderField: "Retry-After"), now: responseDate),
+                path: path
             )
         }
         return result
