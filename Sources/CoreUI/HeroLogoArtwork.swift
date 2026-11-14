@@ -332,20 +332,8 @@ enum HeroLogoMemo {
         }
     }
 
-    /// A policy-independent identity for the same wordmark source. Home and a
-    /// detail page can resolve different artwork areas (different settings) while
-    /// asking for the same file; the exact key misses, so the transparent logo
-    /// would blink to text for a frame on the way into a detail page. Reuse the
-    /// decoded logo across policies when the references and fallback are the same.
-    struct StableKey: Hashable {
-        let references: [String]
-        let fallback: HeroLogoFallback.Identity?
-    }
-
     private static var entries: [Key: ProcessedLogo] = [:]
     private static var order: [Key] = []
-    private static var stableEntries: [StableKey: ProcessedLogo] = [:]
-    private static var stableOrder: [StableKey] = []
     /// Enough for a hero carousel plus the pages reached from it. Evicting
     /// oldest-first costs one await on the next look, not a re-decode.
     private static let capacity = 60
@@ -364,9 +352,7 @@ enum HeroLogoMemo {
         )
     }
 
-    static func value(for key: Key) -> ProcessedLogo? {
-        entries[key] ?? stableEntries[stableKey(for: key)]
-    }
+    static func value(for key: Key) -> ProcessedLogo? { entries[key] }
 
     static func store(_ value: ProcessedLogo, for key: Key) {
         if entries[key] == nil {
@@ -377,20 +363,6 @@ enum HeroLogoMemo {
             }
         }
         entries[key] = value
-
-        let stable = stableKey(for: key)
-        if stableEntries[stable] == nil {
-            stableOrder.append(stable)
-            if stableOrder.count > capacity, let oldest = stableOrder.first {
-                stableOrder.removeFirst()
-                stableEntries[oldest] = nil
-            }
-        }
-        stableEntries[stable] = value
-    }
-
-    private static func stableKey(for key: Key) -> StableKey {
-        StableKey(references: key.references, fallback: key.fallback)
     }
 }
 
