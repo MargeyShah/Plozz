@@ -1265,6 +1265,14 @@ struct PlozziOSTabShell: View {
         } else {
             NavigationStack {
                 destinationContent(for: destination, keepsNavigationBar: isOverflow)
+                    // Search results push a detail page through a view-based link, so
+                    // the Search tab needs UIKit to pop back to its root when the tab
+                    // is pressed. Inert for every other destination.
+                    .background {
+                        PlozziOSNavigationPopProxy(request: navigationRootRequest)
+                            .frame(width: 0, height: 0)
+                            .allowsHitTesting(false)
+                    }
                     .toolbar {
                         if isOverflow, destination != .downloads {
                             PlozziOSOverflowBackToolbarItem(action: overflowNavigation.returnToMore)
