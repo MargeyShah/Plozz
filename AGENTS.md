@@ -16,7 +16,9 @@ configuration and credentials out of committed guidance.
   historical context, not a specification.
 - Keep changes focused on the requested behavior. Reuse existing helpers,
   ownership boundaries, naming, and error handling instead of creating a
-  parallel implementation.
+  parallel implementation. A page or rail that loads content after its header
+  follows the [page loading scaffold](docs/page-loading-scaffold.md) rather than
+  growing another fetch/placeholder path.
 - Put shared behavior in the appropriate `Feature*Core`, core, or runtime
   module; keep the app shells thin. See the
   [architecture map](.github/CONTRIBUTING.md#architecture).
