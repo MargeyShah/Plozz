@@ -881,6 +881,7 @@ private struct PlozziOSScenePhaseEffects: View {
                 if newPhase == .active {
                     appModel.accountsProviders.retryUnconfirmedCredentials()
                     appModel.syncCloudOnForeground()
+                    appModel.requestLocalNetworkAccessIfNeeded()
                     Task { await appModel.synchronizeTrackerHistoryOnForeground() }
                 }
             }
@@ -1045,6 +1046,8 @@ struct PlozziOSTabShell: View {
     @State private var retainsExplicitWatchlistEntry = false
     @State private var retainsExplicitDownloadEntry = false
     @State private var downloadNavigationID: UUID?
+    @State private var searchFocusRequest = 0
+    @State private var searchReplaceQueryRequest = 0
     @State private var hasChosenNavigationDestination = false
     let homeViewModelBox: LazyViewState<HomeViewModel>
     var sharedHomeViewModel: HomeViewModel {
@@ -1213,7 +1216,16 @@ struct PlozziOSTabShell: View {
 
     private func selectDestination(_ destination: PlozziOSDestination) {
         isShowingMorePage = false
-        selectedDestination = resolvedDestination(destination)
+        let wasShowingSearch = effectiveSelectedDestination == .search
+        let resolved = resolvedDestination(destination)
+        selectedDestination = resolved
+        guard resolved == .search else { return }
+        // Pressing Search always lands in the field with the keyboard, whether the
+        // viewer is coming from another tab or pressing Search again while already
+        // there. A re-tap also starts a new search, so the previous query is cleared
+        // instead of being left behind the keyboard.
+        searchFocusRequest &+= 1
+        if wasShowingSearch { searchReplaceQueryRequest &+= 1 }
     }
 
     private func consumeStandaloneEntryIfNeeded() {
@@ -1495,6 +1507,8 @@ struct PlozziOSTabShell: View {
         }
 
         .tabViewStyle(.sidebarAdaptable)
+        .environment(\.plozziOSSearchFocusRequest, searchFocusRequest)
+        .environment(\.plozziOSSearchReplaceQueryRequest, searchReplaceQueryRequest)
         .modifier(PlozziOSNavigationBackground())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if usesOpaqueBottomBar {
