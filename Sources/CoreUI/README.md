@@ -32,6 +32,14 @@ cache that every feature module reuses on tvOS and iOS/iPadOS — guarded behind
 
 ## Responsibility
 
+New tvOS Settings pages enter their first content control, not the header Back
+button. `settingsPageEntryFocus` requests that control only on first entry and
+leaves search targeting and retained-parent restoration alone. Until native
+focus enters the page, `SettingsBackButton` renders the same enabled native
+control in a non-interactive hosting view; it does not dim the button. The
+original SwiftUI button returns as soon as entry succeeds. Keep the header's
+full-width focus section so Up from right-aligned controls still reaches Back.
+
 TV Settings editors can use `settingsPageBackConfirmation` to request confirmation
 for both the header Back button and remote Back on the current page. Pass `nil`
 when no unsaved changes need protection. Explicit `SettingsPageDismiss`
@@ -998,6 +1006,10 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
 - **Provider marks** — IPTV uses coral-red while Media Share keeps teal.
   `ProviderBrandMark` owns their shared icon and badge tints, including deeper
   colors on white focus cards and brighter colors on black focus cards.
+  When an IPTV source supplies `siteURL`, it uses the source origin's favicon
+  on TV and mobile, falling back to the shared IPTV mark if unavailable.
+  Requests omit source credentials, cookies, paths, and query parameters;
+  no third-party favicon service is used.
   Silo retains its multicolor logo over a warm-stone (`#CDB795`) tint at the
   same 18% badge opacity as the other providers. Its narrow artwork is 15%
   larger within the unchanged badge bounds.

@@ -92,8 +92,8 @@ let package = Package(
         // Powers the native HLS-fMP4 remux path for MKV → DoVi + Atmos + seek.
         // See docs/playback-engines.md for integration and fork corrections.
         //
-        // Pinned to the playback-corrected fork integrating upstream 7.61.0
-        // (d612bedb3e60f8bc403c646fe44c0a852ee8a995). This retains Plozz's
+        // Pinned to the playback-corrected fork integrating upstream 7.66.0
+        // (8e74bbb5cfde75287305c535c243c1ef9d96549c). This retains Plozz's
         // AAC timing, ASS duration, dynamic linkage, frame/cache APIs and privacy manifest,
         // plus bounded position-aware compressed-source preparation and older-runtime cleanup.
         //
@@ -248,7 +248,7 @@ let package = Package(
         // bridge; the engine's legacy SMB URL product is not linked.
         // 7.48.0 adds VP9 hardware decoding where available, AV1 Dolby Vision,
         // software-path spatial audio, and bounded MPEG-DASH VOD support.
-        // FFmpegBuild version alignment is owned by the engine.
+        // FFmpegBuild 3.15.0 is owned by the engine.
         // New host-controlled Now Playing and background retention remain opt-in.
         // 7.51.0 includes route-selected lossless PCM spatial beds from 7.50.0.
         // The fork retains Plozz's timing, subtitle, diagnostics and linkage fixes.
@@ -257,15 +257,14 @@ let package = Package(
         // availability. FFmpegBuild 3.11.1 adds AV1 forward-keyframe detection.
         // Audio shaping and low-resolution upscaling remain opt-in and disabled.
         // Resume preroll backfill no longer opens a false native-scrub landing watch.
+        // 7.66.0 includes AAC/PCE, subtitle-seek and packet-wait fixes.
+        // FEL curve folding is available for beta on-demand playback; engine-owned Now Playing stays off.
         // Native media-selection IPC uses bounded off-main readers during media-service stalls.
-        // Profile 7-only HDR10 fallback preserves other Dolby Vision routes.
-        // 7.61.0 advances FFmpegBuild to 3.13.0 and LibDovi to 2.2.0.
-        // It includes native startup/display-gate, teardown, subtitle and live-seam fixes.
-        // The new FEL curve-fold trait remains disabled alongside all optional components.
+        // Selective P7 conversion requires positive MEL/FEL evidence; unknown P7 keeps HDR10.
         .package(
             url: "https://github.com/brandomoore/AetherEngine",
-            revision: "568120847b64029c4e7948f7492d5d210d62305f",
-            traits: []
+            revision: "cc3cb49f4014a208f841bde8d1e0a5af0ff885e9",
+            traits: ["DolbyVisionFelCurves"]
         ),
         // NOTE: FFmpegBuild (FFmpeg n8.1.x media libraries) and LibDovi (Dolby Vision
         // RPU parser) are transitive dependencies — AetherEngine declares and
