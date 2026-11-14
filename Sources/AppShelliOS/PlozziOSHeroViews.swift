@@ -1950,9 +1950,18 @@ struct PlozziOSHomeHeroForeground: View {
         .environment(\.plozziOSHeroLogoSize, appModel.settings.hero.settings.logoSize)
         .opacity(foregroundReady ? 1 : 0)
         .task(id: foregroundReadinessKey) {
+            // Returning from a detail page recreates this view, so the gate ran again and
+            // faded an already-prepared slide in from transparent — a visible redraw on
+            // every pop. A slide whose logo is already prepared reveals immediately, no
+            // animation; only the first preparation fades.
+            if HeroForegroundReadiness.isPrepared(foregroundReadinessKey) {
+                foregroundReady = true
+                return
+            }
             let sources = logoSources
             let hasAnySource = !sources.references.isEmpty || sources.fallback != nil
             guard hasAnySource else {
+                HeroForegroundReadiness.markPrepared(foregroundReadinessKey)
                 foregroundReady = true
                 return
             }
@@ -1964,6 +1973,7 @@ struct PlozziOSHomeHeroForeground: View {
                 policy: artworkPolicy
             )
             guard !Task.isCancelled else { return }
+            HeroForegroundReadiness.markPrepared(foregroundReadinessKey)
             withAnimation(.easeOut(duration: 0.28)) { foregroundReady = true }
         }
     }
@@ -3594,3 +3604,26 @@ struct PlozziOSHomeSidebarOverlapProbe: UIViewControllerRepresentable {
     }
 }
 #endif
+
+/// Remembers which hero foregrounds have already had their logo prepared, so a view
+/// recreated by navigation reveals immediately instead of fading in again.
+enum HeroForegroundReadiness {
+    private static let lock = NSLock()
+    private static var prepared: Set<String> = []
+    private static var order: [String] = []
+    private static let limit = 32
+
+    static func isPrepared(_ key: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return prepared.contains(key)
+    }
+
+    static func markPrepared(_ key: String) {
+        lock.lock(); defer { lock.unlock() }
+        guard prepared.insert(key).inserted else { return }
+        order.append(key)
+        while order.count > limit {
+            prepared.remove(order.removeFirst())
+        }
+    }
+}
