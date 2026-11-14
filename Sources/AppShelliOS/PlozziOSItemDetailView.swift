@@ -550,7 +550,11 @@ private struct PlozziOSCanonicalItemDetailView: View {
             dynamicTypeSize: dynamicTypeSize
         ) / 2
         return ScrollView {
-            VStack(alignment: .leading, spacing: PlozziOSMediaRailLayout.sectionGap(metrics: metrics)) {
+            // Only the hero and the first sections exist on the push frame. The
+            // information grid, cast, extras and related rows are offscreen work;
+            // building them synchronously during the transition is what made the
+            // page feel locked while it "loaded everything".
+            LazyVStack(alignment: .leading, spacing: PlozziOSMediaRailLayout.sectionGap(metrics: metrics)) {
                 PlozziOSDetailHeroSection(
                     item: heroTarget,
                     backdropItem: detail.item,
