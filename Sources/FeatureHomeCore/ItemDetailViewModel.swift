@@ -569,6 +569,9 @@ public final class ItemDetailViewModel {
     private nonisolated(unsafe) var enrichmentTask: Task<Void, Never>?
     @ObservationIgnored private var detailMetadataTask: Task<Void, Never>?
     @ObservationIgnored private var episodePrefetchTask: Task<Void, Never>?
+    /// Season whose episodes the viewer most recently had on screen; the snapshot
+    /// persists that one so a revisit paints the rail immediately.
+    @ObservationIgnored private var lastLoadedSeasonID: String?
     private nonisolated(unsafe) var streamProbeTask: Task<Void, Never>?
     @ObservationIgnored private var completedStreamProbeKey: String?
     /// The fully-loaded item enrichment is keyed to, so a page returned to (popped
@@ -2557,6 +2560,7 @@ public final class ItemDetailViewModel {
     /// focus change.
     public func loadEpisodes(for seasonID: String, forceRefresh: Bool = false) async {
         guard let provider = activeProvider else { return }
+        lastLoadedSeasonID = seasonID
         let sourceItemID = activeItemID
         let sourceAccountID = activeSourceAccountID
         let loadSourceGeneration = sourceGeneration
@@ -2985,10 +2989,28 @@ public final class ItemDetailViewModel {
     /// never overwrites a richer snapshot.
     private func persistSnapshot() {
         guard let detail = state.value, !detail.item.id.isEmpty else { return }
+        // Persist the episodes for the season this page shows, bounded.
+        //
+        // This used to be `[:]` — every snapshot was written without episodes — so the
+        // restore path had nothing to paint and a revisited series always fetched its
+        // rail again. Only one season is stored (the one just loaded, else the season
+        // the page opens on) and only its first `maxRestoredEpisodesPerSeason`, because
+        // this file is read back on the smallest supported device.
+        let persistedSeasonID = lastLoadedSeasonID
+            ?? DetailOpeningSelection.openingSeasonID(
+                children: detail.children,
+                resumeSeasonID: serverResumeEpisode?.seasonID
+            )
+        var persistedEpisodes: [String: [MediaItem]] = [:]
+        if let persistedSeasonID, let episodes = seasonEpisodes[persistedSeasonID] {
+            persistedEpisodes[persistedSeasonID] = Array(
+                episodes.prefix(Self.maxRestoredEpisodesPerSeason)
+            )
+        }
         let snapshot = DetailSnapshotCache.Snapshot(
             item: detail.item,
             children: detail.children,
-            seasonEpisodes: [:],
+            seasonEpisodes: persistedEpisodes,
             sources: sources,
             upcomingSchedule: detail.upcomingSchedule
         )
