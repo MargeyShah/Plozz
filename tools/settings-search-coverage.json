@@ -2532,7 +2532,7 @@
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
-    "Sources/FeatureSettings/ServersAndLibrariesDetailView.swift|ServersAndLibrariesDetailView|body|Button|<dynamic>": {
+    "Sources/FeatureSettings/ServersAndLibrariesDetailView.swift|ServersAndLibrariesDetailView|addSourceButton|Button|<dynamic>": {
       "reason": "Reviewed navigation, connection, credential, confirmation, recovery or content-management action; not a preference value.",
       "count": 1
     },
@@ -3987,6 +3987,14 @@
     },
     "Sources/FeatureSettings/CollectionSectionSettingsView.swift|CollectionSectionSettingsView|body|Button|\"Keep Editing\"": {
       "reason": "Reviewed integration-settings action; it is navigation, connection, confirmation, recovery, or content-management rather than a standalone preference.",
+      "count": 1
+    },
+    "Sources/AppShelliOS/PlozziOSSettingsView.swift|PlozziOSPlaybackSettingsView|body|Toggle|\"P7 FEL → P8.1 conversion\"": {
+      "reason": "Beta-channel playback option; hidden from Settings search until it is available on every release channel.",
+      "count": 1
+    },
+    "Sources/FeatureSettings/PreferenceDetailViews.swift|PlaybackDetailView|audioRows|Toggle|\"P7 FEL → P8.1 conversion\"": {
+      "reason": "Beta-channel playback option; hidden from Settings search until it is available on every release channel.",
       "count": 1
     }
   }
