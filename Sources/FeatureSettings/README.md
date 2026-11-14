@@ -1,25 +1,9 @@
 # FeatureSettings
 
-PublicMetaDB catalog labels load verified title names, retaining the exact TMDB
-ID and child coordinates as a fallback when lookup is unavailable. **Open title
-in Plozz** uses the shell's normal detail route rather than a second playback or
-request implementation. Child history uses **Open show in Plozz** because server
-episode numbering must be resolved by the normal show page.
-
-PublicMetaDB confirmations compose every paragraph into one localized `Text`
-through `publicMetaDBConfirmationMessage`. Native dialogs can omit sibling
-message views, hiding visibility, propagation or publication disclosures.
-Keep the reviewed date, vote or timestamp details in that same message.
-
-PublicMetaDB contribution reads belong to the enclosing page's
-`publicMetaDBRead` modifier, never to the lazy rows emitted by
-`PublicMetaDBReadContent`. Result-row appearance must not start another request.
-The shared read model fences connection, selection, refresh and disabled scopes;
-each action remains a separate native row. Rating browsing can show an explicitly
-capped collection, but contribution changes still require complete readback.
-Single and batch rating scores use native menu pickers with explicit accessible
-labels and values. Do not rely on the automatic tvOS picker style: it compresses
-all 101 scores into an unreadable segmented control.
+The household Sources page places Add Source before saved sources on TV and
+mobile. On TV, Add Source is also the workspace entry focus target and occupies
+its own connected card above saved sources, using the same grouped surfaces as Audio. IPTV source
+rows share the origin-only website-logo lookup and generic fallback across platforms.
 
 Mobile customization choice groups use the same Settings cards and content
 insets, including contained groups such as Hero content sources. TV row sizing
@@ -74,11 +58,9 @@ Its helper note explains HDMV-only menus, automatic video playback for BD-J,
 and the watch-progress limitation once on both platforms; disc action menus
 and video pickers do not repeat it.
 
-Playback groups its optional **Player tabs** in one shared control surface on TV
-and mobile. The switches and their search entries are generated from
-`PlayerOptionalTab`, so future sections inherit both without editing the settings
-view. Labels match the player tabs, Info stays always available, and visibility
-preferences are independent of autoplay and Up Next behavior.
+Playback groups its five optional **Player tabs** in one shared control surface
+on TV and mobile. Labels match the player tabs, Info stays always available, and
+visibility preferences are independent of autoplay and Up Next behavior.
 
 Movie & show details → Trailers & music is the shared destination for trailer
 availability, independent Home autoplay and detail background playback. Home →
@@ -1555,6 +1537,24 @@ watch history and planning-list behavior are documented in
   use the shared transient-status presenter for progress and the actual result,
   and disable both actions while either is running. Reset still requires
   confirmation. Pending Live TV source repair rows remain in Troubleshooting.
+  Both platforms describe supported sign-in syncing consistently with onboarding.
+  Only confirmed iCloud account absence prompts sign-in; account lookup and
+  identity-verification failures retain an error diagnostic. Cancelled or
+  superseded account checks must not overwrite the current sync status.
+  Temporary account unavailability (CloudKit error 36) retries account and identity
+  verification after 2, 5 and 15 seconds, including before the engine first starts.
+  Retries stop on cancellation, revoked consent, deactivation or a newer check;
+  other failures are not retried by this account-check policy. Persistent
+  unavailability uses a readable status while retaining the original diagnostic.
+  Recovery still requires verified account ownership, and later foreground or
+  manual sync can try again after the bounded retries finish.
+  Local snapshot cancellations caused by concurrent changes are recaptured up to
+  four times; cancellation of the caller or a superseded lifecycle never publishes
+  stale data or errors. A genuine preparation failure remains tied to its channel
+  until that channel captures and persists successfully. Unrelated network
+  completions cannot clear it or advance the successful-sync time. Retryable
+  CloudKit conflicts stay in Syncing during a bounded 30-second recovery window;
+  repeated failures cannot extend that window indefinitely.
 - **Profile-namespaced settings.** Per-user prefs (theme, captions,
   diagnostics, spoiler) are namespaced by the active profile id; the
   default profile uses no suffix so an upgrading install keeps existing

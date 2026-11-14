@@ -354,6 +354,15 @@ public final class PlayerViewModel {
     /// community marker sources to consult.
     private let playbackSettings: PlaybackSettings
     public var volumeBrightnessGesturesEnabled: Bool { playbackSettings.volumeBrightnessGestures }
+    @ObservationIgnored private var dolbyVisionFELOverride: Bool?
+
+    public func setDolbyVisionFELConversion(_ enabled: Bool) {
+        guard !didStop, phase == .ready, controls.felConversion.isAvailable,
+              controls.felConversion.isEnabled != enabled else { return }
+        dolbyVisionFELOverride = enabled
+        controls.felConversion.isEnabled = enabled
+        restartStreamingRendition()
+    }
 
     func isTabEnabled(_ tab: PlayerOptionalTab) -> Bool {
         playbackSettings[keyPath: tab.visibilityKeyPath]
@@ -2031,6 +2040,9 @@ public final class PlayerViewModel {
         endTemporarySpeedBoost()
         stopSongWatch()
         var request = request
+        request.dolbyVisionFELConversion = dolbyVisionFELOverride ?? playbackSettings.dolbyVisionFELConversion
+        controls.felConversion.isEnabled = request.dolbyVisionFELConversion
+        controls.felConversion.isAvailable = false
         dynamicRangeLoadGeneration &+= 1
         let rangeLoadGeneration = dynamicRangeLoadGeneration
         controls.infoCard.chapters = playbackSettings.chaptersInPlayer
@@ -2114,6 +2126,7 @@ public final class PlayerViewModel {
         // not after an awaited provider report. System elapsed time extrapolates
         // from this rate, so advertising a rate the engine clamps would drift.
         controls.engineCapabilities = engine.capabilities
+        controls.felConversion.isAvailable = engine.canChangeDolbyVisionFELConversion
         if engine.capabilities.contains(.playbackSpeed) {
             controls.playbackSpeed = min(controls.playbackSpeed, engine.maximumPlaybackSpeed)
             engine.setPlaybackSpeed(controls.playbackSpeed)
@@ -2243,7 +2256,8 @@ public final class PlayerViewModel {
         let seriesIDResolver = seriesIDResolver
         let community = communitySkipMarkers
         segmentsTask = Task { @MainActor [weak self] in
-            let server = ((try? await provider.mediaSegments(for: itemID)) ?? []).squashingDuplicateKinds()
+            let server = ((try? await provider.mediaSegments(for: itemID)) ?? [])
+                .normalizedSkipMarkers(duration: duration)
             guard !Task.isCancelled else { return }
             let serverMerged = server.mergedForPlayback(duration: duration, explicitPostCredits: nil)
             self?.controls.skipSegments.segments = serverMerged.segments
@@ -2259,7 +2273,7 @@ public final class PlayerViewModel {
                 for: item, sources: sources, duration: duration,
                 provider: provider, seriesIDResolver: seriesIDResolver, service: community
             )
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, !fallback.isEmpty else {
                 self?.controls.skipSegments.isResolvingPostCredits = false
                 return
             }

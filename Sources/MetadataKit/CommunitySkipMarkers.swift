@@ -155,6 +155,10 @@ public struct CommunitySkipMarkers: Sendable, Equatable {
 
     public static let empty = CommunitySkipMarkers(segments: [], postCredits: nil)
 
+    /// Nothing arrived: no skippable markers and no after-credits scene. Used by the
+    /// player to skip the merge entirely when the community lookup came back bare.
+    public var isEmpty: Bool { segments.isEmpty && postCredits == nil }
+
     public init(segments: [MediaSegment] = [], postCredits: MediaSegment? = nil) {
         self.segments = segments
         self.postCredits = postCredits
@@ -262,7 +266,7 @@ enum IntroDBClient {
               let response = await MetadataHTTP.get(Response.self, url: url) else { return .empty }
         guard !Task.isCancelled else { return .empty }
         return CommunitySkipMarkers(
-            segments: segments(from: response),
+            segments: segments(from: response).normalizedSkipMarkers(duration: query.duration),
             postCredits: postCredits(from: response)
         )
     }
@@ -275,13 +279,18 @@ enum IntroDBClient {
         let pairs: [(MediaSegment.Kind, Response.Segment?)] = [
             (.intro, response.intro), (.recap, response.recap), (.credits, response.outro)
         ]
-        return pairs.compactMap { kind, segment in
-            guard let segment, let start_ms = segment.start_ms, let end_ms = segment.end_ms else { return nil }
-            let start = start_ms / 1000
-            let end = end_ms / 1000
+        let segments = pairs.compactMap { kind, segment -> MediaSegment? in
+            guard let segment, let startMS = segment.start_ms, let endMS = segment.end_ms else { return nil }
+            let start = startMS / 1000
+            let end = endMS / 1000
             guard start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
             return MediaSegment(id: "introdb-\(kind.rawValue)", kind: kind, start: start, end: end)
         }
+        let postCredits = response.post_credits.flatMap { segment -> MediaSegment? in
+            guard let start = segment.start_ms, let end = segment.end_ms else { return nil }
+            return MediaSegment(id: "introdb-post-credits", kind: .unknown, start: start / 1000, end: end / 1000)
+        }
+        return segments.normalizedSkipMarkers(protecting: postCredits)
     }
 
     static func postCredits(from response: Response) -> MediaSegment? {
@@ -398,7 +407,7 @@ enum TheIntroDBClient {
                       start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
                 if let duration, duration.isFinite, duration > 0, end > duration { return nil }
                 return MediaSegment(id: "theintrodb-\(kind.rawValue)-\(index)", kind: kind, start: start, end: end)
-            }
+            }.normalizedSkipMarkers(duration: duration)
         }
     }
 }

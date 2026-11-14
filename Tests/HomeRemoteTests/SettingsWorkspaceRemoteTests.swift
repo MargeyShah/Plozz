@@ -3,6 +3,52 @@ import Vision
 
 @MainActor
 final class SettingsWorkspaceRemoteTests: XCTestCase {
+    func testSettingsFirstEntryPrefersContentAndBackRestoresSource() throws {
+        #if targetEnvironment(simulator)
+        for style in ["tabBar", "rail", "sidebar"] {
+            let app = try launchSettings(style: style, syncEnabled: false)
+            defer { app.terminate() }
+            let appearance = section("appearance", in: app)
+            try focus(appearance, in: app)
+            XCUIRemote.shared.press(.select)
+            let theme = app.buttons["settings-page-theme"]
+            let firstEntry = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in self.hasFocus(theme) }, object: nil
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [firstEntry], timeout: 5), .completed,
+                           "A new category must start at its first row. \(app.debugDescription)")
+            XCTAssertFalse(hasFocus(pageBack("settings-category-back", in: app)))
+            capture("first-category-entry-\(style)", in: app)
+
+            let circadian = app.buttons["settings-page-night-shift"]
+            try focus(circadian, in: app)
+            XCUIRemote.shared.press(.select)
+            let off = app.buttons["Off"].firstMatch
+            let nestedEntry = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in self.hasFocus(off) }, object: nil
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [nestedEntry], timeout: 5), .completed,
+                           "A new nested page must start at its top control. \(app.debugDescription)")
+            capture("first-nested-entry-\(style)", in: app)
+            try focus(app.buttons["Always On"], in: app)
+            XCUIRemote.shared.press(.up)
+            let back = pageBack(in: app)
+            let backFocused = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in self.hasFocus(back) }, object: nil
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [backFocused], timeout: 5), .completed)
+            XCUIRemote.shared.press(.select)
+            let returned = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in self.hasFocus(circadian) }, object: nil
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed,
+                           "Back must restore the source row, not reset the retained parent to its first row.")
+        }
+        #else
+        throw XCTSkip("Simulator-only Settings entry review.")
+        #endif
+    }
+
     func testNewRowExitOnlyPromptsForChangesAndCanDiscard() throws {
         let app = try launchCollectionExitFixture()
         defer { app.terminate() }
@@ -501,7 +547,15 @@ final class SettingsWorkspaceRemoteTests: XCTestCase {
     }
 
     func testGeneralSourceEntryPointsOpenTheSharedChooser() throws {
-        let app = try launchSettings(style: "tabBar", syncEnabled: false)
+        try verifyGeneralSourceEntryPoints(style: "tabBar")
+    }
+
+    func testSidebarSourceEntryPointsOpenTheSharedChooser() throws {
+        try verifyGeneralSourceEntryPoints(style: "sidebar")
+    }
+
+    private func verifyGeneralSourceEntryPoints(style: String) throws {
+        let app = try launchSettings(style: style, syncEnabled: false)
         defer { app.terminate() }
         for (route, identifier) in [
             ("servers", "sources-add-source"),
@@ -521,6 +575,34 @@ final class SettingsWorkspaceRemoteTests: XCTestCase {
             XCTAssertTrue(app.staticTexts["Jellyfin"].waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertTrue(app.staticTexts["Add Source"].exists)
             capture("source-destination-\(route)", in: app)
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            try VNImageRequestHandler(cgImage: XCTUnwrap(app.screenshot().image.cgImage)).perform([request])
+            let visibleText = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+            XCTAssertTrue(visibleText.contains("Jellyfin"),
+                          "The chooser must be visible above Settings, not merely in its accessibility tree: \(visibleText)")
+            let plex = app.buttons.matching(NSPredicate(format: "label == %@", "Plex")).firstMatch
+            try focus(plex, in: app)
+            XCTAssertTrue(hasFocus(plex), "The foreground chooser must respond to the remote.")
+            if route == "servers" {
+                let music = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Navidrome")).firstMatch
+                try focus(music, in: app)
+                XCUIRemote.shared.press(.select)
+                let signIn = app.buttons["subsonic-sign-in"]
+                let cancel = app.buttons["subsonic-cancel"]
+                XCTAssertTrue(signIn.waitForExistence(timeout: 10), app.debugDescription)
+                XCTAssertTrue(cancel.exists)
+                XCTAssertFalse(signIn.isEnabled, "An empty form must not submit.")
+                XCTAssertEqual(signIn.frame.width, 840, accuracy: 2,
+                               "The native Sign In button must fill the form, not just its text.")
+                XCTAssertEqual(cancel.frame.width, signIn.frame.width, accuracy: 2)
+                XCTAssertEqual(cancel.frame.minX, signIn.frame.minX, accuracy: 2)
+                capture("source-navidrome-actions-\(style)", in: app)
+                try focus(cancel, in: app)
+                XCUIRemote.shared.press(.select)
+                XCTAssertTrue(plex.waitForExistence(timeout: 10), app.debugDescription)
+            }
             XCUIRemote.shared.press(.menu)
             XCTAssertTrue(add.waitForExistence(timeout: 10), app.debugDescription)
             XCUIRemote.shared.press(.menu)

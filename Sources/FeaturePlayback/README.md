@@ -78,8 +78,6 @@ bounded language-match/accessibility flags without track titles or URLs.
     Plex trailers and special features additionally retain a device-local,
     profile/account/server-viewer-scoped resume fallback; ordinary movies and
     episodes remain server-managed. See ProviderPlex's extra resume contract.
-    Tracker playback samples honor the same original-item and resolved-extra
-    exclusions as scrobbling, without suppressing provider progress reports.
   - `PlayerView` + `CustomPlayerContainer` host the engine's vended
     bare video surface and overlay the shared transport chrome.
   - `PlayerCardMetrics` scales touch-player typography to a wide-tablet maximum
@@ -508,9 +506,7 @@ On iPhone and iPad, VOD and Live TV share adaptive native `PlayerMoreMenuButton`
 controls. Portrait uses one ellipsis; landscape exposes the available menus as
 separate controls, with Version and Multiview opening their existing destinations
 directly. Audio, Subtitles and Video reuse the existing player-category icons
-(waveform, captions and adjustment sliders) in both VOD and Live TV. Community
-timestamps follow the same menu/destination lifecycle for supported VOD items
-with an available timestamp source; they remain absent from Live TV. Video combines
+(waveform, captions and adjustment sliders) in both VOD and Live TV. Video combines
 zoom choices with Quality in both layouts; Quality opens its existing editor and
 never acts as a selectable zoom mode. The standalone Video popup omits its redundant
 category heading; portrait retains the named Video entry. Quality remains
@@ -747,26 +743,6 @@ using native media glass and SF Symbols, not stock AVKit HUDs. They share the
 transport's foreground pairing: light ink on native media glass in either theme,
 theme-aware ink on the reduced-glass fallback.
 
-## Manual community timestamps
-
-Connected PublicMetaDB accounts can browse community timestamps from the existing
-TV Playback menu and mobile options menu. Browsing is on demand, read-only, and
-does not enable playback reporting or automatic skipping. Highlights are fetched
-only after a separate spoiler toggle.
-
-The shared browser preserves individual contributions, source-release labels and
-attribution. A timestamp must fit the current finite runtime, but that alone does
-not verify release compatibility. Each start/end jump therefore needs explicit
-confirmation and uses the normal seek coordinator; server markers and chapters
-are never replaced. Jumping directly to the runtime's end is unavailable. The
-confirmation explains that normal progress reporting can follow a seek.
-
-Reads and selections are fenced by the active key/profile connection and player
-load generation. Stop, reload, background recovery, cancellation and changed
-runtime prevent stale selections. A failed lookup remains an error rather than
-a successful empty list. No automatic PublicMetaDB fallback is enabled without
-the missing upstream file/release compatibility evidence.
-
 ## Skip-marker timeline
 
 Skip behavior resolves the profile's master enablement and Movies/TV Shows/Anime
@@ -783,16 +759,14 @@ delay, including the credits-based Up Next countdown when autoplay is enabled.
 Countdown deadlines and rings share that duration and remain tied to playback
 time, preserving pause, seek-entry, dismissal and focus behavior.
 
-Credits are normalized to one effective marker: the latest reported start and
-the latest reported end, so an early outro cannot end playback before the real
-credits. Without an after-credits scene, the credits marker extends to the item
-end so auto-skip follows the normal next-episode/Up Next path. When IntroDB or
-TheIntroDB reports or implies after-credits content, the credits end at that
-scene's start, the scene plays, and next-episode auto-advance and the Up Next
-card are suppressed. While the community after-credits decision is still
-resolving, the credits Skip button remains manual and Up Next waits. Duplicate
-server, IntroDB, or TheIntroDB reports for the same kind are squashed before
-they reach the timeline.
+Separate credits windows remain separate: a mid-credits scene is not a duplicate
+marker. Up Next owns only a credits window that reaches the known playback
+duration. A finite earlier window retains its normal Skip Credits behavior and
+lands at its own end; neither a short unmarked tail nor a missing scene marker
+justifies skipping to the next item. Natural EOF still follows episode/playlist
+autoplay preferences. Unknown duration defers the credits-based handoff.
+Exact duplicate ranges and invalid markers are removed without coalescing
+different windows or overriding a kind's Off/manual/automatic setting.
 
 The on-demand and Live touch timelines keep the native glass surface continuous wherever
 segment cuts would strand tiny pieces. Each uses its measured track width, not
@@ -802,11 +776,8 @@ marker or short unmarked interval are omitted, including near the track ends.
 The same threshold applies at rest and while dragging, so touching does not
 change which cuts appear. Wider layouts retain cuts wherever they fit.
 
-The timeline itself does not retime ranges or invent boundaries inside a
-contiguous skip range; source normalization may merge duplicate reports and
-extend closing credits to the item end or after-credit start before the track
-sees them. Skip behavior, linear seeking, and existing touch targets remain
-unchanged. On iPhone and iPad, progress is shown
+The timeline does not enlarge or retime normalized marker ranges; linear seeking
+and existing touch targets remain unchanged. On iPhone and iPad, progress is shown
 only by the advancing fill, without a vertical playhead at rest or while dragging.
 The track is 8 points tall at rest and 20 while dragging. The dimmer buffered or
 aired fill remains behind it. Live preserves programme timing, rewind availability,
@@ -1286,6 +1257,9 @@ even if the layer does not. PiP continuation and background-audio preferences
 remain independent. Native captions switch drawing ownership for external
 presentation and revert to the shared overlay afterward; stop clears the
 presentation state and detaches the old player.
+Returning after backgrounding restores active PiP to the inline player on iOS
+and iPadOS. PiP opened while browsing in the app stays active; transient
+inactivity such as Control Center does not trigger restoration.
 
 ## Invariants
 
@@ -1322,6 +1296,12 @@ disabled in load options and excluded by engine package traits. Their controls,
 search results and request fields are removed; legacy saved profile values are
 ignored. Ordinary surround audio, standard Dolby Vision playback and native
 E-AC-3/JOC stream-copy remain unchanged. Software playback uses channel PCM.
+The separate beta-only **P7 FEL → P8.1 conversion** setting defaults on per
+profile. It uses native P8.1 curve folding, not full FEL reconstruction. Confirmed
+FEL playback exposes a session-only override in TV Playback/mobile Video options;
+off reloads at the current position and play/pause intent using HDR10. Unknown P7,
+previews and live playback remain conservative; MEL still converts automatically.
+See [FEL policy](../../docs/playback-engines.md#dolby-vision-fel) for limitations.
 Diagnostic parsing still recognizes historical rendered-PCM and APAC labels;
 those labels do not imply that Plozz enables the corresponding conversion.
 Both native and Plozzigen engines declare multichannel content to the audio session.
@@ -2286,26 +2266,22 @@ There are no internal cutouts, patterns, or user-selectable marker styles.
 The base 4pt gaps are centered on the original time boundaries. Each half-gap is
 capped at a quarter of either neighboring section's width so a tiny range is
 not consumed or enlarged. Outer timeline ends remain unchanged.
-Both sides of each gap use the narrower rendered section to size their corners,
-with a small amount of extra rounding capped at half the bar height. Slivers use
-slightly taller elliptical corners without exceeding their available width;
-wider neighbors can use the corresponding circular corner. Base facing corners meet
-the gap at the same height. Roomy joins retain full rounding, and rounding never
-removes a divider. Live programme tracks use the same geometry.
-On TV, constrained corners grow vertically from the 12pt resting geometry as
-focus expands the bar to 20pt. Their horizontal width stays constrained while
-the curves retain their resting proportions instead of becoming squarer.
-The wider side of a tight join gains up to 1.5pt of additional rounding during
-focus, without changing the smaller piece or exceeding a fully rounded end.
-Tight TV joins also gain up to 1pt of optical spacing at rest, increasing to
-2pt at full focus, taken only from the wider neighbor. The smaller piece stays
-in place, and the original time boundary remains inside the gap. Spacing tapers
-away at fully rounded joins and is bounded so a section contributing to both
-neighboring gaps retains at least half its width. Neither seek positions nor
-marker times change.
-Full-radius roomy joins are unchanged.
-Touch timelines retain their existing minimum-width suppression, so expanding
-the bar does not introduce tiny sections or change its established rounded caps.
+Only the two outer ends retain full rounding. Internal cuts have vertical sides
+with small 3pt corner curves, constrained by either neighboring section's width.
+The same small internal radius applies at rest,
+during scrubbing, and when TV focus expands the bar from 12pt to 20pt.
+Live programme tracks use the same geometry.
+TV and touch skip-marker timelines both require 20pt of solid section width
+between retained cuts. First, skip windows too narrow to display are omitted
+from the visual layout. Spacing is then measured again between the remaining
+boundaries, so a short nearby window cannot erase a long credits section.
+Both cuts around any still-undersized unmarked interval are omitted together;
+cuts too close to the timeline ends are also hidden. Crowded endings avoid
+slivers; readable cuts keep their exact timestamps. This threshold is
+fixed while focus or touch expands the bar, and does not depend on progress.
+Only the visual cuts are suppressed: stored ranges, skip buttons, post-credits
+gaps, and autoplay decisions are unchanged. Live programme boundaries retain
+their separate layout policy.
 The mask applies to the base, buffered, and played fills and glass backing
 together, never the white playhead. Each section retains the bar's exact
 material and opacity; only its rounded ends and full-height gaps reveal the

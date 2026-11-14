@@ -33,6 +33,7 @@ import CoreUI
 @MainActor
 @Observable
 public final class AccountsProvidersModel {
+    @ObservationIgnored public var onLocalAccountAuthentication: (String) -> Void = { _ in }
     /// All signed-in accounts, in stable order.
     public private(set) var accounts: [Account] = []
     /// Whether `accounts` reflects what is on disk yet. `false` until the first
@@ -158,6 +159,7 @@ public final class AccountsProvidersModel {
             },
             onComplete: { [weak self] in
                 guard let self else { return }
+                self.onLocalAccountAuthentication(account.id)
                 self.registry.invalidate(accountID: account.id)
                 self.reloadAccounts()
                 onComplete()
