@@ -99,7 +99,10 @@ final class FanoutTests: XCTestCase {
             merge: { $0 }
         ) { _ in }
 
-        XCTAssertEqual(await counter.value, 1)
+        // Await first: XCTest's assertion arguments are autoclosures, so an inline
+        // `await` inside one does not compile.
+        let calls = await counter.value
+        XCTAssertEqual(calls, 1)
         XCTAssertEqual(result.value, ["a"])
     }
 }
