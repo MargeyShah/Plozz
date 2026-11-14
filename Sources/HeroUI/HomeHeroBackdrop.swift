@@ -688,6 +688,20 @@ private struct WipeImageView: UIViewRepresentable {
             // (higher-res / router-resolved) candidate has since been cached.
             if slideID == targetID {
                 if references != targetReferences {
+                    // Reference trace (PLZXFAN-gated; hash only). The carried and
+                    // filtered SETS are stable on device (HEROFRAME/HOMECAROUSEL), so
+                    // an image that still swaps after first paint must come from the
+                    // same slide's artwork references changing — enrichment adding or
+                    // reordering selections. This line proves or rules that out.
+                    if FanoutDiagnostics.isEnabled {
+                        let joined: String = references.map { String(describing: $0) }.joined(separator: "|")
+                        let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                        FanoutDiagnostics.emit(
+                            "HEROARTREF t=\(stamp) id=\(slideID.prefix(8)) "
+                            + "count=\(references.count) sig=\(joined.hashValue) "
+                            + "displayed=\(displayedID?.prefix(8) ?? "none")"
+                        )
+                    }
                     targetReferences = references
                     resolveSameSlideUpgrade(
                         references: references,
