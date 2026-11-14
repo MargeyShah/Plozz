@@ -563,6 +563,7 @@ public final class ItemDetailViewModel {
     /// after tapping through several titles. Trailers + ratings, by contrast, are
     /// awaited on the `load()` path (see ``runTrailersAndRatings(for:)``).
     private nonisolated(unsafe) var enrichmentTask: Task<Void, Never>?
+    @ObservationIgnored private var detailMetadataTask: Task<Void, Never>?
     private nonisolated(unsafe) var streamProbeTask: Task<Void, Never>?
     @ObservationIgnored private var completedStreamProbeKey: String?
     /// The fully-loaded item enrichment is keyed to, so a page returned to (popped
@@ -923,6 +924,12 @@ public final class ItemDetailViewModel {
             )
             let taggedItem = tagged(item)
             nativeDetailItem = taggedItem
+            // Cast and the rest of the external metadata are their own network round
+            // trip. Running them here — concurrent with the children fetch and the
+            // opening season's episode prefetch — means the page settles with cast in
+            // place. They used to start only after children, resume and ratings, which
+            // is why the cast row arrived visibly later than the rest of the page.
+            startDetailMetadataEnrichment(for: item, sourceGeneration: loadSourceGeneration)
 
             if item.kind == .collection {
                 state = .loaded(Detail(
@@ -1592,7 +1599,8 @@ public final class ItemDetailViewModel {
             provider: provider,
             sourceGeneration: sourceGeneration
         )
-        async let metadataDone: Void = enrichDetailMetadata(for: item, sourceGeneration: sourceGeneration)
+        // Cast/metadata already started at item resolution (see
+        // `startDetailMetadataEnrichment`); starting it here too would fetch it twice.
         async let extrasDone: Void = loadExtras(
             for: item,
             children: children,
@@ -1601,7 +1609,6 @@ public final class ItemDetailViewModel {
         )
         _ = await trailersDone
         _ = await ratingsDone
-        _ = await metadataDone
         _ = await extrasDone
     }
 
@@ -2397,6 +2404,16 @@ public final class ItemDetailViewModel {
     /// cancels indexed lookups and fallback searches.
     private func loadRelatedTitles(for item: MediaItem) {
         guard let relatedTitlesLoader else { return }
+        // Enrichment rewrites the item (ratings, overview, credits) and then calls
+        // this again. Restarting the fetch for the same subject cancelled the
+        // in-flight request and started a second one, so the row's arrival time
+        // depended on which pass finished last — the reported "related loads slower
+        // depending, inconsistent". Same subject while a fetch is running or done is
+        // a no-op; only a different item restarts it.
+        if relatedTitlesItem?.id == item.id,
+           relatedTitlesTask != nil || relatedTitlesLoader.hasResolved {
+            return
+        }
         if relatedTitlesTask != nil {
             relatedTitlesTask?.cancel()
             relatedTitlesLoader.cancel()
@@ -3013,6 +3030,17 @@ public final class ItemDetailViewModel {
         }
         state = .loaded(detail)
         persistSnapshot()
+    }
+
+    /// Starts the external metadata (cast, overview, ratings text) fetch early.
+    ///
+    /// Cancellable and generation-guarded like the other speculative work: navigating
+    /// away must not leave a fetch running against the next page's provider.
+    private func startDetailMetadataEnrichment(for item: MediaItem, sourceGeneration: UInt64) {
+        detailMetadataTask?.cancel()
+        detailMetadataTask = Task { [weak self] in
+            await self?.enrichDetailMetadata(for: item, sourceGeneration: sourceGeneration)
+        }
     }
 
     private func enrichDetailMetadata(for item: MediaItem, sourceGeneration: UInt64) async {
