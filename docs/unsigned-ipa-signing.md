@@ -76,9 +76,15 @@ Consequences for this app:
 
 - Every entitlement the profile does not grant is gone. Per the table above that
   is acceptable for playback.
-- A **wildcard** profile (`TEAM.com.*`) leaves `application-identifier` with a
-  literal `*`, which is not a valid app claim. Use an explicit App ID whose
-  bundle id is exactly `com.thatcube.Plozz.selfbuild`.
+- A **wildcard** profile (`TEAM.*`) is supported and is what a normal sideload
+  uses. zsign writes the profile's wildcard `application-identifier`; the app still
+  installs, launches, reads its credentials and loads Home/library rows from servers
+  — observed on a real install. What a wildcard cannot carry is the capability set:
+  App Groups, iCloud/CloudKit, push, Associated Domains, and the Top Shelf's shared
+  container. Those degrade as listed above; the viewer's library, playback and
+  progress do not.
+- An **explicit App ID** is only required if you need one of those capabilities.
+  If you use one, its bundle id must be exactly `com.thatcube.Plozz.selfbuild`.
 - Do not change the bundle id in the signer. `BGTaskSchedulerPermittedIdentifiers`
   and the external-player callback scheme are baked from it at build time, so a
   rename silently breaks background handoff and callbacks. If a rename is
