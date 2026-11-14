@@ -293,3 +293,14 @@ implementation; Subsonic support is music-only and currently development/TestFli
 Follow the [Swift/SwiftUI guidelines](../docs/swiftui-guidelines.md) and existing
 module ownership. Keep changes focused, add relevant regression coverage, and
 update the documentation that owns the changed behavior.
+
+Two conventions that came out of the Home/detail reflow work are now part of
+those guidelines and apply to every surface:
+
+- **Loading states are state-driven.** A placeholder or skeleton is chosen from
+  what the data says (`hasPersistedSnapshot`, `isRestoringSnapshot`,
+  `hasExplicitSeasonSelection`), never from an elapsed-time delay.
+- **Reserve geometry with `PlozzReservedPlaceholder`.** Anything that loads after
+  its header — episode rails, sections, card shelves — lays out its placeholder
+  at the real content height and only *paints* it when the viewer asked for the
+  change. Writing that rule locally per view is how the detail page reflowed.
