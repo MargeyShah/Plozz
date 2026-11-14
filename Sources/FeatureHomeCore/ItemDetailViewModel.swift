@@ -611,6 +611,13 @@ public final class ItemDetailViewModel {
     /// its whole episode list on the smallest supported device.
     static let maxRestoredEpisodesPerSeason = 80
 
+    /// The id this page was opened with, before `adoptLibraryItemIDForActiveAccountIfNeeded`
+    /// re-points `activeItemID` at the library copy. A snapshot written after that
+    /// adoption is stored under the library id, so a page reopened with the original id
+    /// (a discovery/watchlist entry — commonly an anime title) would miss its cache and
+    /// paint placeholders every time.
+    private let navigationItemID: String
+
     private var snapshotKey: String {
         let key = "\(activeSourceAccountID ?? "_")|\(activeItemID)"
         return metadataLanguage == "en" ? key : "\(key)|text-language-v1:\(metadataLanguage)"
@@ -651,6 +658,7 @@ public final class ItemDetailViewModel {
         self.openingEdition = initialItem?.edition
         self.provider = provider
         self.itemID = itemID
+        self.navigationItemID = itemID
         self.activeProvider = provider
         self.activeItemID = itemID
         self.isDiscoveryItem = isDiscoveryItem
@@ -2919,9 +2927,14 @@ public final class ItemDetailViewModel {
         // after the first frame — measured on device as the episode rail going
         // skeleton → cards on every open.
         isRestoringSnapshot = true
+        let alternateKey = "\(activeSourceAccountID ?? "_")|\(navigationItemID)"
         snapshotRestoreTask = Task { [weak self] in
             defer { self?.isRestoringSnapshot = false }
-            guard let snapshot = await cache.snapshot(for: key),
+            var restored = await cache.snapshot(for: key)
+            if restored == nil, alternateKey != key {
+                restored = await cache.snapshot(for: alternateKey)
+            }
+            guard let snapshot = restored,
                   let self, !Task.isCancelled,
                   self.isCurrentSource(generation: generation, itemID: itemID, accountID: accountID) else { return }
             self.applySnapshotIfNotStale(snapshot)
