@@ -1269,9 +1269,25 @@ struct PlozziOSTabShell: View {
                     // the Search tab needs UIKit to pop back to its root when the tab
                     // is pressed. Inert for every other destination.
                     .background {
-                        PlozziOSNavigationPopProxy(request: navigationRootRequest)
-                            .frame(width: 0, height: 0)
-                            .allowsHitTesting(false)
+                        PlozziOSNavigationPopProxy(
+                            request: navigationRootRequest,
+                            isSearch: destination == .search,
+                            onReselect: destination == .search
+                                ? {
+                                    // A re-tap never reaches the TabView binding, so
+                                    // the shell is told explicitly: focus the field,
+                                    // clear the previous query, return to the results.
+                                    if FanoutDiagnostics.isEnabled {
+                                        FanoutDiagnostics.emit(
+                                            "TABRESELECT t=\(Int(ProcessInfo.processInfo.systemUptime * 1000))"
+                                        )
+                                    }
+                                    selectDestination(.search)
+                                }
+                                : nil
+                        )
+                        .frame(width: 0, height: 0)
+                        .allowsHitTesting(false)
                     }
                     .toolbar {
                         if isOverflow, destination != .downloads {
