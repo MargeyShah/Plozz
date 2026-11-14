@@ -68,7 +68,11 @@ public final class ItemDetailViewModel {
     /// that gate on "no content yet" use this to hold instead of flashing a
     /// skeleton (measured on device: the episode rail painted skeleton → cards on
     /// every detail open).
-    public private(set) var isRestoringSnapshot = false
+    ///
+    /// Not observed on purpose: it is read during rendering, and every transition
+    /// that matters already publishes `state`. Tracking it would add a property to an
+    /// `@Observable` type whose budget is a decreasing-only ratchet (arch-guard).
+    @ObservationIgnored public private(set) var isRestoringSnapshot = false
     @ObservationIgnored private var collectionLoadGeneration: UInt64 = 0
 
     /// Playable trailers for this item, loaded alongside detail. Empty until
@@ -564,6 +568,7 @@ public final class ItemDetailViewModel {
     /// awaited on the `load()` path (see ``runTrailersAndRatings(for:)``).
     private nonisolated(unsafe) var enrichmentTask: Task<Void, Never>?
     @ObservationIgnored private var detailMetadataTask: Task<Void, Never>?
+    @ObservationIgnored private var episodePrefetchTask: Task<Void, Never>?
     private nonisolated(unsafe) var streamProbeTask: Task<Void, Never>?
     @ObservationIgnored private var completedStreamProbeKey: String?
     /// The fully-loaded item enrichment is keyed to, so a page returned to (popped
@@ -1018,7 +1023,8 @@ public final class ItemDetailViewModel {
                     children: fetchedChildren,
                     resumeSeasonID: serverResumeEpisode?.seasonID
                 ) {
-                    Task { [weak self] in
+                    episodePrefetchTask?.cancel()
+                    episodePrefetchTask = Task { [weak self] in
                         await self?.loadEpisodes(for: openingSeasonID)
                     }
                 }
@@ -1709,6 +1715,12 @@ public final class ItemDetailViewModel {
     /// page's `provider.item` (the multi-second blank-detail hang).
     public func suspendEnrichment() {
         enrichmentTask?.cancel(); enrichmentTask = nil
+        // The early metadata/cast fetch and the opening-season prefetch are page-local
+        // work. Leaving them running meant a page the viewer had already left kept a
+        // network round trip and its decodes alive while Home scrolled — measured as
+        // hitching on exit. Both are cancellable, so cancel them here with the rest.
+        detailMetadataTask?.cancel(); detailMetadataTask = nil
+        episodePrefetchTask?.cancel(); episodePrefetchTask = nil
         streamProbeTask?.cancel(); streamProbeTask = nil
         crossServerDiscoveryTask?.cancel(); crossServerDiscoveryTask = nil
         alternateSourceEnrichmentTask?.cancel(); alternateSourceEnrichmentTask = nil

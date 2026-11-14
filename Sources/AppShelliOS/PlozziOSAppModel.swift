@@ -2208,6 +2208,18 @@ final class PlozziOSAppModel {
         }
     }
 
+    /// Raises the Local Network alert from the app's own process, once, on a
+    /// calm foreground screen. A re-signed install (unsigned IPA + a
+    /// sideloading tool) is a new signed identity, so the grant the previous
+    /// install earned does not carry over; leaving the alert to the first
+    /// playback request lets the player present it mid-transition and then time
+    /// out with `NSURLError -1001` if it is missed. Gated on a configured
+    /// account because a fresh install has nothing on the LAN to reach yet.
+    func requestLocalNetworkAccessIfNeeded() {
+        guard !Self.isRunningUnitTests, !accountsProviders.accounts.isEmpty else { return }
+        Task { _ = await LocalNetworkAuthorization.requestIfNeeded() }
+    }
+
     private var historySyncReaders: [any TrackerHistorySyncReading] {
         [publicMetaDBService, traktService, wetrakrService, simklService, anilistService, malService]
     }

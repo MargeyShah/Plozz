@@ -1330,6 +1330,11 @@ public final class PlayerViewModel {
         phase = .loading
         controls.infoCard.chapters = []
         stopSongWatch()  // a new item starts without the last song
+        // Playback may be the first local-network operation after a re-signed
+        // install (cached rows, a deep link straight into an item). Ask from the
+        // app process without gating bring-up on the answer; the foreground
+        // hook in the iOS shell normally got there first.
+        Task { _ = await LocalNetworkAuthorization.requestIfNeeded() }
         let bringUpStart = Date()
         bringUpStartedAt = bringUpStart
         HandoffDiagnostics.emit(
@@ -3542,7 +3547,20 @@ extension PlayerViewModel: EngineHandoffCoordinatorHost {
     static func streamingFailure(
         _ error: AppError, evidence: StreamingPlaybackFailure? = nil, streamWasSupplied: Bool = true
     ) -> StreamingQualityError? {
-        if let evidence { return .playback(evidence) }
+        if let evidence {
+            if LocalNetworkAuthorization.recordedState == .denied,
+               evidence.kind == .timedOut || evidence.kind == .network {
+                // The most common "player is broken" report on a freshly
+                // re-signed install is actually a Local Network denial: the
+                // grant is bound to the signed identity, so a sideloaded
+                // re-sign starts from denied/undecided. Name it in logs so a
+                // diagnostics capture points at the permission, not the codec.
+                PlozzLog.playback.error(
+                    "Playback failed while Local Network access is denied; enable it in Settings ▸ Privacy & Security ▸ Local Network"
+                )
+            }
+            return .playback(evidence)
+        }
         switch error {
         case .serverUnreachable: return .playback(.init(kind: .network))
         case .unauthorized, .invalidCredentials: return .authenticationRequired
