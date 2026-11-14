@@ -68,10 +68,6 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
             installTabReSelectionIfNeeded()
         }
 
-        override func viewDidDisappear(_ animated: Bool) {
-            super.viewDidDisappear(animated)
-            removeTabReSelection()
-        }
 
         private func enclosingNavigationController() -> UINavigationController? {
             var candidate: UIViewController? = self
@@ -106,14 +102,6 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
             observedTabBar = tabs.tabBar
         }
 
-        private func removeTabReSelection() {
-            if let tabBarTap, let observedTabBar {
-                observedTabBar.removeGestureRecognizer(tabBarTap)
-            }
-            tabBarTap = nil
-            observedTabBar = nil
-        }
-
         @objc private func tabBarTapped(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended, let bar = observedTabBar else { return }
             let point = recognizer.location(in: bar)
@@ -131,6 +119,19 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
             shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
         ) -> Bool {
             true
+        }
+
+        deinit {
+            // The recogniser lives on the tab bar, which outlives this controller
+            // only until the shell rebuilds. Detach on the main actor rather than
+            // in `viewDidDisappear`: pushing a result covers the Search root, and
+            // removing the observer there would disable the very re-tap it exists
+            // to notice.
+            let bar = observedTabBar
+            let recognizer = tabBarTap
+            Task { @MainActor in
+                if let bar, let recognizer { bar.removeGestureRecognizer(recognizer) }
+            }
         }
 
         override func loadView() {
