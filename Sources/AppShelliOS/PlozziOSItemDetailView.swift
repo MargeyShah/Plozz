@@ -1774,7 +1774,13 @@ struct PlozziOSInlineSeriesBrowser: View {
                         && displayedEpisodes == nil
                         // A cached page is being restored from disk: hold rather than
                         // paint a skeleton that would be replaced a moment later.
-                        && !viewModel.isRestoringSnapshot,
+                        && !viewModel.isRestoringSnapshot
+                        // No timers: a skeleton is only honest when the viewer asked
+                        // for a different season and its episodes are not in hand yet.
+                        // On the page's first load the rail sits in its final geometry
+                        // and the cards appear in place, which is what "no flash"
+                        // means without guessing at a delay.
+                        && hasExplicitSeasonSelection,
                     currentEpisodeID: railTargetID,
                     onInteraction: {},
                     onPlay: onPlay
@@ -1828,7 +1834,7 @@ struct PlozziOSInlineSeriesBrowser: View {
             // that clears the season list would make it reappear under the viewer.
             .onChange(
                 of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil
-                    && !viewModel.isRestoringSnapshot,
+                    && !viewModel.isRestoringSnapshot && hasExplicitSeasonSelection,
                 initial: true
             ) { _, skeleton in
                 if FanoutDiagnostics.isEnabled {

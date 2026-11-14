@@ -68,7 +68,12 @@ to three and reseats, and a Continue Watching row that empties under the viewer.
   not move the viewer. A decoded image is applied synchronously on first paint and
   art is retained across a reference change.
 - **Continue Watching is not gate-kept behind the aggregate.** Cached cards stay
-  painted while the fresh multi-account result lands.
+  painted while the fresh multi-account result lands, and a row that already holds
+  cards is never re-marked as loading: `HomeViewModel` seeds `loadingRows` in
+  `init` and in every `receiveProgress` from the **data** each row currently has,
+  not from the account list. Measured regression: a row with 48 cached cards
+  rendered as placeholders on the first frame and again for ~2.4 s mid-load,
+  which is what "starts blank, scroll shows the covers" looked like.
 
 These paths carry opt-in telemetry (`HOMESEED`, `HOMEFRAME`, `HEROFRAME`,
 `HOMECAROUSEL`, `HEROARTREF`, `HOMECW`, `DETAILVIEW`, `DETAILRAIL`,

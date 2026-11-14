@@ -179,7 +179,15 @@ struct PlozziOSHomeView: View {
     /// flipping it re-lays out the entire page (hero band unreserved + status-bar
     /// inset inserted) and then flips back — the "another render of Home with the
     /// wrong hero spacing, flickering until it settles" symptom.
-    @State private var skeletonArmed = false
+    /// Key for the hero-freshness run loop. Extracted from the modifier because the
+    /// inline five-term boolean made the view body expensive enough to blow the
+    /// type-checker's budget once the diagnostics grew.
+    private var heroFreshnessRunKey: Bool {
+        let active = homeIsFrontmost && homeHasAppeared && scenePhase == .active
+        let idle = playbackRequest == nil
+        let heroOn = appModel.settings.hero.effectiveSettings.isActive
+        return active && idle && heroOn
+    }
     /// Compact identity of what Home is presenting right now, for the millisecond
     /// frame trace (see the `HOMEFRAME` emit in `body`).
     private var frameTelemetryKey: String {
@@ -187,7 +195,7 @@ struct PlozziOSHomeView: View {
             viewModel.state, liveTV: liveTV,
             visibility: appModel.settings.homeVisibility.visibility
         ).diagnosticName
-        return "state=\(state) armed=\(skeletonArmed) "
+        return "state=\(state) snapshot=\(viewModel.hasPersistedSnapshot) "
             + "loadingRows=\(viewModel.loadingRows.count) heroItems=\(heroItems.count) "
             + "heroShown=\(viewModel.hasCompletedLiveLoad)"
     }
@@ -307,6 +315,7 @@ struct PlozziOSHomeView: View {
                 + "rowSeed=\(rowSeed.map { String($0.count) } ?? "nil") "
                 + "cachedContent=\(viewModel.state.value != nil) "
                 + "store=\(viewModel.hasPersistedSnapshot) "
+                + "cw=\(viewModel.state.value?.continueWatching.count ?? -1) "
                 + "liveLoadDone=\(viewModel.hasCompletedLiveLoad)"
             )
         }
@@ -341,7 +350,7 @@ struct PlozziOSHomeView: View {
                 // row cards, then content). Waiting here means a warm launch goes
                 // straight from the launch screen to the restored page, while a
                 // genuinely slow first launch still gets the skeleton.
-                if skeletonArmed {
+                if !viewModel.hasPersistedSnapshot {
                 PlozziOSHomeSkeletonScreen(
                     heroActive: HomeHeroSlotState.resolve(
                         settings: appModel.settings.hero.effectiveSettings,
@@ -396,36 +405,14 @@ struct PlozziOSHomeView: View {
         .task(id: viewModel.state.diagnosticName) {
             seedHeroFromCachedRowsIfNeeded()
         }
-        .task {
-            // Arm the skeleton only when there is no cached snapshot to restore.
-            //
-            // With a snapshot on disk the page paints it on the first frame, so a
-            // skeleton can only ever be a flash between the launch screen and that
-            // first painted frame — measured on device as a single phantom frame that
-            // appeared and disappeared between screenshots. Without a snapshot (a true
-            // first launch) the skeleton is the honest state and appears immediately.
-            if !viewModel.hasPersistedSnapshot {
-                skeletonArmed = true
-                return
-            }
-            // Cached page exists: never arm the full-page skeleton for the warm
-            // restore. Only a load that is still empty after a generous window (a
-            // genuinely wedged first refresh) falls back to it.
-            try? await Task.sleep(for: .milliseconds(6000))
-            skeletonArmed = true
-        }
-        // Millisecond-resolution frame telemetry. `devicectl` screenshots cost ~2.4s
-        // each, which cannot resolve the launch window; this records every
-        // presentation transition from inside the app so the cold-launch question is
-        // answered by the app itself. Gated, and it prints only counts and names.
-        .onChange(of: frameTelemetryKey, initial: true) { _, key in
-            if FanoutDiagnostics.isEnabled {
-                FanoutDiagnostics.emit(
-                    "HOMEFRAME t=\(Int(ProcessInfo.processInfo.systemUptime * 1000)) "
-                    + key
-                )
-            }
-        }
+        .modifier(
+            HomePresentationDiagnostics(
+                frameKey: frameTelemetryKey,
+                cwCount: viewModel.state.value?.continueWatching.count ?? -1,
+                cwPlaceholder: viewModel.loadingRows.contains(.continueWatching),
+                cachedSnapshot: viewModel.isShowingCachedSnapshot
+            )
+        )
         .plozziOSTracksHeroContainerHeight()
         .artworkGradientBackground(
             scope: ObjectIdentifier(viewModel), isVisible: homeIsFrontmost && homeHasAppeared,
@@ -494,10 +481,8 @@ struct PlozziOSHomeView: View {
             heroRequestStatusSetAt = [:]
             heroStatusContext = context
         }
-        .task(id: homeIsFrontmost && homeHasAppeared && scenePhase == .active
-            && playbackRequest == nil && appModel.settings.hero.effectiveSettings.isActive) {
-            guard homeIsFrontmost, homeHasAppeared, scenePhase == .active,
-                  playbackRequest == nil, appModel.settings.hero.effectiveSettings.isActive else { return }
+        .task(id: heroFreshnessRunKey) {
+            guard heroFreshnessRunKey else { return }
             await heroFreshnessRefresh.runWhileVisible()
         }
         .navigationTitle(Text(verbatim: ""))
@@ -4109,3 +4094,43 @@ private struct PlozziOSScreenshotPlaybackRegistration: ViewModifier {
     }
 }
 #endif
+
+/// Presentation telemetry for Home, kept out of the page body.
+///
+/// These are `onChange` observers with string formatting, and inline they pushed
+/// the view body past the SwiftUI type-checker's budget (repeated
+/// "unable to type-check this expression in reasonable time" failures). A
+/// modifier keeps the body readable and the compiler fast. Everything is gated by
+/// `PLZXFAN_STDOUT=1` and prints counts, kinds and hashes only — never titles,
+/// ids or URLs.
+private struct HomePresentationDiagnostics: ViewModifier {
+    let frameKey: String
+    let cwCount: Int
+    let cwPlaceholder: Bool
+    let cachedSnapshot: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: frameKey, initial: true) { _, key in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit("HOMEFRAME t=\(stamp) \(key)")
+            }
+            .onChange(of: cwCount, initial: true) { _, count in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit(
+                    "HOMECW t=\(stamp) count=\(count) "
+                    + "placeholder=\(cwPlaceholder) cachedSnapshot=\(cachedSnapshot)"
+                )
+            }
+            .onChange(of: cwPlaceholder, initial: true) { _, loading in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit(
+                    "HOMECWLOADING t=\(stamp) placeholder=\(loading) count=\(cwCount)"
+                )
+            }
+    }
+}
+

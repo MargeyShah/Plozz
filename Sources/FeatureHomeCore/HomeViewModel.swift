@@ -18,6 +18,7 @@ actor HomeSnapshotPersistence {
         generation: UInt64,
         to store: any HomeContentStoring,
         preservePreviousWatchlist: Bool,
+        preservePreviousContinueWatching: Bool = false,
         excludingUnconfirmedContinueWatchingIDs unconfirmedIDs: Set<String>
     ) {
         let scope = store.persistenceScope
@@ -31,6 +32,15 @@ actor HomeSnapshotPersistence {
                 content.watchlist,
                 on: store.load()?.watchlist ?? []
             )
+        }
+        if preservePreviousContinueWatching, durable.continueWatching.isEmpty {
+            // A load whose Continue Watching row came back empty while its other rows
+            // succeeded is not an empty aggregate, so the write went ahead and
+            // replaced a good resume row with nothing — the snapshot then had no cards
+            // to paint on the next launch, which is the reported "starts blank even
+            // though the row was retained". Keep last session's row unless a load has
+            // positively confirmed the viewer has nothing in progress.
+            durable.continueWatching = store.load()?.continueWatching ?? []
         }
         if !unconfirmedIDs.isEmpty {
             durable.continueWatching.removeAll {
@@ -688,7 +698,16 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
                 self.state = .loaded(cached)
                 self.isShowingCachedSnapshot = true
                 if !accounts.isEmpty {
-                    self.loadingRows = [.continueWatching, .recentlyAdded, .watchlist]
+                    // Only rows with nothing cached may start as placeholders. Marking
+                    // them unconditionally made a fully populated Continue Watching row
+                    // (measured: 48 cached cards) render as placeholders on the very
+                    // first frame — the reported "starts out blank, scrolling shows the
+                    // covers". Placeholder-ness follows the data, not the account list.
+                    var pending: Set<HomeRowKind> = []
+                    if cached.continueWatching.isEmpty { pending.insert(.continueWatching) }
+                    if cached.latest.isEmpty { pending.insert(.recentlyAdded) }
+                    if cached.watchlist.isEmpty { pending.insert(.watchlist) }
+                    self.loadingRows = pending
                 }
             }
         }
@@ -1340,7 +1359,17 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
         content.collectionRows = retainingCollectionRowContent(
             progress.content.collectionRows, previous: content.collectionRows
         )
-        if let resume { content.continueWatching = resume }
+        if let resume {
+            // Never let a mid-load empty result wipe the row: progress arrives per
+            // account, so one account reporting no in-progress titles before the
+            // others land is not evidence that the viewer has none. Blanking here is
+            // the reported "Continue Watching loads, then goes blank, and scrolling
+            // brings the covers back". An empty reconcile only replaces a non-empty
+            // row when the row is fully ready AND nothing was carried forward.
+            if !resume.isEmpty || content.continueWatching.isEmpty {
+                content.continueWatching = resume
+            }
+        }
         if newlyReady.contains(.recentlyAdded) {
             content.latest = progress.content.latest
             content.recentlyAddedCandidates = progress.content.recentlyAddedCandidates
@@ -1389,6 +1418,13 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
         rowFailures = progress.failures
         continueWatchingDiagnostic = progress.continueWatchingDiagnostic
         loadingRows = progress.loadingRows.subtracting(receivedLiveRows)
+        // A row holding published cards is never a placeholder. Progress is reported
+        // per account, so a partly-loaded aggregate kept marking Continue Watching as
+        // loading and replaced 48 rendered cards with placeholders for ~2.4s
+        // (measured on device). Placeholder-ness follows the data, not the account.
+        if !content.continueWatching.isEmpty { loadingRows.remove(.continueWatching) }
+        if !content.latest.isEmpty { loadingRows.remove(.recentlyAdded) }
+        if !content.watchlist.isEmpty { loadingRows.remove(.watchlist) }
         let publication = PerformanceDiagnostics.shared.begin(.homePublish)
         if state.value != content { state = .loaded(content) }
         publication?.finish(.succeeded)
@@ -2012,6 +2048,9 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
                 generation: storeGeneration,
                 to: self.contentStore,
                 preservePreviousWatchlist: preservePreviousWatchlist,
+                preservePreviousContinueWatching:
+                    !self.hasCompletedHomeLoad
+                    || self.rowFailures[.continueWatching] != nil,
                 excludingUnconfirmedContinueWatchingIDs:
                     self.unconfirmedContinueWatchingIDs
             )
@@ -2408,6 +2447,8 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
                 generation: storeGeneration,
                 to: contentStore,
                 preservePreviousWatchlist: preservePreviousWatchlist,
+                preservePreviousContinueWatching:
+                    !hasCompletedHomeLoad || rowFailures[.continueWatching] != nil,
                 excludingUnconfirmedContinueWatchingIDs: unconfirmedIDs
             )
         }
