@@ -1958,7 +1958,9 @@ struct PlozziOSHomeHeroForeground: View {
         // Width fill / alignment now come from the shared placement modifier.
         .multilineTextAlignment(style == .compactPortrait ? .center : .leading)
         .environment(\.plozziOSHeroLogoSize, appModel.settings.hero.settings.logoSize)
-        .opacity(foregroundReady ? 1 : 0)
+        // A prepared slide is visible immediately, before the task runs, so a
+        // returned-to hero never spends a frame at zero opacity.
+        .opacity(foregroundReady || HeroForegroundReadiness.isPrepared(foregroundReadinessKey) ? 1 : 0)
         .task(id: foregroundReadinessKey) {
             // Returning from a detail page recreates this view, so the gate ran again and
             // faded an already-prepared slide in from transparent — a visible redraw on
@@ -1997,8 +1999,12 @@ struct PlozziOSHomeHeroForeground: View {
     /// logo — or whose logo is already cached — reveals immediately, and a page with
     /// one reveals when the artwork is actually ready.
     private var foregroundReadinessKey: String {
-        let refs = presentation.logoReferences.map { String(describing: $0) }.joined(separator: "|")
-        return "\(detailItem.id)#\(refs)#\(style == .compactPortrait)"
+        // Identity, not artwork references. An enrichment pass can hand the same
+        // slide a new logo reference after its first reveal; keying on the refs made
+        // the returned-to hero look unprepared, so it dropped to transparent, waited
+        // for the wordmark again, and faded back in — the "card disappears, then the
+        // freeze/reanimate finishes" report. Same title + style is the same slide.
+        "\(detailItem.id)#\(style == .compactPortrait)"
     }
 
     private var logoSources: (references: [ArtworkReference], fallback: HeroLogoFallback?) {
