@@ -346,6 +346,9 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
     public private(set) var isShowingCachedSnapshot = false
     @ObservationIgnored private var hasReceivedLiveContent = false
     @ObservationIgnored private var hasCompletedHomeLoad = false
+    /// Rows whose last publication reported a failure. They keep a retry footprint
+    /// (a loading row with no cards) until a request actually settles.
+    @ObservationIgnored private var rowsAwaitingRetry: Set<HomeRowKind> = []
     @ObservationIgnored private var detailResumeByAccount: [String: [MediaItem]] = [:]
     /// Detail opens can use a server's native episode ids before the other servers
     /// finish, and after the visible row merges those copies into a single card.
@@ -680,7 +683,7 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
             // wiped a valid snapshot and made the next launch show a skeleton before
             // its cached page. Both the row prune and the snapshot clear now wait for
             // a load that actually completed (see `load(showLoadingState:)`).
-            if accounts.isEmpty, accountsAreResolved, hasCompletedHomeLoad {
+            if accounts.isEmpty, accountsAreResolved {
                 cached.continueWatching = []
                 cached.latest = []
                 cached.recentlyAddedCandidates = nil
@@ -1416,15 +1419,60 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
         // Publish failures with reconciled content, never across an await that
         // could replace a focused loading row before its usable cards arrive.
         rowFailures = progress.failures
+        rowsAwaitingRetry.formUnion(progress.failures.keys)
         continueWatchingDiagnostic = progress.continueWatchingDiagnostic
         loadingRows = progress.loadingRows.subtracting(receivedLiveRows)
         // A row holding published cards is never a placeholder. Progress is reported
         // per account, so a partly-loaded aggregate kept marking Continue Watching as
         // loading and replaced 48 rendered cards with placeholders for ~2.4s
-        // (measured on device). Placeholder-ness follows the data, not the account.
-        if !content.continueWatching.isEmpty { loadingRows.remove(.continueWatching) }
-        if !content.latest.isEmpty { loadingRows.remove(.recentlyAdded) }
-        if !content.watchlist.isEmpty { loadingRows.remove(.watchlist) }
+        // (measured on device). Placeholder-ness follows the VISIBLE data, not the raw
+        // aggregate: a row whose only cards are filtered out (hidden library, watched
+        // Recently Added) is still empty on screen and must reserve its retry
+        // footprint instead of collapsing.
+        let loadingVisibility = currentVisibility()
+        let visibleLatest = (content.latest + (content.recentlyAddedCandidates ?? [])).contains {
+            $0.isVisibleOnHome(isLibraryVisible: loadingVisibility.isEnabled)
+                && (!loadingVisibility.hideWatchedRecentlyAdded
+                    || !HomeRecentlyAddedPolicy.isWatched($0))
+        }
+        let visibleLibraries = content.libraries.contains(
+            where: loadingVisibility.isVisibleOnHome
+        )
+        for kind in HomeRowKind.allCases {
+            let rawHasContent: Bool
+            let hasVisibleCards: Bool
+            switch kind {
+            case .continueWatching:
+                rawHasContent = !content.continueWatching.isEmpty
+                hasVisibleCards = rawHasContent
+            case .recentlyAdded:
+                rawHasContent = !content.latest.isEmpty
+                    || content.recentlyAddedCandidates?.isEmpty == false
+                hasVisibleCards = visibleLatest
+            case .watchlist:
+                rawHasContent = !content.watchlist.isEmpty
+                hasVisibleCards = rawHasContent
+            case .libraries:
+                rawHasContent = !content.libraries.isEmpty
+                hasVisibleCards = visibleLibraries
+            }
+            if hasVisibleCards {
+                loadingRows.remove(kind)
+            } else if (isLoading || isRefreshing), progress.failures[kind] == nil,
+                      rawHasContent || rowsAwaitingRetry.contains(kind) {
+                // A row whose only cards are filtered out, or that is retrying a
+                // failure, is empty on screen and must reserve its footprint.
+                loadingRows.insert(kind)
+            } else if !progress.loadingRows.contains(kind),
+                      progress.failures[kind] == nil, !rawHasContent {
+                // A settled, empty answer is not a loading row; only a query that is
+                // still in flight (or a previous failure) reserves one.
+                loadingRows.remove(kind)
+            }
+            if progress.failures[kind] == nil, !progress.loadingRows.contains(kind) {
+                rowsAwaitingRetry.remove(kind)
+            }
+        }
         let publication = PerformanceDiagnostics.shared.begin(.homePublish)
         if state.value != content { state = .loaded(content) }
         publication?.finish(.succeeded)
