@@ -1771,7 +1771,10 @@ struct PlozziOSInlineSeriesBrowser: View {
                     episodes: displayedEpisodes,
                     isLoading: !seasons.isEmpty
                         && selectedSeasonID != nil
-                        && displayedEpisodes == nil,
+                        && displayedEpisodes == nil
+                        // A cached page is being restored from disk: hold rather than
+                        // paint a skeleton that would be replaced a moment later.
+                        && !viewModel.isRestoringSnapshot,
                     currentEpisodeID: railTargetID,
                     onInteraction: {},
                     onPlay: onPlay
@@ -1824,7 +1827,8 @@ struct PlozziOSInlineSeriesBrowser: View {
             // skeleton exactly when `displayedEpisodes == nil`, and a return refresh
             // that clears the season list would make it reappear under the viewer.
             .onChange(
-                of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil,
+                of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil
+                    && !viewModel.isRestoringSnapshot,
                 initial: true
             ) { _, skeleton in
                 if FanoutDiagnostics.isEnabled {

@@ -63,6 +63,12 @@ public final class ItemDetailViewModel {
     }
 
     public private(set) var state: LoadState<Detail> = .idle
+    /// True while a cached detail page is being read back from disk. The read is
+    /// off-actor, so it always lands a turn or two after the first frame; surfaces
+    /// that gate on "no content yet" use this to hold instead of flashing a
+    /// skeleton (measured on device: the episode rail painted skeleton → cards on
+    /// every detail open).
+    public private(set) var isRestoringSnapshot = false
     @ObservationIgnored private var collectionLoadGeneration: UInt64 = 0
 
     /// Playable trailers for this item, loaded alongside detail. Empty until
@@ -2830,7 +2836,14 @@ public final class ItemDetailViewModel {
         let generation = sourceGeneration
         let itemID = activeItemID
         let accountID = activeSourceAccountID
+        // Publishes "a cached page is being restored" so surfaces that would
+        // otherwise paint a loading skeleton can hold instead. The restore reads from
+        // disk off-actor, so on a revisited title it always finishes a turn or two
+        // after the first frame — measured on device as the episode rail going
+        // skeleton → cards on every open.
+        isRestoringSnapshot = true
         snapshotRestoreTask = Task { [weak self] in
+            defer { self?.isRestoringSnapshot = false }
             guard let snapshot = await cache.snapshot(for: key),
                   let self, !Task.isCancelled,
                   self.isCurrentSource(generation: generation, itemID: itemID, accountID: accountID) else { return }
