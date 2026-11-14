@@ -185,10 +185,31 @@ struct PlozziOSItemDetailView: View {
                     loadIndexedBatches: relatedTitleLibraryBatchLoaders(in: accounts),
                     displayMode: mode
                 )
-            }
+            },
+            snapshotCache: appModel.detailSnapshotCache
         )
     }
 
+}
+
+/// The largest picture the tapped card already decoded. The push's zoom transition
+/// is stretching this exact image, so the detail hero should start from it rather
+/// than paint a flat background until a 2000px backdrop is fetched and decoded again.
+private func plozziOSHeroSeedArtwork(_ items: MediaItem...) -> UIImage? {
+    let variants: [ArtworkImageVariant] = [
+        .heroBackdrop, .heroPreview, .landscapeCard, .posterCard, .posterPreview, .original
+    ]
+    for item in items {
+        let urls = [item.backdropURL, item.heroBackdropURL, item.posterURL, item.seriesPosterURL]
+        for url in urls.compactMap({ $0 }) {
+            for variant in variants {
+                if let image = ArtworkImageCache.shared.cachedImage(for: url, variant: variant) {
+                    return image
+                }
+            }
+        }
+    }
+    return nil
 }
 
 private struct PlozziOSCanonicalItemDetailView: View {
@@ -533,6 +554,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                 PlozziOSDetailHeroSection(
                     item: heroTarget,
                     backdropItem: detail.item,
+                    seedArtwork: plozziOSHeroSeedArtwork(heroTarget, detail.item),
                     playableItem: playableHeroTarget,
                     showsPlayPlaceholder: showsPlayPlaceholder,
                     onRetryPlaybackInventory: viewModel.hasNoPlaybackStreams(for: versionTarget) ? {
@@ -626,6 +648,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                         Task { await viewModel.retryExtras() }
                     }
                 )
+                .plozzFadeInOnAppear()
 
                 // Related titles arrive after the page is readable, so reserve the
                 // rail's geometry while the loader works — same rule as Home's hero
@@ -661,6 +684,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                         people: detail.item.people,
                         sourceAccountID: detail.item.sourceAccountID
                     )
+                    .plozzFadeInOnAppear()
                 }
 
                 DetailInformationSections(

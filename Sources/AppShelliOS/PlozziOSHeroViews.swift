@@ -468,6 +468,9 @@ struct PlozziOSDetailHeroSection: View {
 
     let item: MediaItem
     let backdropItem: MediaItem
+    /// Artwork the tapped card already had decoded, painted behind the stage until
+    /// the full-size backdrop resolves.
+    var seedArtwork: UIImage? = nil
     let playableItem: MediaItem?
     var showsPlayPlaceholder: Bool = false
     var onRetryPlaybackInventory: (() -> Void)?
@@ -511,6 +514,7 @@ struct PlozziOSDetailHeroSection: View {
             presentation: backdropPresentation,
             style: style,
             surfaceRole: .detail,
+            seedArtwork: seedArtwork,
             isActive: true,
             // Episode pages retain their own still instead of a show backdrop.
             showsBackdrop: !presentsEpisodeStill,
@@ -620,6 +624,9 @@ struct PlozziOSHeroStage<Foreground: View>: View {
     let presentation: HeroPresentation
     let style: HeroArtworkStyle
     let surfaceRole: HeroTrailerSurfaceRole
+    /// Already-decoded card artwork to show on the first frame (a card's zoom
+    /// transition is already stretching it).
+    var seedArtwork: UIImage? = nil
     let isActive: Bool
     var showsBackdrop = true
     var showsScrim = true
@@ -692,6 +699,7 @@ struct PlozziOSHeroStage<Foreground: View>: View {
                 PlozziOSReflectedHeroStage(height: height, ancestorScale: pullScale) { _ in
                     PlozziOSHeroBackdrop(
                         presentation: presentation,
+                        seedArtwork: seedArtwork,
                         asyncFallbackURL: onlineArtworkFallback,
                         sharedResolutionIdentity: artworkAppearanceID,
                         style: style,
@@ -1081,6 +1089,7 @@ private struct PlozziOSHeroBackdrop: View {
     @Environment(\.plozzArtworkPolicy) private var artworkPolicy
 
     let presentation: HeroPresentation
+    var seedArtwork: UIImage? = nil
     let asyncFallbackURL: (@Sendable () async -> URL?)?
     let sharedResolutionIdentity: String?
     let style: HeroArtworkStyle
@@ -1167,6 +1176,20 @@ private struct PlozziOSHeroBackdrop: View {
     }
 
     private func stillArtwork() -> some View {
+        ZStack {
+            if let seedArtwork {
+                Image(uiImage: seedArtwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
+            }
+            backdropImage
+        }
+    }
+
+    private var backdropImage: some View {
         FallbackAsyncImage(
             references: presentation.artworkReferences(settings: artworkPolicy.settings, in: artworkPolicy.area),
             prefersLandscape: style != .compactPortrait,
@@ -1188,7 +1211,8 @@ private struct PlozziOSHeroBackdrop: View {
         ) { image in
             PlozziOSHeroArtworkImage(image: image, style: style, surfaceRole: surfaceRole)
         } placeholder: {
-            palette.backgroundBase
+            // Keep the seeded card picture visible until the full backdrop lands.
+            seedArtwork == nil ? palette.backgroundBase : Color.clear
         }
         .reportingHeroArtwork(id: presentation.itemID)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

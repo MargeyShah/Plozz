@@ -26,6 +26,7 @@ import SwiftUI
 /// }
 /// ```
 public struct PlozzReservedPlaceholder<Placeholder: View, Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let isPending: Bool
     private let revealsPlaceholder: Bool
     private let placeholder: Placeholder
@@ -44,14 +45,53 @@ public struct PlozzReservedPlaceholder<Placeholder: View, Content: View>: View {
     }
 
     public var body: some View {
-        if isPending {
-            placeholder
-                // Laid out either way: `.opacity` keeps the placeholder's real
-                // height, which is the whole point of reserving it.
-                .opacity(revealsPlaceholder ? 1 : 0)
-                .accessibilityHidden(!revealsPlaceholder)
-        } else {
-            content
+        Group {
+            if isPending {
+                placeholder
+                    // Laid out either way: `.opacity` keeps the placeholder's real
+                    // height, which is the whole point of reserving it.
+                    .opacity(revealsPlaceholder ? 1 : 0)
+                    .accessibilityHidden(!revealsPlaceholder)
+                    .transition(.opacity)
+            } else {
+                content
+                    .transition(.opacity)
+            }
         }
+        // Content arrives underneath the viewer without moving the page; a short
+        // fade keeps it from snapping in. Nothing here gates hit testing.
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.24), value: isPending)
+    }
+}
+
+/// Fades a section in when it first appears. Used for content that arrives from
+/// its own network round trip (cast, extras, related) so it joins the page
+/// smoothly instead of snapping into place, while the page stays interactive.
+public struct PlozzFadeInOnAppear: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = false
+    private let duration: Double
+
+    public init(duration: Double = 0.24) {
+        self.duration = duration
+    }
+
+    public func body(content: Content) -> some View {
+        content
+            .opacity(visible ? 1 : 0)
+            .onAppear {
+                guard !visible else { return }
+                if reduceMotion {
+                    visible = true
+                } else {
+                    withAnimation(.easeOut(duration: duration)) { visible = true }
+                }
+            }
+    }
+}
+
+public extension View {
+    func plozzFadeInOnAppear(duration: Double = 0.24) -> some View {
+        modifier(PlozzFadeInOnAppear(duration: duration))
     }
 }
