@@ -24,6 +24,10 @@ struct PlozziOSNavigationTransitionGate: UIViewControllerRepresentable {
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
+            // Also clears the push state if the tab-root coordinator misses its
+            // completion (e.g. a custom transition), so a detail can never wait for
+            // a signal that will not arrive.
+            PlozziOSNavigationTransitionState.end()
             if let coordinator = transitionCoordinator, animated {
                 coordinator.animate(alongsideTransition: nil) { [weak self] _ in
                     self?.publish(true)
