@@ -3993,7 +3993,7 @@
       "reason": "Beta-channel playback option; hidden from Settings search until it is available on every release channel.",
       "count": 1
     },
-    "Sources/FeatureSettings/PreferenceDetailViews.swift|PlaybackDetailView|audioRows|Toggle|\"P7 FEL → P8.1 conversion\"": {
+    "Sources/FeatureSettings/PreferenceDetailViews.swift|PlaybackDetailView|videoRows|Toggle|\"P7 FEL → P8.1 conversion\"": {
       "reason": "Beta-channel playback option; hidden from Settings search until it is available on every release channel.",
       "count": 1
     }
