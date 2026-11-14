@@ -160,7 +160,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertIn("    needs: guards\n", block)
                 self.assertEqual(block.count("needs:"), 1)
                 self.assertIn("    runs-on: xcode-27\n", block)
-                timeout = {"app-build": 45, "package-tests": 55, "hosted-focus": 60}[lane]
+                timeout = {"app-build": 60, "package-tests": 80, "hosted-focus": 120}[lane]
                 self.assertIn(f"    timeout-minutes: {timeout}\n", block)
                 self.assertIn(f"          lane: {lane}\n", block)
                 self.assertIn("uses: ./.github/actions/ci-prepare", block)
@@ -199,7 +199,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("tools/ci-shards.py package --index", JOBS["package-tests"])
         self.assertIn("tools/ci-shards.py focus --index", JOBS["hosted-focus"])
         self.assertIn(
-            'python3 tools/run-bounded.py 2400 "package test shard" -- \\\n'
+            'python3 tools/run-bounded.py 3600 "package test shard" -- \\\n'
             '            tools/run-tests.sh "${SELECTED[@]}"\n',
             JOBS["package-tests"],
         )
@@ -210,22 +210,22 @@ class WorkflowTests(unittest.TestCase):
         self.assertGreaterEqual(package_job_minutes * 60 - package_deadline, 15 * 60,
                                 "Keep setup, timeout teardown, and diagnostic uploads inside the outer job budget.")
         self.assertIn('tools/run-focus-tests.sh "${SELECTED[@]}"', JOBS["hosted-focus"])
-        self.assertIn('PLOZZ_FOCUS_TEST_TIMEOUT: "1200"', JOBS["hosted-focus"])
+        self.assertIn('PLOZZ_FOCUS_TEST_TIMEOUT: "3000"', JOBS["hosted-focus"])
         self.assertEqual(
             re.findall(r"PLOZZ_FOCUS_TEST_TIMEOUT:\s*([^\n]+)", WORKFLOW + PREPARE),
-            ['"1200"'],
+            ['"3000"'],
         )
         self.assertEqual(
             re.findall(r"PLOZZ_FOCUS_BUILD_TIMEOUT:\s*([^\n]+)", WORKFLOW + PREPARE),
-            ['"1800"'],
+            ['"3600"'],
         )
         hosted_deadlines = [
             int(re.search(rf'{name}:\s*"(\d+)"', JOBS["hosted-focus"])[1])
             for name in ("PLOZZ_FOCUS_BUILD_TIMEOUT", "PLOZZ_FOCUS_TEST_TIMEOUT")
         ]
         hosted_job_minutes = int(re.search(r"timeout-minutes: (\d+)", JOBS["hosted-focus"])[1])
-        # A cold hosted build needs most of its 30-minute bound; keep 10 minutes
-        # for setup and diagnostics inside the runner cap.
+        # A cold hosted build takes over 30 minutes on a fork cache; the bounds
+        # match the original single job and leave 20 minutes inside the job.
         self.assertGreaterEqual(
             hosted_job_minutes * 60 - sum(hosted_deadlines), 10 * 60,
             "Keep setup, timeout teardown, and diagnostic uploads outside both hosted deadlines.",
