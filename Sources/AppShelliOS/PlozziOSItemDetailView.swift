@@ -56,7 +56,7 @@ struct PlozziOSItemDetailView: View {
             .onAppear {
                 if FanoutDiagnostics.isEnabled {
                     FanoutDiagnostics.emit(
-                        "DETAILVIEW appeared kind=\(item.kind.rawValue) "
+                        "DETAILVIEW t=\(Int(ProcessInfo.processInfo.systemUptime * 1000)) appeared kind=\(item.kind.rawValue) "
                         + "series=\(item.kind == .series)"
                     )
                 }
@@ -1775,10 +1775,13 @@ struct PlozziOSInlineSeriesBrowser: View {
                         // A cached page is being restored from disk: hold rather than
                         // paint a skeleton that would be replaced a moment later.
                         && !viewModel.isRestoringSnapshot,
-                    // Reserve the rail's height on every load so the page does not
-                    // reflow when the cards arrive; only an explicit season switch
-                    // reveals the skeleton itself.
-                    showsSkeleton: hasExplicitSeasonSelection,
+                    // Reserve the rail's height on every load AND paint the
+                    // shimmering placeholder cards while the episodes are in flight:
+                    // an empty reserved band reads as broken, and the sweep is the
+                    // only affordance saying the row is coming. The placeholder is
+                    // present from the rail's first frame, so nothing appears or
+                    // disappears mid-page — it is replaced in place by the cards.
+                    showsSkeleton: true,
                     currentEpisodeID: railTargetID,
                     onInteraction: {},
                     onPlay: onPlay
@@ -1830,6 +1833,13 @@ struct PlozziOSInlineSeriesBrowser: View {
             // reported reflow is unmeasured, and this is its gate: the rail paints a
             // skeleton exactly when `displayedEpisodes == nil`, and a return refresh
             // that clears the season list would make it reappear under the viewer.
+            // Cards-arrived trace: pairs with DETAILVIEW's timestamp to give the
+            // real open latency (item -> seasons -> episodes) instead of a guess.
+            .onChange(of: displayedEpisodes?.count ?? -1, initial: true) { _, count in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit("DETAILCARDS t=\(stamp) count=\(count)")
+            }
             .onChange(
                 of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil
                     && !viewModel.isRestoringSnapshot && hasExplicitSeasonSelection,
@@ -1837,7 +1847,7 @@ struct PlozziOSInlineSeriesBrowser: View {
             ) { _, skeleton in
                 if FanoutDiagnostics.isEnabled {
                     FanoutDiagnostics.emit(
-                        "DETAILRAIL skeleton=\(skeleton) "
+                        "DETAILRAIL t=\(Int(ProcessInfo.processInfo.systemUptime * 1000)) skeleton=\(skeleton) "
                         + "episodes=\(displayedEpisodes?.count ?? -1) "
                         + "seasons=\(seasons.count) "
                         + "loose=\(looseEpisodes.count)"

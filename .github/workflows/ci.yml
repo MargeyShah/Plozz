@@ -51,8 +51,8 @@ jobs:
 
       - name: CI shard partition guard
         run: |
-          python3 tools/ci-shards.py package --count 4 --verify
-          python3 tools/ci-shards.py focus --count 4 --verify
+          python3 tools/ci-shards.py package --count 3 --verify
+          python3 tools/ci-shards.py focus --count 2 --verify
 
       - name: Settings search coverage and regression tests
         run: tools/check-settings-search.sh
@@ -168,16 +168,17 @@ jobs:
           retention-days: 7
 
   package-tests:
-    name: Package tests (${{ matrix.shard }}/4)
+    name: Package tests (${{ matrix.shard }}/3)
     needs: guards
     runs-on: xcode-27
     # GitHub caps a job at 3600s and free runners routinely lost the single
-    # 80-minute matrix job to it. Four shards, each inside 45 minutes.
+    # 80-minute matrix job to it. Three shards; together with the two focus
+    # shards this is five macOS jobs, the free-plan concurrency limit.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -192,8 +193,8 @@ jobs:
       - name: Run package test shard ${{ matrix.shard }} of 3
         run: |
           # macOS runners ship bash 3.2: no readarray/mapfile.
-          SELECTED=( $(python3 tools/ci-shards.py package --index "${{ matrix.shard }}" --count 4) )
-          echo "Shard ${{ matrix.shard }}/4: ${#SELECTED[@]} test targets"
+          SELECTED=( $(python3 tools/ci-shards.py package --index "${{ matrix.shard }}" --count 3) )
+          echo "Shard ${{ matrix.shard }}/3: ${#SELECTED[@]} test targets"
           python3 tools/run-bounded.py 2400 "package test shard" -- \
             tools/run-tests.sh "${SELECTED[@]}"
 
@@ -218,17 +219,17 @@ jobs:
           retention-days: 7
 
   hosted-focus:
-    name: Hosted focus tests (${{ matrix.shard }}/4)
+    name: Hosted focus tests (${{ matrix.shard }}/2)
     needs: guards
     runs-on: xcode-27
     # The whole suite used to run in one 240-minute job, which the runner cap
     # killed. The focus scheme has a single test bundle, so shards are test
     # classes, derived from project.yml plus the sources by tools/ci-shards.py.
-    timeout-minutes: 50
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -245,8 +246,8 @@ jobs:
           PLOZZ_FOCUS_BUILD_TIMEOUT: "1800"
           PLOZZ_FOCUS_TEST_TIMEOUT: "2400"
         run: |
-          SELECTED=( $(python3 tools/ci-shards.py focus --index "${{ matrix.shard }}" --count 4) )
-          echo "Shard ${{ matrix.shard }}/4: ${#SELECTED[@]} test classes"
+          SELECTED=( $(python3 tools/ci-shards.py focus --index "${{ matrix.shard }}" --count 2) )
+          echo "Shard ${{ matrix.shard }}/2: ${#SELECTED[@]} test classes"
           tools/run-focus-tests.sh "${SELECTED[@]}"
 
       - name: Save successful trusted caches
