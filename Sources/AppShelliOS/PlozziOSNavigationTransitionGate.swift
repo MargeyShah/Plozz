@@ -44,7 +44,12 @@ struct PlozziOSNavigationTransitionGate: UIViewControllerRepresentable {
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            if lastPublished != true { publish(false) }
+            if lastPublished != true {
+                // A detail pushed from another detail (Related, Episode Info)
+                // never passes the tab root, so this page marks its own transition.
+                PlozziOSNavigationTransitionState.begin()
+                publish(false)
+            }
         }
 
         private func publish(_ value: Bool) {
