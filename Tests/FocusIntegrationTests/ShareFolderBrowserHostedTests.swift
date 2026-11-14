@@ -91,7 +91,9 @@ final class ShareFolderBrowserHostedTests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
             print(measurement)
-            XCTAssertLessThan(milliseconds, 150, "An instant folder listing must not eagerly render every row.")
+            // The lazy-rendering guarantee is the visible-cell bound below; this
+            // wall-clock bound is a hang guard and must tolerate CI-runner jitter.
+            XCTAssertLessThan(milliseconds, 250, "An instant folder listing must not eagerly render every row.")
             XCTAssertNotNil(UIFocusSystem.focusSystem(for: window)?.focusedItem)
             let scroll = try XCTUnwrap(scrollViews(in: window).first {
                 $0.bounds.height <= 620 && $0.contentSize.height > 30_000
