@@ -190,7 +190,7 @@ struct PlozziOSHomeView: View {
     }
     /// Compact identity of what Home is presenting right now, for the millisecond
     /// frame trace (see the `HOMEFRAME` emit in `body`).
-    private var frameTelemetryKey: String {
+    private var frameTelemetryKey: String {  // l10n:content — PLZXFAN frame telemetry, never rendered
         let state = HomePresentationRow.displayState(
             viewModel.state, liveTV: liveTV,
             visibility: appModel.settings.homeVisibility.visibility
