@@ -1093,6 +1093,9 @@ private struct PlozziOSHeroBackdrop: View {
     let asyncFallbackURL: (@Sendable () async -> URL?)?
     let sharedResolutionIdentity: String?
     let style: HeroArtworkStyle
+    /// Once the real backdrop has any picture, drop the card seed so the two can
+    /// never be visible together (the "two images" on the way into a detail page).
+    @State private var backdropResolved = false
     let itemID: String
     let height: CGFloat
     let showsScrim: Bool
@@ -1177,7 +1180,7 @@ private struct PlozziOSHeroBackdrop: View {
 
     private func stillArtwork() -> some View {
         ZStack {
-            if let seedArtwork {
+            if let seedArtwork, !backdropResolved {
                 Image(uiImage: seedArtwork)
                     .resizable()
                     .scaledToFill()
@@ -1202,6 +1205,10 @@ private struct PlozziOSHeroBackdrop: View {
             previewVariant: .heroPreview,
             artworkPolicy: artworkPolicy.forPlacement(presentation.artworkPlacement),
             asyncFallbackURL: asyncFallbackURL,
+            onResolveReference: { _ in
+                guard !backdropResolved else { return }
+                withAnimation(.easeOut(duration: 0.2)) { backdropResolved = true }
+            },
             pinIdentity: PlozziOSHeroArtworkFallback.cacheIdentity(
                 "\(surfaceRole == .home ? "home" : "detail"):\(presentation.itemID)", style: style
             ),
@@ -1217,6 +1224,7 @@ private struct PlozziOSHeroBackdrop: View {
         .reportingHeroArtwork(id: presentation.itemID)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        .onChange(of: presentation.itemID) { _, _ in backdropResolved = false }
     }
 
     @ViewBuilder
