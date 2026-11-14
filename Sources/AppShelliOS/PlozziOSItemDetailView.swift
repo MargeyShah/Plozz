@@ -1774,13 +1774,11 @@ struct PlozziOSInlineSeriesBrowser: View {
                         && displayedEpisodes == nil
                         // A cached page is being restored from disk: hold rather than
                         // paint a skeleton that would be replaced a moment later.
-                        && !viewModel.isRestoringSnapshot
-                        // No timers: a skeleton is only honest when the viewer asked
-                        // for a different season and its episodes are not in hand yet.
-                        // On the page's first load the rail sits in its final geometry
-                        // and the cards appear in place, which is what "no flash"
-                        // means without guessing at a delay.
-                        && hasExplicitSeasonSelection,
+                        && !viewModel.isRestoringSnapshot,
+                    // Reserve the rail's height on every load so the page does not
+                    // reflow when the cards arrive; only an explicit season switch
+                    // reveals the skeleton itself.
+                    showsSkeleton: hasExplicitSeasonSelection,
                     currentEpisodeID: railTargetID,
                     onInteraction: {},
                     onPlay: onPlay
@@ -3567,6 +3565,13 @@ struct PlozziOSInlineEpisodeRail: View {
     @State private var scrollPositionID: String?
     let episodes: [MediaItem]?
     let isLoading: Bool
+    /// Whether the reserved rail shows its skeleton or only holds the space.
+    ///
+    /// A first load holds the geometry invisibly: the cards must not push the page
+    /// down when they arrive (the same reflow Home's preallocated hero avoids), but
+    /// the viewer has not asked for anything, so there is nothing to animate. An
+    /// explicit season switch shows the skeleton as feedback.
+    var showsSkeleton: Bool = true
     var currentEpisodeID: String? = nil
     let onInteraction: () -> Void
     let onPlay: (MediaItem, Bool) -> Void
@@ -3574,12 +3579,14 @@ struct PlozziOSInlineEpisodeRail: View {
     init(
         episodes: [MediaItem]?,
         isLoading: Bool,
+        showsSkeleton: Bool = true,
         currentEpisodeID: String? = nil,
         onInteraction: @escaping () -> Void = {},
         onPlay: @escaping (MediaItem, Bool) -> Void
     ) {
         self.episodes = episodes
         self.isLoading = isLoading
+        self.showsSkeleton = showsSkeleton
         self.currentEpisodeID = currentEpisodeID
         self.onInteraction = onInteraction
         self.onPlay = onPlay
@@ -3587,9 +3594,18 @@ struct PlozziOSInlineEpisodeRail: View {
     }
 
     var body: some View {
-        if isLoading {
+        // Shared guardrail (CoreUI): the placeholder always reserves the rail's real
+        // height, and is only painted when the viewer asked for the change. A local
+        // copy of this rule is how the page ended up reflowing when cards arrived.
+        PlozzReservedPlaceholder(isPending: isLoading, revealsPlaceholder: showsSkeleton) {
             PlozziOSInlineEpisodeSkeletonRail()
-        } else if let episodes, episodes.isEmpty {
+        } content: {
+            railContent
+        }
+    }
+
+    @ViewBuilder private var railContent: some View {
+        if let episodes, episodes.isEmpty {
             ContentUnavailableView(
                 "No episodes",
                 systemImage: "play.rectangle"

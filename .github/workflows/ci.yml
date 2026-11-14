@@ -43,6 +43,12 @@ jobs:
       - name: Test hygiene guard
         run: python3 tools/test-hygiene.py
 
+      - name: UI loading-state guard
+        run: python3 tools/ui-state-guard.py
+
+      - name: UI loading-state guard regression tests
+        run: python3 -m unittest discover -s tools/tests -p 'test_ui_state_guard.py'
+
       - name: CI shard partition guard
         run: |
           python3 tools/ci-shards.py package --count 4 --verify
