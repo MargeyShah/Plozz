@@ -689,6 +689,17 @@ struct PlozziOSHomeView: View {
             content: heroContent, randomLibraries: randomLibraries,
             candidates: heroItems, supportingCandidates: heroCandidatePool
         )
+        // Before the first live load completes the source eligibility is still
+        // provisional — watchlist readiness and per-source resolution are landing.
+        // Filtering the visible carousel with it makes the set collapse and expand
+        // (measured on device: count 8 → 3 → 8 → 7 → 8 within seconds, with the
+        // selected slide changing each time) which is exactly the reported "hero
+        // changes images a few times on load". Hold the slides the page already has
+        // until a real load has confirmed the filter; the live pass then applies it
+        // once, and `preservesLineup` covers the hide-watched half of the same rule.
+        let visibleEligibility: HeroSourceEligibility = viewModel.hasCompletedLiveLoad
+            ? sourceEligibility
+            : .unrestricted
         let curatedHeroItems = HeroCurator().reconcile(
             heroItems, settings: settings, watchMutations: [],
             // First paint (before any live load has completed) must not run the
@@ -700,7 +711,7 @@ struct PlozziOSHomeView: View {
             // is this curator's own switch for exactly that (it only clears
             // `hideWatched`); the live curation re-applies the real filter.
             preservesLineup: !viewModel.hasCompletedLiveLoad,
-            sourceEligibility: sourceEligibility
+            sourceEligibility: visibleEligibility
         )
         // First-paint bridge. The durable snapshot can be non-empty yet curate to
         // NOTHING once the real filters run: measured on device as
@@ -1979,6 +1990,20 @@ struct PlozziOSHomeHeroCarousel: View {
             seatedHeroIdentity = Self.heroSeatIdentity(item)
         }
         .onChange(of: items.map(\.id), initial: true) { oldIDs, itemIDs in
+            // Carousel-set trace (PLZXFAN-gated; hash only). The hero's carried set is
+            // stable on warm launches (HEROFRAME = 0 changes), so an image that swaps
+            // after first paint must come from THIS filtered set changing — eligibility
+            // narrowing as watchlist readiness arrives — or from the artwork reference
+            // for the same slide. This line distinguishes the first case.
+            if FanoutDiagnostics.isEnabled {
+                let joined: String = itemIDs.joined(separator: "|")
+                let signature: Int = joined.hashValue
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit(
+                    "HOMECAROUSEL t=\(stamp) count=\(itemIDs.count) sig=\(signature) "
+                    + "selected=\(selectedItemID ?? "none")"
+                )
+            }
             guard selectedItemID == nil || !itemIDs.contains(selectedItemID ?? "") else {
                 return
             }
