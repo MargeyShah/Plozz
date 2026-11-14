@@ -174,7 +174,7 @@ jobs:
     # GitHub caps a job at 3600s and free runners routinely lost the single
     # 80-minute matrix job to it. Three shards; together with the two focus
     # shards this is five macOS jobs, the free-plan concurrency limit.
-    timeout-minutes: 45
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
@@ -225,7 +225,8 @@ jobs:
     # The whole suite used to run in one 240-minute job, which the runner cap
     # killed. The focus scheme has a single test bundle, so shards are test
     # classes, derived from project.yml plus the sources by tools/ci-shards.py.
-    timeout-minutes: 55
+    # Build + test bounds below leave 15 minutes for setup and diagnostics.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -243,8 +244,8 @@ jobs:
 
       - name: Run hosted focus shard ${{ matrix.shard }} of 3
         env:
-          PLOZZ_FOCUS_BUILD_TIMEOUT: "1800"
-          PLOZZ_FOCUS_TEST_TIMEOUT: "2400"
+          PLOZZ_FOCUS_BUILD_TIMEOUT: "1200"
+          PLOZZ_FOCUS_TEST_TIMEOUT: "1500"
         run: |
           SELECTED=( $(python3 tools/ci-shards.py focus --index "${{ matrix.shard }}" --count 2) )
           echo "Shard ${{ matrix.shard }}/2: ${#SELECTED[@]} test classes"
