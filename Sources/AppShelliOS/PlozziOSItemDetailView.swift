@@ -627,12 +627,33 @@ private struct PlozziOSCanonicalItemDetailView: View {
                     }
                 )
 
-                if let entries = viewModel.relatedTitlesLoader?.entries, !entries.isEmpty {
-                    PlozziOSRelatedSection(
-                        entries: entries,
-                        inset: pageInset,
-                        onSelect: { item, source in artworkItemNavigator?(item, source) }
-                    )
+                // Related titles arrive after the page is readable, so reserve the
+                // rail's geometry while the loader works — same rule as Home's hero
+                // and the episode rail. Without it the page grew under the viewer the
+                // moment the section appeared. `isLoading`/`hasResolved` are the
+                // loader's own state, so there is no timing guess involved.
+                if let loader = viewModel.relatedTitlesLoader {
+                    PlozzReservedPlaceholder(
+                        isPending: loader.isLoading || !loader.hasResolved,
+                        revealsPlaceholder: true
+                    ) {
+                        PlozziOSHomeSkeletonRail(
+                            title: Text(verbatim: " "),
+                            style: .poster,
+                            showsCaption: true
+                        )
+                        .accessibilityLabel(
+                            Text("Loading related titles")
+                        )
+                    } content: {
+                        if !loader.entries.isEmpty {
+                            PlozziOSRelatedSection(
+                                entries: loader.entries,
+                                inset: pageInset,
+                                onSelect: { item, source in artworkItemNavigator?(item, source) }
+                            )
+                        }
+                    }
                 }
 
                 if !detail.item.detailCredits.isEmpty {

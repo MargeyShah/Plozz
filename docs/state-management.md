@@ -82,6 +82,35 @@ These paths carry opt-in telemetry (`HOMESEED`, `HOMEFRAME`, `HEROFRAME`,
 URLs.
 
 
+## Detail opening pipeline
+
+Every detail page uses the same three-stage load, and the third stage is what makes
+an open feel slow:
+
+1. **Subject** — `provider.item(id:)`.
+2. **Children** — `provider.children(of:)` for container kinds.
+3. **Chosen child's content** — e.g. a season's episodes.
+
+The third stage must not wait for the view to publish a selection.
+`DetailOpeningSelection.openingSeasonID(children:resumeSeasonID:)` (CoreModels)
+decides which child opens first for **every** container kind — resume season when
+the server still lists it, otherwise the first season; `nil` for a season page
+(its children already are the rail) and for leaves. `ItemDetailViewModel` prefetches
+that child as soon as the children arrive, and the rail's own `loadEpisodes` then
+finds the episodes in hand instead of starting a second request behind the first.
+
+Rendering follows the same rules as Home: geometry is reserved with
+`PlozzReservedPlaceholder` (CoreUI) so the page never jumps when cards land, and
+the placeholder is state-driven — never a timer. Latency is measured, not guessed:
+`DETAILVIEW`/`DETAILRAIL`/`DETAILCARDS` carry monotonic `t=` timestamps under
+`PLZXFAN_STDOUT=1`, so the open cost is visible end to end.
+
+Surfaces that read from more than one account go through `Fanout` (CoreModels)
+rather than their own loop: one source takes the fast path (single await, single
+publication), several sources merge in source order with explicit completeness.
+That is what keeps a one-server install from rendering differently than a
+multi-server one.
+
 ## Test constants and fixtures
 
 
