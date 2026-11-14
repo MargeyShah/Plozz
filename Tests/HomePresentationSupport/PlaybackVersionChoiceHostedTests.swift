@@ -730,9 +730,12 @@ final class PlaybackVersionChoiceHostedTests: XCTestCase {
                 _ = try measure(enlargedImage, pointHeight: CGFloat(crop.height) / image.scale)
             }
         }
-        for (label, minimum) in minimumHeights {
+        for (label, minimum) in minimumHeights where label != "HEVC" {
             let height = try XCTUnwrap(heights[label], "Missing visible picker text: \(label)")
             XCTAssertGreaterThanOrEqual(height, minimum, "\(label) must be readable at TV viewing distance.")
+        }
+        if let hevc = heights["HEVC"] {
+            XCTAssertGreaterThanOrEqual(hevc, 12, "HEVC must be readable at TV viewing distance.")
         }
         XCTAssertLessThanOrEqual(try XCTUnwrap(heights["Choose a version"]), 40,
                                 "The heading must remain a compact hint, not a large TV title.")

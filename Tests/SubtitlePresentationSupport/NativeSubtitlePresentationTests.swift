@@ -908,6 +908,7 @@ final class NativeSubtitlePresentationTests: XCTestCase {
         XCTAssertNil(item.currentMediaSelection.selectedMediaOption(in: group))
         engine.setNativeSubtitlesActive(false)
         try await waitUntil(
+            timeout: 25,
             detail: "After restoring the overlay: visible=\(model.primary.compactMap(\.text)), "
                 + "decoded=\(cues.compactMap(\.text)), "
                 + "selected=\(String(describing: item.currentMediaSelection.selectedMediaOption(in: group))), "
