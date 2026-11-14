@@ -1452,7 +1452,8 @@ struct PlozziOSTabShell: View {
             recentlyAppliedRecency: { [weak appModel] in
                 await appModel?.appliedWatchRecency() ?? [:]
             },
-            mediaItemActionHandler: appModel.mediaItemActionHandler
+            mediaItemActionHandler: appModel.mediaItemActionHandler,
+            accountsAreResolved: appModel.accountsProviders.hasResolvedAccounts
         )
     }
 

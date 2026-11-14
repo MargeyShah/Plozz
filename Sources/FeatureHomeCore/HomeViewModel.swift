@@ -372,6 +372,22 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
     public private(set) var rowFailures: [HomeRowKind: AppError] = [:]
     public private(set) var continueWatchingDiagnostic: LibraryLoadDiagnostic?
     public var hasLiveContinueWatching: Bool { hasReceivedLiveContent }
+    /// Whether a Home snapshot actually exists on disk right now.
+    ///
+    /// Diagnostic-only, and deliberately cheap: the content store memoizes its first
+    /// decode. Exists so launch telemetry can tell "the snapshot is gone" apart from
+    /// "the snapshot is there but the restore is slow" — the two produce the same
+    /// one-frame skeleton on screen and need opposite fixes.
+    public var hasPersistedSnapshot: Bool { contentStore.load() != nil }
+    /// Whether a live aggregation has completed at least once in this session.
+    ///
+    /// Consumers that would otherwise destroy durable state on an *empty* result
+    /// (the hero's cached candidate pool is the first) must wait for this: an empty
+    /// read before the first live load finishes means "nothing arrived yet", not
+    /// "the library is empty". Clearing on that read is how a phone lost the hero
+    /// artwork it would otherwise paint instantly, so every launch started with a
+    /// skeleton until the network caught up.
+    public var hasCompletedLiveLoad: Bool { hasCompletedHomeLoad }
     @ObservationIgnored private var loadGeneration: UInt64 = 0
     @ObservationIgnored private var publishedLoadRows: Set<HomeRowKind> = []
     @ObservationIgnored private var receivedLiveRows: Set<HomeRowKind> = []
@@ -550,6 +566,12 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
         recentlyAppliedRecency: @escaping @Sendable () async -> [String: AppliedResumeRecord] = { [:] },
         mediaItemActionHandler: (any MediaItemActionHandling)? = nil,
         policy: ContinueWatchingPolicy = .default,
+        // `false` while the account store has not been read yet. Only an empty list
+        // that is KNOWN empty may prune the cached snapshot; during launch the list
+        // is empty merely because nothing has loaded, and pruning there discarded a
+        // valid snapshot (and `scheduleSnapshotClear()` destroyed it for the next
+        // launch), leaving the page to re-fetch from scratch.
+        accountsAreResolved: Bool = true,
         contentPublisher: @escaping HomeContentPublishing = { _, _ in }
     ) {
         self.accounts = accounts
@@ -636,7 +658,19 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
             // `save` refuses to overwrite good content with an empty aggregate,
             // so it came back on every launch. The universal watchlist is the
             // user's own and survives: it isn't a server's to take away.
-            if accounts.isEmpty {
+            // With NO servers to watch, every SERVER-derived row in the snapshot
+            // belongs to a library this profile no longer sees, and `save` refuses to
+            // overwrite good content with an empty aggregate, so the stale library
+            // came back on every launch.
+            //
+            // That pruning must NOT happen here. `init` runs before the profile's
+            // active account selection has been published, so `accounts` is briefly
+            // empty on a perfectly normal launch; pruning (and especially
+            // `scheduleSnapshotClear()`) on that empty list is what intermittently
+            // wiped a valid snapshot and made the next launch show a skeleton before
+            // its cached page. Both the row prune and the snapshot clear now wait for
+            // a load that actually completed (see `load(showLoadingState:)`).
+            if accounts.isEmpty, accountsAreResolved, hasCompletedHomeLoad {
                 cached.continueWatching = []
                 cached.latest = []
                 cached.recentlyAddedCandidates = nil
@@ -811,7 +845,20 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
             willReload: true,
             reason: "visibility-changed-or-not-loaded"
         ))
-        await load()
+        // Retention rule: a refresh fold arriving at `.idle`/`.loading`/`.failed`
+        // must NOT tear a page that has already shown content back to the full-screen
+        // skeleton rail. The loud load replaced the settled hero + rows with
+        // placeholders and let every card re-render as its artwork decoded — the
+        // "images leave, elements resize as they render" flicker, most visible
+        // after a background return where the reload rule fires while a load is
+        // still in flight or ended in a failure. Refresh SILENTLY instead: the
+        // previous snapshot stays on screen until replacements are ready
+        // (`load(showLoadingState: false)` keeps `state` loaded and publishes
+        // rows as they arrive). The skeleton only paints for a page that has
+        // never shown content at all; an explicit retry (the "Try Again" button)
+        // still asks for the loud path by calling `load()` directly.
+        let appearedOnce = hasReceivedLiveContent || hasCompletedHomeLoad
+        await load(showLoadingState: !appearedOnce)
     }
 
     public func load() async {
@@ -906,6 +953,15 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
             rowFailures = [:]
             continueWatchingDiagnostic = nil
             loadingRows = Set(HomeRowKind.allCases).subtracting(receivedLiveRows)
+            // Continue Watching already has cards on screen from the cached snapshot:
+            // keep them painted while the multi-server aggregate arrives instead of
+            // swapping the whole row for placeholders. This was the one row that
+            // always took seconds longer than every other row on launch — not because
+            // its artwork was slow, but because its CONTENT was withheld here. The
+            // fresh aggregate still replaces the cards in place when it resolves.
+            if isShowingCachedSnapshot, !onScreenContinueWatching.isEmpty {
+                loadingRows.remove(.continueWatching)
+            }
             var initial = previousContent ?? Content()
             initial.sectionIssues = []
             initial.mergeLibraries = !visibility.usesIndividualHomeRows

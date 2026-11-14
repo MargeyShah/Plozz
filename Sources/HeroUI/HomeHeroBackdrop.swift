@@ -703,6 +703,25 @@ private struct WipeImageView: UIViewRepresentable {
             }
             targetID = slideID
             targetReferences = references
+            // Paint an already-decoded image for this slide SYNCHRONOUSLY, before
+            // any async resolution. On a relaunch the artwork is usually in the
+            // decoded cache already, but the progressive path still resolves it on a
+            // later turn — which is the "hero shows the no-image cover for a moment,
+            // then the image appears" flash (rows, incl. Continue Watching, are
+            // already painted from cache at that instant). Placing the cached image
+            // here costs a dictionary lookup; progressive resolution still runs to
+            // upgrade the preview to full size.
+            if container?.hasPages == false, let cached = firstUsableCached(references, variant: .heroBackdrop) {
+                applyResolved(
+                    cached.0, reference: cached.1, quality: .full,
+                    id: slideID, forward: forward
+                )
+            } else if container?.hasPages == false, let cached = firstUsableCached(references, variant: .heroPreview) {
+                applyResolved(
+                    cached.0, reference: cached.1, quality: .preview,
+                    id: slideID, forward: forward
+                )
+            }
             beginProgressiveResolution(
                 references: references,
                 slideID: slideID,
@@ -751,6 +770,13 @@ private struct WipeImageView: UIViewRepresentable {
                 guard let firstPaint else {
                     guard !Task.isCancelled, token == self.loadToken else { return }
                     self.loadTask = nil
+                    // A refresh replaces a slide with a fresh copy whose artwork URLs
+                    // are re-signed, so the new references can miss the cache for a
+                    // moment. Clearing here was the visible "hero shows its image,
+                    // flips to the no-image cover, then loads the image again" flash.
+                    // This slide still has usable art on screen: keep it and let the
+                    // upgrade path replace it when the new art is ready.
+                    if self.displayedID == slideID, self.displayedReference != nil { return }
                     self.noArtResolved(for: slideID)
                     return
                 }

@@ -127,7 +127,14 @@ extension EnvironmentValues {
 }
 
 private struct PlozziOSHeroContainerHeightModifier: ViewModifier {
-    @State private var height: CGFloat?
+    /// Seeded synchronously from the window scene so the FIRST painted frame already
+    /// uses the real height. Starting `nil` meant the hero (and the loading skeleton
+    /// that reserves its space) laid out at the 610pt fallback and then jumped to
+    /// `0.76 × windowHeight` on the next pass — on a 440×956pt phone that is a 117pt
+    /// shift after content is already on screen: the "same page comes up again with
+    /// the wrong spacing for the hero, then corrects" reflow. `PlozziOSWindowHeightReader`
+    /// still corrects the value if the real window differs (iPad multi-window).
+    @State private var height: CGFloat? = PlozziOSHeroContainerHeightSeed.current
 
     func body(content: Content) -> some View {
         content
@@ -140,6 +147,19 @@ private struct PlozziOSHeroContainerHeightModifier: ViewModifier {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
+    }
+}
+
+/// Synchronous first-frame window height. `PlozziOSWindowHeightReader` only reports
+/// from its next layout pass, which is one frame too late for a full-bleed hero that
+/// must reserve its final height before the first paint.
+enum PlozziOSHeroContainerHeightSeed {
+    @MainActor
+    static var current: CGFloat? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        let height = scene?.screen.bounds.height ?? UIScreen.main.bounds.height
+        return height > 0 ? height : nil
     }
 }
 
@@ -574,9 +594,13 @@ struct PlozziOSSeriesLoadingHero: View {
         .environment(\.plozzArtworkArea, .home)
         .environment(\.plozziOSHeroLogoSize, settings.logoSize)
         .ignoresSafeArea(.container, edges: .top)
-        .plozziOSHeroNavigationChrome()
+        // Simplify-toward-upstream (testing step R4): bffac44 does not paint hero
+        // navigation chrome on the loading hero; it hides the toolbar background.
+        // Re-prove the fork's chrome here incrementally once the settled flicker
+        // is gone on phone AND tester.
         .background(palette.backgroundBase.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading show…")
