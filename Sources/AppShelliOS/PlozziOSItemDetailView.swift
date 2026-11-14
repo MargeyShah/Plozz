@@ -24,6 +24,9 @@ struct PlozziOSItemDetailView: View {
     /// — the entering freeze and the metadata/play label repopulating in place.
     @State private var detailViewModels =
         KeyedViewStateCache<PlozziOSDetailViewModelKey, ItemDetailViewModel>()
+    /// False until this page's push transition has settled. Repeated taps on the
+    /// source card must not land on this page's Play button or synopsis hit area.
+    @State private var acceptsInteraction = false
 
     @Environment(HomeViewModel.self) private var homeViewModel: HomeViewModel?
     @Environment(\.locale) private var locale
@@ -74,6 +77,16 @@ struct PlozziOSItemDetailView: View {
                 }
             }
             .detailOpenFeedback()
+            #if os(iOS)
+            .allowsHitTesting(acceptsInteraction)
+            .disabled(!acceptsInteraction)
+            .background {
+                PlozziOSNavigationTransitionGate(isInteractive: $acceptsInteraction)
+                    .frame(width: 0, height: 0)
+                    .allowsHitTesting(false)
+            }
+            .onDisappear { acceptsInteraction = false }
+            #endif
             .environment(\.plozzArtworkArea, .details)
             // Each detail page installs its own router. A pushed destination —
             // whether from an inline `NavigationLink` or a
@@ -463,6 +476,10 @@ private struct PlozziOSCanonicalItemDetailView: View {
         }
         .task(id: locale.identifier) {
             viewModel.updateMetadataLanguage(locale.identifier)
+            // Keep the live fan-out and snapshot application off the push frames.
+            // The seeded hero/metadata already give the page something to show;
+            // without this the transition competes with the load and hitches.
+            await PlozziOSNavigationTransitionState.waitUntilSettled()
             await viewModel.load()
         }
         .contentRefreshSurface(

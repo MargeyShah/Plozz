@@ -70,6 +70,7 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
             removePushShield()
+            PlozziOSNavigationTransitionState.end()
         }
 
         override func viewDidAppear(_ animated: Bool) {
@@ -95,9 +96,11 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
             shield.isUserInteractionEnabled = true
             window.addSubview(shield)
             pushShield = shield
+            PlozziOSNavigationTransitionState.begin()
             // A cancelled transition still completes through this callback.
             coordinator.animate(alongsideTransition: nil) { [weak self] _ in
                 self?.removePushShield()
+                Task { @MainActor in PlozziOSNavigationTransitionState.end() }
             }
         }
 
