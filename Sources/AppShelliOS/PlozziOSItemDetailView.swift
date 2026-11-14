@@ -1861,6 +1861,19 @@ struct PlozziOSInlineSeriesBrowser: View {
                 let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
                 FanoutDiagnostics.emit("DETAILCARDS t=\(stamp) count=\(count)")
             }
+            // Cast and Related arrive from their own network round trips, so they get
+            // their own arrival timestamps: "cast is slow" is only actionable with a
+            // number next to DETAILVIEW's.
+            .onChange(of: viewModel.state.value?.item.detailCredits.count ?? -1, initial: true) { _, count in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit("DETAILCAST t=\(stamp) count=\(count)")
+            }
+            .onChange(of: viewModel.relatedTitlesLoader?.entries.count ?? -1, initial: true) { _, count in
+                guard FanoutDiagnostics.isEnabled else { return }
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit("DETAILRELATED t=\(stamp) count=\(count)")
+            }
             .onChange(
                 of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil
                     && !viewModel.isRestoringSnapshot && hasExplicitSeasonSelection,
