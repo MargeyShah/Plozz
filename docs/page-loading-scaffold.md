@@ -98,6 +98,24 @@ PlozzPlaceholderRail(isPending: loading, cardWidth: metrics.posterWidth, spacing
 - **Never gate these on elapsed time.** State only. `tools/ui-state-guard.py`
   rejects time-armed skeletons and bare-loading branches in CI.
 
+### Revisit caches must be bounded and device-tiered
+
+A revisit cache is only free if it is small. Two rules, both enforced here:
+
+- **Restore only what the page will paint.** A detail snapshot can hold episodes for
+  every season the viewer browsed; hydrating all of them to draw one rail is waste.
+  `ItemDetailViewModel` restores just the opening season, capped at
+  `maxRestoredEpisodesPerSeason` (80); the rail is lazy and the live fetch fills the
+  rest on demand.
+- **Size budgets by device.** `ArtworkMemoryBudget` and `DetailSnapshotCache.budget`
+  both tier on `physicalMemory` (192 MB decoded artwork / 800 entries on ≥2.5 GB,
+  96 MB / 300 entries below). The smallest supported Apple TV has 3 GB; a
+  phone-sized cache is not something a low-RAM device should pay for on every prune
+  scan and decode.
+
+When adding a cache, ask: what is the largest thing a single page can put in it, and
+what does that cost on the smallest device we support?
+
 ## 4. Sanitise provider text
 
 Providers return prose as HTML. Convert at display with `CoreModels/HTMLText`:

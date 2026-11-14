@@ -37,10 +37,11 @@ get-task-allow              = true
 ```
 
 There is no multicast entitlement, no App Group, no keychain group and no
-network extension. Every one of those claims is supplied by the provisioning
-profile at signing time, not by the app. That is the first useful negative
-result: **entitlements are not the reason playback differs**, because the build
-that plays has no playback entitlement to lose.
+network extension. Those three claims are written into the signature from the
+provisioning profile; the canonical entitlements file contributes nothing else
+to the working build. That is the first useful negative result: **entitlements
+are not the reason playback differs**, because the build that plays has no
+playback entitlement to lose.
 
 `App/PlozziOS/PlozziOS.entitlements` (the canonical file) also asks for:
 
@@ -59,12 +60,17 @@ absent and the code paths above degrade as listed.
 
 ## What Feather does
 
+This describes Feather `main` as inspected on 2026-11-14
+(`Feather/Utilities/Handlers/SigningHandler.swift` and its `Zsign` submodule;
+zsign is the signer Feather drives). Re-check it if a later release changes the
+options.
+
 Feather's `SigningHandler` reads entitlements **from the app binary** before it
 re-signs. The unsigned artifact has no such blob, so the merge step has nothing
 to read. Its `mergeEntitlements` option is also off by default. The result is
 that zsign signs the app with the provisioning profile's `Entitlements`
-dictionary verbatim, narrowed to the concrete bundle id when the profile uses an
-explicit App ID.
+dictionary verbatim — concrete for an explicit App ID, still wildcarded for a
+wildcard profile.
 
 Consequences for this app:
 
