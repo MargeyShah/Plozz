@@ -1125,7 +1125,16 @@ public final class PlayerViewModel {
         // A credits marker may still be resolving whether post-credits content
         // exists. Never auto-advance before that decision is known; otherwise an
         // episode with after-credits content would be skipped.
-        if controls.skipSegments.hasPostCredits || controls.skipSegments.isResolvingPostCredits {
+        //
+        // An EOF *before* the timeline ends is the credits boundary: a known
+        // after-credits tail has not played yet, so do not advance. An EOF at the
+        // real end of the timeline is the ordinary end of the whole episode
+        // (tail included), so autoplay applies again; suppressing there dismissed
+        // the player even when nothing was left to watch.
+        let atTimelineEnd = engine.duration > 0
+            && engine.currentTime >= engine.duration - 0.5
+        if controls.skipSegments.isResolvingPostCredits
+            || (controls.skipSegments.hasPostCredits && !atTimelineEnd) {
             shouldDismiss = true
             return
         }
