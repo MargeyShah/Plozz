@@ -346,6 +346,7 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
     public private(set) var isShowingCachedSnapshot = false
     @ObservationIgnored private var hasReceivedLiveContent = false
     @ObservationIgnored private var hasCompletedHomeLoad = false
+    @ObservationIgnored private var deferNavigationRefreshGeneration: UInt64 = 0
     /// Rows whose last publication reported a failure. They keep a retry footprint
     /// (a loading row with no cards) until a request actually settles.
     @ObservationIgnored private var rowsAwaitingRetry: Set<HomeRowKind> = []
@@ -793,6 +794,7 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
         cancelPendingLoad()
         topShelfPublishTask?.cancel()
         durableWatchlistRefreshTask?.cancel()
+        deferNavigationRefreshGeneration &+= 1
     }
 
     /// Loads on first appearance and re-aggregates only when the visibility
@@ -856,6 +858,22 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
                     }
                     return
                 }
+                if trigger == "appear" {
+                    // Coming back from a detail page is navigation, not new
+                    // information. Starting the multi-account fan-out in the same
+                    // turn as the pop is what makes the first moments back on Home
+                    // unresponsive (and lets a silent swap move the card under the
+                    // viewer's finger). Let the pop settle first; a tap/scroll bumps
+                    // the generation and skips the refresh outright.
+                    deferNavigationRefreshGeneration &+= 1
+                    let token = deferNavigationRefreshGeneration
+                    try? await Task.sleep(for: .milliseconds(900))
+                    guard !Task.isCancelled,
+                          deferNavigationRefreshGeneration == token,
+                          canLoadContent, lastLoadedVisibility == visibility else { return }
+                    await load(showLoadingState: false)
+                    return
+                }
                 await load(showLoadingState: false)
                 return
             }
@@ -893,6 +911,7 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
     /// skeleton flash or focus reset for a background update.
     public func load(showLoadingState: Bool) async {
         guard canLoadContent else { return }
+        deferNavigationRefreshGeneration &+= 1
         // Coalesce concurrent loads. A load is a fan-out across every signed-in
         // account — measured at ~2.5s per account on a cold launch — so two
         // overlapping ones cost double the network and CPU for one result. They
@@ -1883,6 +1902,9 @@ public final class HomeViewModel: HomeContentSnapshotProviding {
     /// Keeps a pending durable fold off the scrolling hot path.
     public func noteHomeNavigationInteraction() {
         lastWatchlistNavigationInteractionAt = Date()
+        // The viewer is already using the page; do not start a background refresh
+        // underneath their tap.
+        deferNavigationRefreshGeneration &+= 1
         guard durableWatchlistRefreshPending
                 || pendingAuthoritativeWatchlist != nil
         else { return }
