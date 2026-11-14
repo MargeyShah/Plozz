@@ -1882,6 +1882,16 @@ struct PlozziOSHomeHeroForeground: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(PlozziOSAppModel.self) private var appModel
     @Environment(\.mediaItemActionHandler) private var actionHandler
+    @Environment(\.plozzArtworkPolicy) private var artworkPolicy
+    /// One reveal for the whole foreground.
+    ///
+    /// The wordmark, the description and the action row used to appear on three
+    /// independent schedules: the description immediately, the buttons when the play
+    /// target resolved, and the transparent logo last (it is a separate artwork
+    /// fetch). Watching the page assemble itself that way was reported as ugly. Now
+    /// the column waits for the logo it is going to draw and then fades in once, so
+    /// the slowest piece sets the moment for all of them.
+    @State private var foregroundReady = false
 
     let item: MediaItem
     let detailItem: MediaItem
@@ -1938,6 +1948,37 @@ struct PlozziOSHomeHeroForeground: View {
         // Width fill / alignment now come from the shared placement modifier.
         .multilineTextAlignment(style == .compactPortrait ? .center : .leading)
         .environment(\.plozziOSHeroLogoSize, appModel.settings.hero.settings.logoSize)
+        .opacity(foregroundReady ? 1 : 0)
+        .task(id: foregroundReadinessKey) {
+            let sources = logoSources
+            let hasAnySource = !sources.references.isEmpty || sources.fallback != nil
+            guard hasAnySource else {
+                foregroundReady = true
+                return
+            }
+            // `prepare` warms the memo that `HeroLogoArtwork` reads synchronously, so
+            // when this returns the wordmark can draw on the same frame as the rest.
+            await HeroLogoPreloader.prepare(
+                references: sources.references,
+                fallback: sources.fallback,
+                policy: artworkPolicy
+            )
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.28)) { foregroundReady = true }
+        }
+    }
+
+    /// Waits for the logo this page will draw (the same memo `HeroLogoArtwork`
+    /// reads) and then reveals the whole foreground. No timers: a page without a
+    /// logo — or whose logo is already cached — reveals immediately, and a page with
+    /// one reveals when the artwork is actually ready.
+    private var foregroundReadinessKey: String {
+        let refs = presentation.logoReferences.map { String(describing: $0) }.joined(separator: "|")
+        return "\(detailItem.id)#\(refs)#\(style == .compactPortrait)"
+    }
+
+    private var logoSources: (references: [ArtworkReference], fallback: HeroLogoFallback?) {
+        (presentation.logoReferences, PlozziOSHeroMetadata.tmdbLogoFallback(for: item))
     }
 
     @ViewBuilder
