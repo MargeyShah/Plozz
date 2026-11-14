@@ -1227,6 +1227,12 @@ public final class ItemDetailViewModel {
         detail.childrenLoaded = true
         state = .loaded(detail)
         hasPaintedFreshDetail = true
+        // Discovery titles (AniList/Seerr/watchlist entries with no library item)
+        // take this path instead of `load()`, and this path never wrote a snapshot.
+        // TV and film pages therefore reopened from cache while an anime page
+        // painted placeholders on every visit. Persist here as well, and again after
+        // the optional ratings/trailer work below adds anything worth keeping.
+        persistSnapshot()
 
         let enriched = detail.item
         if enriched.kind == .series {
@@ -1250,6 +1256,7 @@ public final class ItemDetailViewModel {
             state = .loaded(latest)
         }
         await trailer
+        persistSnapshot()
     }
 
     private static func applying(

@@ -1840,6 +1840,49 @@ final class ItemDetailViewModelTests: XCTestCase {
         vm.suspendEnrichment()
     }
 
+    func testDiscoveryPagePersistsItsSnapshotForTheNextOpen() async throws {
+        // Anime and other discovery titles have no library item, so they take
+        // `loadDiscoveryDetail` rather than `load()`. That path never wrote a
+        // snapshot, so reopening one always repainted placeholders while TV and
+        // film pages restored instantly. Pin the write down.
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plozz-discovery-snapshot-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = DetailSnapshotCache(directory: directory)
+        let seed = MediaItem(
+            id: "external-anime", title: "External anime", kind: .series,
+            overview: "Cached by the discovery path", locallyValidatedPlayableSource: false
+        )
+        let vm = ItemDetailViewModel(
+            provider: nil, itemID: seed.id, initialItem: seed, isDiscoveryItem: true,
+            externalMetadataResolver: { _, region in
+                ExternalTitleMetadata(
+                    enrichment: MetadataEnrichment(),
+                    availability: ExternalTitleAvailability(regionCode: region)
+                )
+            },
+            onlineTrailerResolver: { _ in [] }, playableVideoIDResolver: { _ in nil },
+            trailerCache: TrailerResolutionCache(),
+            snapshotCache: cache
+        )
+        await vm.load()
+        XCTAssertEqual(vm.state.value?.item.overview, "Cached by the discovery path")
+
+        // `persistSnapshot` coalesces behind a short debounce, so poll the cache
+        // rather than assuming the first write already landed.
+        let key = "_|\(seed.id)"
+        var stored: DetailSnapshotCache.Snapshot?
+        for _ in 0..<50 {
+            stored = await cache.snapshot(for: key)
+            if stored != nil { break }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(stored?.item.id, seed.id, "Discovery pages must cache like library pages")
+        XCTAssertEqual(stored?.item.overview, "Cached by the discovery path")
+        vm.suspendEnrichment()
+    }
+
     func testProviderFreeDiscoveryLoadsMetadataAndRequestStatus() async {
         let seed = MediaItem(
             id: "external", title: "External movie", kind: .movie,
