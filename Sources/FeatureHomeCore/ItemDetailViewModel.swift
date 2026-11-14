@@ -3007,19 +3007,27 @@ public final class ItemDetailViewModel {
                 episodes.prefix(Self.maxRestoredEpisodesPerSeason)
             )
         }
-        let snapshot = DetailSnapshotCache.Snapshot(
-            item: detail.item,
-            children: detail.children,
-            seasonEpisodes: persistedEpisodes,
-            sources: sources,
-            upcomingSchedule: detail.upcomingSchedule
-        )
+        // Build the snapshot inside the detached task, not on the caller. Constructing
+        // it here copied the item, its children and up to 80 episodes on the main
+        // actor every time a season loaded, which is exactly the enter/exit churn the
+        // viewer feels as a freeze when moving between seasons.
+        let item = detail.item
+        let children = detail.children
+        let sourcesSnapshot = sources
+        let schedule = detail.upcomingSchedule
         let key = snapshotKey
         let cache = snapshotCache
         pendingSnapshotWrite?.cancel()
         pendingSnapshotWrite = Task.detached(priority: .utility) {
             try? await Task.sleep(nanoseconds: 400_000_000)
             if Task.isCancelled { return }
+            let snapshot = DetailSnapshotCache.Snapshot(
+                item: item,
+                children: children,
+                seasonEpisodes: persistedEpisodes,
+                sources: sourcesSnapshot,
+                upcomingSchedule: schedule
+            )
             await cache.store(snapshot, for: key)
         }
     }
