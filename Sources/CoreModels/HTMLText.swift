@@ -48,13 +48,13 @@ public enum HTMLText {
 
         // Collapse horizontal whitespace, then paragraph runs.
         text = text.replacingOccurrences(
-            of: "[\\t\\u{00A0} ]+", with: " ", options: [.regularExpression]
+            of: "[\\t\\x{00A0} ]+", with: " ", options: [.regularExpression]
         )
         text = text.replacingOccurrences(
             of: " *\\n *", with: "\n", options: [.regularExpression]
         )
         text = text.replacingOccurrences(
-            of: "\\n{3,}", with: "\n\n", options: [.regularExpression]
+            of: "\\n{2,}", with: "\n", options: [.regularExpression]
         )
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -34,7 +34,10 @@ final class FanoutTests: XCTestCase {
             await recorder.record(snapshot)
         }
 
-        XCTAssertEqual((await recorder.snapshots).count, 1)
+        // Hoisted: XCTest assertion arguments are autoclosures, and an `await`
+        // inside one does not compile.
+        let snapshots = await recorder.snapshots
+        XCTAssertEqual(snapshots.count, 1)
         XCTAssertTrue(values(result).isEmpty)
         XCTAssertTrue(result.isComplete)
     }
