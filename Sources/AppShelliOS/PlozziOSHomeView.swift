@@ -1855,7 +1855,8 @@ struct PlozziOSHomeHeroCarousel: View {
                         style: style,
                         onPlay: onPlay,
                         heroRequest: heroRequest(for: currentItem),
-                        scheduleLine: scheduleLine
+                        scheduleLine: scheduleLine,
+                        scheduleLines: schedules
                     )
                     .id(currentItem.id)
                     .transition(.opacity)

@@ -1903,8 +1903,18 @@ struct PlozziOSHomeHeroForeground: View {
     /// "New episode every Friday" for a returning series, from the shared
     /// `HeroScheduleLines` the tvOS hero already uses.
     var scheduleLine: LocalizedStringResource?
+    /// The carousel's schedule store. Passing it (rather than only the resolved
+    /// line) lets the reveal gate wait for the *cached* badge, so a returning
+    /// series fades in as one piece instead of popping the badge in a second later.
+    /// Optional so previews and fixtures can keep constructing the foreground.
+    var scheduleLines: HeroScheduleLines? = nil
 
     var body: some View {
+        // Reading the store in the body is what makes a late cache hit re-render
+        // this column; the passed line is the fallback for snapshot/fixture input.
+        let resolvedScheduleLine = scheduleLines?.line(for: detailItem)
+            ?? scheduleLines?.line(for: item)
+            ?? scheduleLine
         VStack(
             alignment: style == .compactPortrait ? .center : .leading,
             spacing: 12
@@ -1918,7 +1928,7 @@ struct PlozziOSHomeHeroForeground: View {
                     spoilerSettings: appModel.settings.spoilers.settings
                 ),
                 ratingPreferences: appModel.settings.hero.settings.ratingPreferences,
-                scheduleLine: scheduleLine,
+                scheduleLine: resolvedScheduleLine,
                 logoFallback: PlozziOSHeroMetadata.tmdbLogoFallback(for: item),
                 textSize: appModel.settings.hero.settings.textSize
             )
@@ -1958,6 +1968,10 @@ struct PlozziOSHomeHeroForeground: View {
                 foregroundReady = true
                 return
             }
+            // Zero-network: publishes any schedule already on disk for this slide, so
+            // the badge is part of the same first frame and fade as the wordmark. A
+            // genuinely unknown schedule still resolves later and fades in on its own.
+            await scheduleLines?.loadCached([detailItem, item])
             let sources = logoSources
             let hasAnySource = !sources.references.isEmpty || sources.fallback != nil
             guard hasAnySource else {
@@ -2846,6 +2860,7 @@ struct PlozziOSHeroMetadata: View {
             if content != .information {
                 if let scheduleLine {
                     scheduleBadge(scheduleLine)
+                        .transition(.opacity)
                 }
                 if let seriesBreadcrumb {
                     // The episode is this page's subject, so the show is context
