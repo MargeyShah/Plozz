@@ -2471,7 +2471,7 @@ struct PlozziOSHomeHeroCarousel: View {
     /// recognise a re-issued copy and deliberately public-API only.
     static func heroSeatIdentity(_ item: MediaItem) -> String {
         let title = (item.parentTitle ?? item.title).lowercased()
-        let year = item.year.map(String.init) ?? ""
+        let year = item.productionYear.map(String.init) ?? ""
         return "\(item.kind.rawValue)|\(title)|\(year)"
     }
 
