@@ -35,6 +35,48 @@ platform thresholds, or provider refresh policy.
 
 Do not add a second foreground-refresh mechanism beside the coordinator.
 
+## Home first paint and refresh retention
+
+Home renders from a persisted snapshot before the network answers, and the rules
+that keep that first paint stable are part of the contract, not incidental
+polish. Measured regressions these rules exist to prevent: a hero that paints
+then blanks to its no-image cover, a carousel that collapses from eight slides
+to three and reseats, and a Continue Watching row that empties under the viewer.
+
+- **Skeleton only without a snapshot.** `PlozziOSHomeView` paints the full-page
+  skeleton only when `HomeViewModel.hasPersistedSnapshot` is false. With a
+  snapshot on disk the page paints it on the frame it appears. Never gate this on
+  elapsed time.
+- **A fold never takes the loud path.** A `reloadHome` that arrives at
+  `.idle`/`.loading`/`.failed` against a page that has already shown content
+  refreshes silently (`load(showLoadingState: false)`), so the settled rows and
+  hero stay on screen until replacements are ready.
+- **Empty results are not evidence.** A per-account aggregate, a hero curation,
+  or a snapshot write that returns nothing cannot clear content that is already
+  shown. The row keeps its cards until a completed load says otherwise, and
+  `HomeSnapshotPersistence` preserves the previous Continue Watching row when the
+  new one is empty because other rows succeeded (that write is not an empty
+  aggregate, so nothing else would have stopped it).
+- **Snapshots are not pruned on unknown state.** `HomeViewModel.init` only
+  prunes for an empty account list once accounts have resolved *and* a live load
+  has completed; before that, an empty list means "not loaded yet", and pruning
+  there (including `scheduleSnapshotClear`) destroyed the snapshot the next launch
+  paints from.
+- **Hero stability.** `heroItems` is replaced only by a non-empty curation, the
+  visible set keeps `.unrestricted` eligibility until `hasCompletedLiveLoad`, and
+  the slide is reseated by title identity so a copy arriving with a new id does
+  not move the viewer. A decoded image is applied synchronously on first paint and
+  art is retained across a reference change.
+- **Continue Watching is not gate-kept behind the aggregate.** Cached cards stay
+  painted while the fresh multi-account result lands.
+
+These paths carry opt-in telemetry (`HOMESEED`, `HOMEFRAME`, `HEROFRAME`,
+`HOMECAROUSEL`, `HEROARTREF`, `HOMECW`, `DETAILVIEW`, `DETAILRAIL`,
+`DETAILRETURN`). It is silent unless the process is launched with
+`PLZXFAN_STDOUT=1`; the lines print counts, kinds and hashes, never titles, ids or
+URLs.
+
+
 ## Test constants and fixtures
 
 
