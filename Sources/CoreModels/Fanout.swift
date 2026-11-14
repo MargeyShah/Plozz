@@ -65,7 +65,7 @@ public enum Fanout {
     public static func run<Element: Sendable, Value: Sendable>(
         sources: [String],
         publication: FanoutPublication = .progressive,
-        fetch: @Sendable (String) async -> Result<Element, AppError>,
+        fetch: @escaping @Sendable (String) async -> Result<Element, AppError>,
         merge: @Sendable ([Element]) -> Value,
         onProgress: @Sendable (FanoutResult<Value>) async -> Void
     ) async -> FanoutResult<Value> {

@@ -1007,8 +1007,8 @@ public final class ItemDetailViewModel {
                 // starting a second request behind the first. Fire-and-forget: it must
                 // not hold up the publish above, and a superseded page cancels it via
                 // the generation checks inside `loadEpisodes`.
-                if let openingSeasonID = Self.openingSeasonID(
-                    seasons: fetchedChildren,
+                if let openingSeasonID = DetailOpeningSelection.openingSeasonID(
+                    children: fetchedChildren,
                     resumeSeasonID: serverResumeEpisode?.seasonID
                 ) {
                     Task { [weak self] in
@@ -1099,20 +1099,6 @@ public final class ItemDetailViewModel {
         }
     }
 
-
-    /// The season a freshly opened series page will show first.
-    ///
-    /// Mirrors the view's opening rule closely enough for prefetching: an explicit
-    /// resume season wins, otherwise the first season in server order. Prefetching
-    /// the wrong season only costs one request; waiting for the view to decide costs
-    /// a full round-trip on every open.
-    static func openingSeasonID(seasons: [MediaItem], resumeSeasonID: String?) -> String? {
-        if let resumeSeasonID,
-           seasons.contains(where: { $0.id == resumeSeasonID }) {
-            return resumeSeasonID
-        }
-        return seasons.first { $0.kind == .season }?.id
-    }
 
     /// An index miss is not proof of absence: a cold or capped catalogue can miss
     /// a title that a targeted server search finds immediately (issue #33).
