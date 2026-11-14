@@ -96,33 +96,54 @@ private final class LocalNetworkProbe: @unchecked Sendable {
     func request() async -> LocalNetworkPermissionState {
         guard !Self.isTestHost else { return .notRequired }
 
-        var settled: LocalNetworkPermissionState?
-        var startNow = false
-        lock.lock()
-        if state != .unknown {
-            settled = state
-        } else if !started {
-            started = true
-            startNow = true
-        }
-        lock.unlock()
-
-        if let settled { return settled }
-        if startNow { startBrowser() }
+        let decision = begin()
+        if let settled = decision.settled { return settled }
+        // The alert is already up (or the browse already ran). Later callers
+        // must not park for another five seconds on every foreground or
+        // playback start; the recorded state is read from diagnostics instead.
+        guard decision.startNow else { return .unknown }
+        startBrowser()
 
         return await withCheckedContinuation { continuation in
-            lock.lock()
-            if state != .unknown {
-                let current = state
-                lock.unlock()
-                continuation.resume(returning: current)
-            } else {
-                let armTimeout = waiters.isEmpty
-                waiters.append(continuation)
-                lock.unlock()
-                if armTimeout { armDecisionTimeout() }
+            if let settled = enqueue(continuation) {
+                continuation.resume(returning: settled)
             }
         }
+    }
+
+    private struct Decision {
+        let settled: LocalNetworkPermissionState?
+        let startNow: Bool
+    }
+
+    /// Synchronous so the async entry point never holds `NSLock` across a
+    /// suspension point (`NSLock.lock()` is unavailable in async contexts).
+    private func begin() -> Decision {
+        lock.lock()
+        defer { lock.unlock() }
+        if state != .unknown { return Decision(settled: state, startNow: false) }
+        if started { return Decision(settled: nil, startNow: false) }
+        started = true
+        return Decision(settled: nil, startNow: true)
+    }
+
+    /// Returns a decided state when the answer arrived between `begin()` and
+    /// the continuation; otherwise parks the caller until the probe resolves or
+    /// the decision timeout lapses.
+    private func enqueue(
+        _ continuation: CheckedContinuation<LocalNetworkPermissionState, Never>
+    ) -> LocalNetworkPermissionState? {
+        lock.lock()
+        if state != .unknown {
+            let current = state
+            lock.unlock()
+            return current
+        }
+        let armTimeout = waiters.isEmpty
+        waiters.append(continuation)
+        lock.unlock()
+        if armTimeout { armDecisionTimeout() }
+        return nil
     }
 
     /// Bounds only the caller's wait. The browse keeps running so the alert is

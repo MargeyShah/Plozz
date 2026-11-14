@@ -1048,6 +1048,7 @@ struct PlozziOSTabShell: View {
     @State private var downloadNavigationID: UUID?
     @State private var searchFocusRequest = 0
     @State private var searchReplaceQueryRequest = 0
+    @State private var navigationRootRequest = 0
     @State private var hasChosenNavigationDestination = false
     let homeViewModelBox: LazyViewState<HomeViewModel>
     var sharedHomeViewModel: HomeViewModel {
@@ -1225,6 +1226,9 @@ struct PlozziOSTabShell: View {
         // there. A re-tap also starts a new search, so the previous query is cleared
         // instead of being left behind the keyboard.
         searchFocusRequest &+= 1
+        // Pressing Search means "search", even when a detail page was pushed on top
+        // of the search results: return that stack to its root first, then focus.
+        navigationRootRequest &+= 1
         if wasShowingSearch { searchReplaceQueryRequest &+= 1 }
     }
 
@@ -1509,6 +1513,7 @@ struct PlozziOSTabShell: View {
         .tabViewStyle(.sidebarAdaptable)
         .environment(\.plozziOSSearchFocusRequest, searchFocusRequest)
         .environment(\.plozziOSSearchReplaceQueryRequest, searchReplaceQueryRequest)
+        .environment(\.plozziOSNavigationRootRequest, navigationRootRequest)
         .modifier(PlozziOSNavigationBackground())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if usesOpaqueBottomBar {

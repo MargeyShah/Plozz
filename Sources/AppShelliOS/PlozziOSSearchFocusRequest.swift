@@ -21,7 +21,20 @@ struct PlozziOSSearchReplaceQueryRequestKey: EnvironmentKey {
     static let defaultValue = 0
 }
 
+/// Increments when the shell needs the active navigation stack to return to its
+/// root — pressing the Search tab while a detail page (or a person page) is pushed
+/// on top of it. Each stack observes this and clears whatever it pushed; the stack
+/// that is not visible simply has nothing to clear.
+struct PlozziOSNavigationRootRequestKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
 extension EnvironmentValues {
+    var plozziOSNavigationRootRequest: Int {
+        get { self[PlozziOSNavigationRootRequestKey.self] }
+        set { self[PlozziOSNavigationRootRequestKey.self] = newValue }
+    }
+
     var plozziOSSearchFocusRequest: Int {
         get { self[PlozziOSSearchFocusRequestKey.self] }
         set { self[PlozziOSSearchFocusRequestKey.self] = newValue }

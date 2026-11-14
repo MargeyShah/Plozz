@@ -162,7 +162,7 @@ app executable is unsigned; a re-signer supplies identity and profile claims.
 Local Network access is a per-signature privacy grant, not an entitlement, so a
 re-signed install must be granted it again before streaming from a LAN server
 (the app now asks on the first foreground with an account). See
-[signing an unsigned self-build](docs/unsigned-ipa-signing.md) for the exact
+[signing an unsigned self-build](../docs/unsigned-ipa-signing.md) for the exact
 entitlement inventory, what Feather keeps or drops, and the verification steps.
 
 ### Tests

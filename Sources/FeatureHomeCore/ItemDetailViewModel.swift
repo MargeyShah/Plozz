@@ -603,6 +603,11 @@ public final class ItemDetailViewModel {
     /// Stable per-title key for ``snapshotCache``. Scoped by owning account so the
     /// same id on two servers or in two languages caches independently. Routes to a series share a
     /// key (they're all built with the series id as `itemID`).
+    /// How many of a restored season's episodes are hydrated into memory on a
+    /// revisit. Bounded so a long-running show cannot make page-open cost scale with
+    /// its whole episode list on the smallest supported device.
+    static let maxRestoredEpisodesPerSeason = 80
+
     private var snapshotKey: String {
         let key = "\(activeSourceAccountID ?? "_")|\(activeItemID)"
         return metadataLanguage == "en" ? key : "\(key)|text-language-v1:\(metadataLanguage)"
@@ -2862,6 +2867,27 @@ public final class ItemDetailViewModel {
             upcomingSchedule: snapshot.upcomingSchedule,
             serverResumeEpisode: serverResumeEpisode
         ))
+        // Restore the episodes for the season this page will actually open on — the
+        // snapshot already persists them, and ignoring them left the rail empty on
+        // every revisit, so a series reopened a second later still painted
+        // placeholders and fetched again.
+        //
+        // Deliberately bounded, because this is a low-RAM path (a 3 GB Apple TV is the
+        // smallest supported device): a snapshot can hold episodes for every season
+        // the viewer browsed, and mapping all of them into memory to paint one rail is
+        // pure waste. Only the opening season is restored, and only its first
+        // `maxRestoredEpisodesPerSeason` — the rail is lazy and the live fetch fills
+        // the rest on demand. Everything else stays on disk until a page needs it.
+        if !snapshot.seasonEpisodes.isEmpty,
+           let openingSeasonID = DetailOpeningSelection.openingSeasonID(
+               children: snapshot.children,
+               resumeSeasonID: nil
+           ),
+           let episodes = snapshot.seasonEpisodes[openingSeasonID] {
+            seasonEpisodes[openingSeasonID] = episodes
+                .prefix(Self.maxRestoredEpisodesPerSeason)
+                .map(tagged)
+        }
         if snapshot.sources.count > 1 {
             let restored = prunedToActiveAccounts(snapshot.sources)
             if restored.count > 1 {
