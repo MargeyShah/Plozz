@@ -79,7 +79,11 @@ public struct PlozzFadeInOnAppear: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .opacity(visible ? 1 : 0)
-            .onAppear {
+            // `.task` runs after the first rendered frame, so the 0-opacity state
+            // is actually painted before the fade starts. `.onAppear` could run
+            // during the push and finish the fade while the section was offscreen,
+            // which is why the sections appeared to snap in.
+            .task {
                 guard !visible else { return }
                 if reduceMotion {
                     visible = true

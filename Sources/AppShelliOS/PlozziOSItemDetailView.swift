@@ -12,7 +12,19 @@ import SeerService
 import TraktService
 import SwiftUI
 
+private struct PlozziOSDetailViewModelKey: Hashable {
+    let itemID: String
+    let libraryOrigin: String?
+}
+
 struct PlozziOSItemDetailView: View {
+    /// One view model per title/origin, retained across body re-evaluations. The
+    /// factory used to run inside `canonicalDetail`'s view builder, so every render
+    /// pass could construct another `ItemDetailViewModel` and start its loads again
+    /// — the entering freeze and the metadata/play label repopulating in place.
+    @State private var detailViewModels =
+        KeyedViewStateCache<PlozziOSDetailViewModelKey, ItemDetailViewModel>()
+
     @Environment(HomeViewModel.self) private var homeViewModel: HomeViewModel?
     @Environment(\.locale) private var locale
     let appModel: PlozziOSAppModel
@@ -119,9 +131,16 @@ struct PlozziOSItemDetailView: View {
     @ViewBuilder
     private func canonicalDetail(for resolvedItem: MediaItem) -> some View {
         let contextItem = item
-        if let model = try? detailEnvironment.makeViewModel(
-            for: resolvedItem, libraryOrigin: originSourceAccountID
-            ) {
+        let key = PlozziOSDetailViewModelKey(
+            itemID: resolvedItem.stablePresentationID,
+            libraryOrigin: originSourceAccountID
+        )
+        let model = try? detailViewModels.value(forKey: key) {
+            try detailEnvironment.makeViewModel(
+                for: resolvedItem, libraryOrigin: originSourceAccountID
+            )
+        }
+        if let model {
                 PlozziOSCanonicalItemDetailView(
                     appModel: appModel,
                     provider: provider,
@@ -708,6 +727,7 @@ private struct PlozziOSCanonicalItemDetailView: View {
                         ? HeroContentPolicy.detailDescription(focused: headerPresentation, root: rootPresentation)
                         : nil
                 )
+                .plozzFadeInOnAppear()
             }
             // No trailing padding here. The information band is the last thing in
             // this stack and paints its own tint, so a gap added out here is page
