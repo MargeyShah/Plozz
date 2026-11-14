@@ -48,6 +48,19 @@ struct PlozziOSItemDetailView: View {
 
     var body: some View {
         detailBody
+            // Detail-path telemetry anchor (PLZXFAN-gated; kind only). Deliberately
+            // at the page body: the episode browser sits inside a lazy container, so
+            // an anchor there never fires unless the viewer scrolls it into view —
+            // which is why the series fixture produced zero detail lines. This fires
+            // on every detail open, which is what the return-path capture needs.
+            .onAppear {
+                if FanoutDiagnostics.isEnabled {
+                    FanoutDiagnostics.emit(
+                        "DETAILVIEW appeared kind=\(item.kind.rawValue) "
+                        + "series=\(item.kind == .series)"
+                    )
+                }
+            }
             .detailOpenFeedback()
             .environment(\.plozzArtworkArea, .details)
             // Each detail page installs its own router. A pushed destination —
@@ -1725,6 +1738,21 @@ struct PlozziOSInlineSeriesBrowser: View {
     var body: some View {
         if !seasons.isEmpty || !looseEpisodes.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
+                // Detail-path telemetry anchor (PLZXFAN-gated; counts only). Fires
+                // whenever a series page actually builds its episode browser, which
+                // is the surface the "detail reflow" report is about; the return
+                // refresh itself is logged by `DETAILRETURN`.
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .onAppear {
+                        if FanoutDiagnostics.isEnabled {
+                            FanoutDiagnostics.emit(
+                                "DETAILRAIL appeared seasons=\(seasons.count) "
+                                + "loose=\(looseEpisodes.count) "
+                                + "episodes=\(displayedEpisodes?.count ?? -1)"
+                            )
+                        }
+                    }
                 if !seasons.isEmpty {
                     PlozzContentTabs(
                         options: seasons, id: \.id, selection: selectedSeasonID,
@@ -1790,6 +1818,23 @@ struct PlozziOSInlineSeriesBrowser: View {
             }
             .onChange(of: displayedEpisodes, initial: true) {
                 publishPlayTarget()
+            }
+            // Rail telemetry (PLZXFAN-gated; counts only). The detail half of the
+            // reported reflow is unmeasured, and this is its gate: the rail paints a
+            // skeleton exactly when `displayedEpisodes == nil`, and a return refresh
+            // that clears the season list would make it reappear under the viewer.
+            .onChange(
+                of: !seasons.isEmpty && selectedSeasonID != nil && displayedEpisodes == nil,
+                initial: true
+            ) { _, skeleton in
+                if FanoutDiagnostics.isEnabled {
+                    FanoutDiagnostics.emit(
+                        "DETAILRAIL skeleton=\(skeleton) "
+                        + "episodes=\(displayedEpisodes?.count ?? -1) "
+                        + "seasons=\(seasons.count) "
+                        + "loose=\(looseEpisodes.count)"
+                    )
+                }
             }
         }
     }

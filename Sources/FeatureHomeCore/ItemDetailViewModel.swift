@@ -2105,6 +2105,27 @@ public final class ItemDetailViewModel {
         guard !isDiscoveryItem, !Task.isCancelled,
               case let .loaded(detail) = state, detail.childrenLoaded,
               let provider = activeProvider else { return }
+        // Return-path telemetry (PLZXFAN-gated; counts and kinds only). The detail
+        // half of the reported reflow has never been measurable, and the suspects are
+        // exactly here: this force-refreshes every season, which drives the inline
+        // rail's `displayedEpisodes == nil` skeleton gate.
+        let diagnosticsOn = FanoutDiagnostics.isEnabled
+        if diagnosticsOn {
+            FanoutDiagnostics.emit(
+                "DETAILRETURN begin kind=\(detail.item.kind.rawValue) "
+                + "children=\(detail.children.count) seasons=\(seasonEpisodes.count) "
+                + "childrenLoaded=\(!detail.children.isEmpty)"
+            )
+        }
+        defer {
+            if diagnosticsOn {
+                FanoutDiagnostics.emit(
+                    "DETAILRETURN end kind=\(detail.item.kind.rawValue) "
+                    + "seasons=\(seasonEpisodes.count) "
+                    + "episodeCounts=\(seasonEpisodes.values.map(\.count).sorted())"
+                )
+            }
+        }
         let generation = sourceGeneration
         let itemID = activeItemID
         let accountID = activeSourceAccountID

@@ -60,10 +60,18 @@ public struct HeroResolutionCacheEntry: Sendable {
 }
 
 /// Content-loading identity, independent of carousel presentation preferences.
+/// Keyed on title MEMBERSHIP, not full item values: re-aggregation folds
+/// (`ContentRefresh` reloads Home ~every 15 s while foreground) re-fetch the
+/// same titles with volatile status fields (resume position, availability,
+/// artwork/copy). Those must NOT restart hero curation — otherwise the
+/// `.task(id: heroLoadKey)` chain tears the settled hero, re-resolves it over
+/// the network, and re-warms artwork on every fold (the visible "hero leaves,
+/// art re-renders" flicker and the slow hero paint). Status-only changes have
+/// their own lane, like `HeroStatusRefreshKey` documents below.
 public struct HeroCurationLoadKey: Equatable, Sendable {
-    private let continueWatching: [MediaItem]
-    private let watchlist: [MediaItem]
-    private let recentlyAdded: [MediaItem]
+    private let continueWatchingIDs: [String]
+    private let watchlistIDs: [String]
+    private let recentlyAddedIDs: [String]
     private let libraries: [AggregatedLibrary]
     private let configuration: HeroConfigurationKey
     private let visibility: HomeLibraryVisibility
@@ -84,9 +92,9 @@ public struct HeroCurationLoadKey: Equatable, Sendable {
         scopeID: ObjectIdentifier,
         seerRevision: UUID
     ) {
-        continueWatching = settings.isEnabled(.continueWatching) ? content.continueWatching : []
-        watchlist = settings.isEnabled(.watchlist) ? content.watchlist : []
-        recentlyAdded = settings.isEnabled(.recentlyAdded) ? content.latest : []
+        continueWatchingIDs = settings.isEnabled(.continueWatching) ? content.continueWatching.map(\.id) : []
+        watchlistIDs = settings.isEnabled(.watchlist) ? content.watchlist.map(\.id) : []
+        recentlyAddedIDs = settings.isEnabled(.recentlyAdded) ? content.latest.map(\.id) : []
         libraries = settings.isEnabled(.randomFromLibrary) || settings.isEnabled(.collection)
             ? content.libraries : []
         configuration = HeroConfigurationKey(settings: settings)

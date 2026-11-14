@@ -173,6 +173,25 @@ struct PlozziOSHomeView: View {
     /// curation instead of folding into the old one.
     @State private var heroCuratedConfiguration: HeroConfigurationKey?
     @State private var heroCompletedLoadKey: HeroCurationLoadKey?
+    /// Whether the hero stage has ever painted real content this session. Once it
+    /// has, the band must stay reserved: `heroActive` drives BOTH the conditional
+    /// hero in `PlozziOSHomeScrollView` and its `ignoresSafeArea(edges: .top)`, so
+    /// flipping it re-lays out the entire page (hero band unreserved + status-bar
+    /// inset inserted) and then flips back — the "another render of Home with the
+    /// wrong hero spacing, flickering until it settles" symptom.
+    @State private var skeletonArmed = false
+    /// Compact identity of what Home is presenting right now, for the millisecond
+    /// frame trace (see the `HOMEFRAME` emit in `body`).
+    private var frameTelemetryKey: String {
+        let state = HomePresentationRow.displayState(
+            viewModel.state, liveTV: liveTV,
+            visibility: appModel.settings.homeVisibility.visibility
+        ).diagnosticName
+        return "state=\(state) armed=\(skeletonArmed) "
+            + "loadingRows=\(viewModel.loadingRows.count) heroItems=\(heroItems.count) "
+            + "heroShown=\(viewModel.hasCompletedLiveLoad)"
+    }
+    @State private var heroHasPainted = false
     @State private var heroCuratedDisabledLibraryKeys: Set<String> = []
     /// How many consecutive curations have failed to offer each retained title,
     /// so a deleted or un-watchlisted one eventually leaves. See `HeroLiveMerge`.
@@ -264,8 +283,26 @@ struct PlozziOSHomeView: View {
         // and the fresh curation folds into it rather than replacing it, so the
         // slides on screen keep their slots when it lands. Same policy as tvOS.
         let settings = appModel.settings.hero.effectiveSettings
+        // Launch-time seed report. Gated by the existing PLZXFAN_STDOUT switch, so it
+        // is silent in normal use; it exists to answer ONE question on the device:
+        // why the first frame of a relaunch still paints a hero skeleton. Prints
+        // counts and source kinds only — never titles, ids or URLs.
+        if FanoutDiagnostics.isEnabled {
+            let cachedHero = viewModel.cachedHeroItems(for: settings)
+            let rowSeed = Self.cachedRowHeroSeed(for: settings, content: viewModel.state.value)
+            FanoutDiagnostics.emit(
+                "HOMESEED launch active=\(settings.isActive) "
+                + "sources=\(settings.sources.map(\.rawValue).joined(separator: ",")) "
+                + "cached=\(cachedHero.map { String($0.count) } ?? "nil") "
+                + "rowSeed=\(rowSeed.map { String($0.count) } ?? "nil") "
+                + "cachedContent=\(viewModel.state.value != nil) "
+                + "store=\(viewModel.hasPersistedSnapshot) "
+                + "liveLoadDone=\(viewModel.hasCompletedLiveLoad)"
+            )
+        }
         if settings.isActive,
-           let seed = viewModel.cachedHeroItems(for: settings) {
+           let seed = viewModel.cachedHeroItems(for: settings)
+                ?? Self.cachedRowHeroSeed(for: settings, content: viewModel.state.value) {
             _heroItems = State(initialValue: HeroDiscoveryStatus.clearingRequestStatus(in: seed))
             _heroCuratedConfiguration = State(
                 initialValue: HeroConfigurationKey(settings: settings)
@@ -286,6 +323,15 @@ struct PlozziOSHomeView: View {
                 // Skeleton rails rather than a bare spinner, matching tvOS: the
                 // placeholders occupy the same geometry the real rows will, so
                 // content swaps in without the page reflowing.
+                //
+                // Held back for a moment after appearing. The cached snapshot is
+                // restored on the first runloop turns, and on device that window is
+                // long enough for the skeleton to be captured as a whole-page flash
+                // before the real page paints (measured: a full skeleton with grey
+                // row cards, then content). Waiting here means a warm launch goes
+                // straight from the launch screen to the restored page, while a
+                // genuinely slow first launch still gets the skeleton.
+                if skeletonArmed {
                 PlozziOSHomeSkeletonScreen(
                     heroActive: HomeHeroSlotState.resolve(
                         settings: appModel.settings.hero.effectiveSettings,
@@ -301,6 +347,11 @@ struct PlozziOSHomeView: View {
                         isContinueWatching: true
                     )
                 )
+                } else {
+                    // Nothing yet: keep the launch background rather than flashing
+                    // a full-page skeleton during a warm restore.
+                    Color.clear
+                }
             case .empty:
                 PlozziOSHomeEmptyState(
                     hasAccounts: true, onAddSource: onAddServer, isOfflineMode: appModel.isOfflineMode
@@ -322,10 +373,49 @@ struct PlozziOSHomeView: View {
                 loadedContent(content)
             }
         }
-        .environment(\.shimmerAnimationsEnabled, homeIsFrontmost && scenePhase == .active)
+        // Simplify-toward-upstream (testing step R5): bffac44 has no fork-only
+        // shimmer-animations environment gate on the Home content column; it is
+        // absent upstream. Re-introduce .environment(\.shimmerAnimationsEnabled,
+        // homeIsFrontmost && scenePhase == .active) once the settled flicker is
+        // gone on phone AND tester, and the Shimmer.swift consumer is verified
+        // fold-safe. Consumer is Sources/CoreUI/Shimmer.swift only.
+        // .environment(\.shimmerAnimationsEnabled, homeIsFrontmost && scenePhase == .active)
         // The portrait hero is sized to the phone, not to a constant — see
         // `HeroStageMetrics`. Published here so the loading skeleton reserves the
         // same height the real hero will take, rather than reflowing when it lands.
+        .task(id: viewModel.state.diagnosticName) {
+            seedHeroFromCachedRowsIfNeeded()
+        }
+        .task {
+            // Arm the skeleton only when there is no cached snapshot to restore.
+            //
+            // With a snapshot on disk the page paints it on the first frame, so a
+            // skeleton can only ever be a flash between the launch screen and that
+            // first painted frame — measured on device as a single phantom frame that
+            // appeared and disappeared between screenshots. Without a snapshot (a true
+            // first launch) the skeleton is the honest state and appears immediately.
+            if !viewModel.hasPersistedSnapshot {
+                skeletonArmed = true
+                return
+            }
+            // Cached page exists: never arm the full-page skeleton for the warm
+            // restore. Only a load that is still empty after a generous window (a
+            // genuinely wedged first refresh) falls back to it.
+            try? await Task.sleep(for: .milliseconds(6000))
+            skeletonArmed = true
+        }
+        // Millisecond-resolution frame telemetry. `devicectl` screenshots cost ~2.4s
+        // each, which cannot resolve the launch window; this records every
+        // presentation transition from inside the app so the cold-launch question is
+        // answered by the app itself. Gated, and it prints only counts and names.
+        .onChange(of: frameTelemetryKey, initial: true) { _, key in
+            if FanoutDiagnostics.isEnabled {
+                FanoutDiagnostics.emit(
+                    "HOMEFRAME t=\(Int(ProcessInfo.processInfo.systemUptime * 1000)) "
+                    + key
+                )
+            }
+        }
         .plozziOSTracksHeroContainerHeight()
         .artworkGradientBackground(
             scope: ObjectIdentifier(viewModel), isVisible: homeIsFrontmost && homeHasAppeared,
@@ -433,6 +523,7 @@ struct PlozziOSHomeView: View {
         .contentRefreshSurface(
             id: ContentRefreshSurfaceID(kind: .home),
             isVisible: homeIsFrontmost && homeHasAppeared && appModel.allowsHomeContentLoading
+                && playbackRequest == nil && pendingResumeRequest == nil
         ) { request in
             switch request.action {
             case .reloadHome:
@@ -588,10 +679,29 @@ struct PlozziOSHomeView: View {
             content: heroContent, randomLibraries: randomLibraries,
             candidates: heroItems, supportingCandidates: heroCandidatePool
         )
-        let displayHeroItems = HeroCurator().reconcile(
+        let curatedHeroItems = HeroCurator().reconcile(
             heroItems, settings: settings, watchMutations: [],
+            // First paint (before any live load has completed) must not run the
+            // hide-watched rule over cached slides: those copies carry last
+            // session's local watch state, so a title the server still considers
+            // in-progress can look watched and the WHOLE carousel filters to empty
+            // — the slot then paints a skeleton until curation lands. Measured on
+            // device: heroItems=8, eligibilityAllows=4, display=0. `preservesLineup`
+            // is this curator's own switch for exactly that (it only clears
+            // `hideWatched`); the live curation re-applies the real filter.
+            preservesLineup: !viewModel.hasCompletedLiveLoad,
             sourceEligibility: sourceEligibility
         )
+        // First-paint bridge. The durable snapshot can be non-empty yet curate to
+        // NOTHING once the real filters run: measured on device as
+        // heroItems=8, eligibilityAllows=4, display=0 — the stored slides are
+        // discovery-tagged while this viewer's sources have discovery off, so the
+        // curator drops every one and the slot paints a skeleton for seconds.
+        // Before the first live load completes, fall back to the titles the rows are
+        // ALREADY painting from cache; the live curation then takes over as usual.
+        let displayHeroItems = curatedHeroItems.isEmpty && !viewModel.hasCompletedLiveLoad
+            ? (Self.cachedRowHeroSeed(for: settings, content: content) ?? [])
+            : curatedHeroItems
         let heroLoadKey = HeroCurationLoadKey(
             content: heroContent,
             settings: settings,
@@ -604,11 +714,34 @@ struct PlozziOSHomeView: View {
         )
         let heroConfigurationMatches = heroCuratedConfiguration == HeroConfigurationKey(settings: settings)
             && heroCuratedDisabledLibraryKeys == visibility.visibility.disabledKeys
-        let heroSlotState = HomeHeroSlotState.resolve(
+        var heroSlotState = HomeHeroSlotState.resolve(
             settings: settings,
             hasItems: heroConfigurationMatches && !displayHeroItems.isEmpty,
             recomputeComplete: heroCompletedLoadKey == heroLoadKey
         )
+        // Sticky stage. A hero that has already painted must never retire to
+        // `.hidden` because one refresh fold momentarily curated an empty set:
+        // `.hidden` removes the band AND switches off the scroll view's top safe
+        // area, so the page re-lays out twice per fold (up, then back down) while
+        // the fold settles. `.placeholder` keeps the band reserved at the real
+        // hero height, so the settled geometry never changes. Genuine retirement
+        // (the viewer switching every source off) changes the configuration, so
+        // `heroConfigurationMatches` is false there and `.hidden` still applies.
+        if heroSlotState == .hidden, heroHasPainted, heroConfigurationMatches {
+            heroSlotState = .placeholder
+        }
+        if FanoutDiagnostics.isEnabled, heroSlotState == .placeholder, !heroItems.isEmpty {
+            // The anomaly this line exists for: a seeded hero that still renders as
+            // a skeleton. Distinguishes "reconcile filtered every slide out" from
+            // "the configuration key no longer matches" from "curation incomplete".
+            FanoutDiagnostics.emit(
+                "HOMESLOT placeholder heroItems=\(heroItems.count) "
+                + "display=\(displayHeroItems.count) "
+                + "configMatches=\(heroConfigurationMatches) "
+                + "complete=\(heroCompletedLoadKey == heroLoadKey) "
+                + "eligibilityAllows=\(heroEligibility.filtering(heroItems).count)"
+            )
+        }
         let rows = HomeRow.rows(
             for: content,
             libraryOrder: appModel.settings.navigation.libraryOrderingKeys,
@@ -788,6 +921,7 @@ struct PlozziOSHomeView: View {
                 await loadHero(from: heroContent)
                 guard !Task.isCancelled else { return }
                 heroCompletedLoadKey = heroLoadKey
+                if !heroItems.isEmpty { heroHasPainted = true }
             }
     }
 
@@ -1205,6 +1339,9 @@ struct PlozziOSHomeView: View {
         heroPinnedItemIDs = []
         heroRetainedMisses = [:]
         heroCompletedLoadKey = nil
+        // A different profile/viewer starts from scratch: its hero stage must be
+        // allowed to resolve to `.hidden` until it paints content of its own.
+        heroHasPainted = false
         featuredItems = []
         featuredConfiguration = nil
         featuredDisabledLibraryKeys = []
@@ -1215,6 +1352,42 @@ struct PlozziOSHomeView: View {
         heroCuratedConfiguration = HeroConfigurationKey(settings: settings)
         heroCuratedDisabledLibraryKeys = appModel.settings.homeVisibility.visibility.disabledKeys
         discoveryIdentityRevision = appModel.identityIndex.identityRevisionProvider()
+    }
+
+    /// First-paint hero seed taken from the rows the page is already painting.
+    ///
+    /// `cachedHeroItems` only carries what the durable snapshot stores, and that
+    /// snapshot deliberately excludes Continue Watching — so a hero sourced from
+    /// Continue Watching had NO seed and every relaunch painted a hero skeleton
+    /// (empty backdrop + placeholder bars) until the network curation landed. The
+    /// rows themselves paint immediately from `HomeContentStore`, so seeding the
+    /// carousel from those same cached rows keeps the first frame complete; the
+    /// live curation still folds into this set and replaces slides as before.
+    private static func cachedRowHeroSeed(
+        for settings: HeroSettings, content: HomeViewModel.Content?
+    ) -> [MediaItem]? {
+        guard let content else { return nil }
+        var items: [MediaItem] = []
+        if settings.isEnabled(.continueWatching) { items += content.continueWatching }
+        if settings.isEnabled(.recentlyAdded) { items += content.latest }
+        guard !items.isEmpty else { return nil }
+        return Array(items.prefix(settings.maxItems))
+    }
+
+    /// Paint the cached rows' hero on the first frame even when no durable hero
+    /// snapshot exists (Continue Watching sources are deliberately excluded from
+    /// that snapshot). Runs when the cached content actually lands — it is NOT
+    /// available at `init`, which is why the constructor seed alone still painted a
+    /// skeleton on the phone — and never overrides a live curation.
+    private func seedHeroFromCachedRowsIfNeeded() {
+        guard heroItems.isEmpty, !viewModel.hasCompletedLiveLoad else { return }
+        let settings = appModel.settings.hero.effectiveSettings
+        guard settings.isActive,
+              let seed = Self.cachedRowHeroSeed(for: settings, content: viewModel.state.value),
+              !seed.isEmpty else { return }
+        heroItems = HeroDiscoveryStatus.clearingRequestStatus(in: seed)
+        heroCuratedConfiguration = HeroConfigurationKey(settings: settings)
+        heroCuratedDisabledLibraryKeys = appModel.settings.homeVisibility.visibility.disabledKeys
     }
 
     private func refreshHeroSourceEligibility() {
@@ -1437,7 +1610,34 @@ struct PlozziOSHomeView: View {
         heroCuratedConfiguration = configuration
         heroCuratedDisabledLibraryKeys = disabledLibraryKeys
         heroRetainedMisses = merge.misses
-        if merge.items != heroItems { heroItems = merge.items }
+        // Never blank a painted carousel from a curation that produced nothing.
+        // Measured on device at millisecond resolution: on every launch `heroItems`
+        // went 8 → 0 → 8 within ~1.8s, and that empty window is the hero painting its
+        // no-image cover between the cached artwork and the live curation — exactly
+        // the reported "hero loads the image, then drops to the no-image cover and
+        // reloads". The first curation pass can legitimately resolve before the
+        // sources it needs are ready (`foldsIntoLoadedSet` is false on the very first
+        // pass), so an empty result there proves nothing and must not clear the
+        // slides already on screen. Genuine retirement still happens above: an
+        // inactive hero configuration returns early with `heroItems = []`, and the
+        // slot hides when the viewer switches every source off.
+        if merge.items != heroItems, !(merge.items.isEmpty && !heroItems.isEmpty) {
+            heroItems = merge.items
+            // Hero-set trace (PLZXFAN-gated; a hash, never titles). The user-visible
+            // symptom "the hero changes images a few times while loading" is exactly
+            // this assignment firing repeatedly, so record every change with a
+            // timestamp. On a warm launch there should be exactly ONE such line.
+            if FanoutDiagnostics.isEnabled {
+                let ids: [String] = heroItems.map { $0.id }
+                let joined: String = ids.joined(separator: "|")
+                let signature: Int = joined.hashValue
+                let stamp: Int = Int(ProcessInfo.processInfo.systemUptime * 1000)
+                FanoutDiagnostics.emit(
+                    "HEROFRAME t=\(stamp) count=\(ids.count) "
+                    + "sig=\(signature) folds=\(foldsIntoLoadedSet)"
+                )
+            }
+        }
         heroStatusContext = appModel.plozziOSSeasonRequestContextID
         // What the next launch may repaint instead of a skeleton, re-checked
         // against the final payload (see `HeroDurableSnapshot`).
@@ -1447,7 +1647,12 @@ struct PlozziOSHomeView: View {
         // `showing` is deliberately empty — and deleting the snapshot there is the
         // very thing `saveHero`'s empty-write refusal exists to prevent.
         let durablePool = heroCandidatePool.durable()
-        if durablePool.isEmpty, freshIsAuthoritative {
+        // Never treat an empty pool as "the viewer has nothing" before a live load
+        // has actually completed. On the phone the first curation can run while
+        // accounts are still warming, and clearing here deleted the snapshot the
+        // next launch paints instantly — so every relaunch showed a hero skeleton
+        // with an empty backdrop for seconds before the art arrived.
+        if durablePool.isEmpty, freshIsAuthoritative, viewModel.hasCompletedLiveLoad {
             viewModel.clearCachedHeroItems()
         } else {
             viewModel.cacheHeroCandidatePool(durablePool, for: settings)
@@ -1464,6 +1669,12 @@ struct PlozziOSHomeHeroCarousel: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(HeroTrailerController.self) private var trailerController
     @State private var selectedItemID: String?
+    /// Identity of the title currently on screen, used to stay on it when a
+    /// curation/enrichment pass hands back the same title under a different copy id
+    /// (the "hero changes images a few times while loading" report). Deliberately a
+    /// small local key — the hero's internal dedupe tokens are not public outside
+    /// FeatureHomeCore.
+    @State private var seatedHeroIdentity: String?
     @State private var dwellStart = Date()
     /// Seconds of this slide's dwell spent showing a trailer, which the countdown
     /// does not charge for. Everything else is derived from `dwellStart` — the
@@ -1747,8 +1958,26 @@ struct PlozziOSHomeHeroCarousel: View {
                 }
             }
         }
+        .onChange(of: selectedItemID, initial: true) { _, id in
+            guard let id, let item = items.first(where: { $0.id == id }) else {
+                seatedHeroIdentity = nil
+                return
+            }
+            seatedHeroIdentity = Self.heroSeatIdentity(item)
+        }
         .onChange(of: items.map(\.id), initial: true) { oldIDs, itemIDs in
             guard selectedItemID == nil || !itemIDs.contains(selectedItemID ?? "") else {
+                return
+            }
+            // The slide on screen is still the same TITLE wearing a new copy id (an
+            // enrichment/curation pass or another server's edition): keep the viewer
+            // on it rather than re-seating them to a different slide.
+            if let identity = seatedHeroIdentity,
+               let current = items.first(where: { Self.heroSeatIdentity($0) == identity }) {
+                selectedItemID = current.id
+                dwellStart = .now
+                dwellTrailerSeconds = 0
+                dwellItemID = current.id
                 return
             }
             // Re-seat by POSITION, not to the front. A curation folding into the
@@ -1828,20 +2057,12 @@ struct PlozziOSHomeHeroCarousel: View {
             async let play: Void = resolvePlayTarget(for: currentItem)
             _ = await (root, play)
         }
-        // Warm the slides either side of the fronted one whenever the curated
-        // set or the fronted slide changes. Keyed on BOTH so a background
-        // curation that folds new media in re-warms the new neighbours instead
-        // of leaving the first swipe onto them cold.
-        .task(id: heroArtworkWarmKey) {
+        // Simplify-toward-upstream (testing step R1): upstream bffac44 keys the
+        // neighbour warm on the fronted slide only and has no drag-start warm
+        // task. Re-introduce the fork's set-keyed re-warm and drag warm
+        // individually once the settled flicker is gone and each is proven.
+        .task(id: selectedItemID) {
             await warmAdjacentArtwork()
-        }
-        // Warm the incoming slide the moment a swipe targets it, rather than
-        // only when the swap commits. Dragging toward a slide that is already
-        // warm is what makes the picture arrive at full size instead of
-        // loading under the finger.
-        .task(id: dragTargetItem?.id) {
-            guard let target = dragTargetItem else { return }
-            await Self.warmBackdrop(references: heroReferences(for: target))
         }
         .onChange(of: items.map(\.id)) { _, ids in
             let retained = Set(ids)
@@ -2245,6 +2466,15 @@ struct PlozziOSHomeHeroCarousel: View {
         items.map(\.id).joined(separator: "|") + "#" + (selectedItemID ?? "")
     }
 
+    /// Small local identity for "is this the same title?", used only for keeping the
+    /// viewer's slide seated across copy changes. Title + kind + year is enough to
+    /// recognise a re-issued copy and deliberately public-API only.
+    static func heroSeatIdentity(_ item: MediaItem) -> String {
+        let title = (item.parentTitle ?? item.title).lowercased()
+        let year = item.year.map(String.init) ?? ""
+        return "\(item.kind.rawValue)|\(title)|\(year)"
+    }
+
     private func heroReferences(for item: MediaItem) -> [ArtworkReference] {
         let style: HeroArtworkStyle = horizontalSizeClass == .compact
             ? .compactPortrait
@@ -2256,24 +2486,26 @@ struct PlozziOSHomeHeroCarousel: View {
         ).artworkReferences(settings: artworkPolicy.settings, in: .home)
     }
 
-    /// Decodes the full-size artwork for the slides either side of this one.
+    /// Decodes the full-size artwork for the slide on screen and its neighbours.
     ///
-    /// Deliberately skips the slide on screen: the view is already downloading
-    /// that one, and this used to warm it *first*, serially, so on a cold start
-    /// the neighbours did not begin until the current slide's own 2000px pass
-    /// had finished — which is exactly when they were needed. The neighbours are
-    /// warmed concurrently for the same reason, through the shared artwork
-    /// limiter so they queue behind visible work rather than competing with it.
+    /// The fronted slide is included deliberately. It used to be skipped on the
+    /// theory that the view was already downloading it, but the carousel's own load
+    /// is asynchronous — on device that is exactly what leaves the fronted slide
+    /// showing its placeholder band for the first second after a relaunch (measured
+    /// in device screenshots). It is warmed CONCURRENTLY with the neighbours, never
+    /// serially ahead of them (the original serial version starved them), and
+    /// `hasUsableCachedBackdrop` short-circuits immediately when the art is already
+    /// on disk, so a warm launch costs nothing. Through the shared artwork limiter,
+    /// so this queues behind visible work instead of competing with it.
     private func warmAdjacentArtwork() async {
         guard !items.isEmpty else { return }
-        let neighbours = HeroArtworkWindow
+        let targets = HeroArtworkWindow
             .indices(count: items.count, centeredAt: currentIndex)
-            .dropFirst()
             .map { items[$0] }
-        guard !neighbours.isEmpty else { return }
+        guard !targets.isEmpty else { return }
 
         await withTaskGroup(of: Void.self) { group in
-            for target in neighbours {
+            for target in targets {
                 let references = heroReferences(for: target)
                 guard !references.isEmpty else { continue }
                 group.addTask(priority: .utility) {
