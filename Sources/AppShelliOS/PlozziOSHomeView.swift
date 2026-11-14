@@ -1073,18 +1073,12 @@ struct PlozziOSHomeView: View {
         for item in items {
             guard !Task.isCancelled else { return }
             let references = item.artworkReferences(for: .logo)
-            // Warm the same sources the reveal gate will prepare. This used to warm
-            // only the provider's own logo, so a slide whose wordmark comes from the
-            // TMDb fallback (discovery titles, and anything whose server has no logo)
-            // fetched it on demand once the slide fronted — the reported "some items
-            // load their logo slower than others".
-            let fallback = PlozziOSHeroMetadata.tmdbLogoFallback(for: item)
-            guard !references.isEmpty || fallback != nil else { continue }
-            await HeroLogoPreloader.prepare(
-                references: references,
-                fallback: fallback,
-                policy: artworkPolicy
-            )
+            guard !references.isEmpty else { continue }
+            // References only: asking every slide for its TMDb fallback here issued a
+            // metadata request per slide and held the shared artwork limiter, which
+            // starved the backdrop and Continue Watching prefetches. The fronted
+            // slide still prepares its fallback in the reveal gate.
+            await HeroLogoPreloader.warm(references: references)
         }
     }
 
@@ -3469,10 +3463,12 @@ struct PlozziOSHomeMediaRail: View {
 
     private var artworkPrefetchIdentity: PlozziOSArtworkPrefetchIdentity? {
         guard prefetchesArtwork else { return nil }
-        // Compare retained inputs instead of rebuilding metadata queries for the
-        // entire row during layout. Only the bounded lookahead needs those queries.
+        // Only a changed *row* should cancel and restart the prefetch. Comparing
+        // whole `MediaItem`s restarted it on every progress/played-state publication,
+        // so a silent fold or a return from playback cancelled the artwork that was
+        // about to be swiped to. Per-card `.onAppear` still fills late enrichment.
         return PlozziOSArtworkPrefetchIdentity(
-            items: items,
+            itemIDs: items.map(\.stablePresentationID),
             isPortrait: style == .poster,
             showsSeriesArtwork: showsSeriesArtwork,
             spoilers: appModel.settings.spoilers.settings,
@@ -3606,7 +3602,7 @@ struct PlozziOSHomeMediaRail: View {
 }
 
 private struct PlozziOSArtworkPrefetchIdentity: Equatable {
-    let items: [MediaItem]
+    let itemIDs: [String]
     let isPortrait: Bool
     let showsSeriesArtwork: Bool
     let spoilers: SpoilerSettings
