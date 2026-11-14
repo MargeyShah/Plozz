@@ -572,6 +572,11 @@ public final class ItemDetailViewModel {
     /// Season whose episodes the viewer most recently had on screen; the snapshot
     /// persists that one so a revisit paints the rail immediately.
     @ObservationIgnored private var lastLoadedSeasonID: String?
+    /// Seasons whose episodes came from the on-disk snapshot rather than a live
+    /// fetch. They paint instantly, but the first explicit `loadEpisodes` must
+    /// still refresh them (played state and counts move).
+    @ObservationIgnored private var snapshotSeasonIDs: Set<String> = []
+    private let prefetchesOpeningSeason: Bool
     private nonisolated(unsafe) var streamProbeTask: Task<Void, Never>?
     @ObservationIgnored private var completedStreamProbeKey: String?
     /// The fully-loaded item enrichment is keyed to, so a page returned to (popped
@@ -651,7 +656,11 @@ public final class ItemDetailViewModel {
         relatedTitlesLoader: RelatedTitlesLoader? = nil,
         snapshotCache: DetailSnapshotCache = .ephemeral,
         openingResolver: (@MainActor () async throws -> DetailOpeningResolution)? = nil,
-        localizedDetailMetadataResolver: (@Sendable (MediaItem, String) async -> MetadataEnrichment)? = nil
+        localizedDetailMetadataResolver: (@Sendable (MediaItem, String) async -> MetadataEnrichment)? = nil,
+        /// Prefetch the season the page opens on so its rail does not wait for a
+        /// second request after the season list publishes. Tests that exercise an
+        /// explicit `loadEpisodes` as the first request opt out.
+        prefetchesOpeningSeason: Bool = true
     ) {
         self.relatedTitlesLoader = relatedTitlesLoader
         self.editionOpeningSource = initialItem?.editionOpeningSource
@@ -694,6 +703,7 @@ public final class ItemDetailViewModel {
         self.identitySources = identitySources
         self.snapshotCache = snapshotCache
         self.openingResolver = openingResolver
+        self.prefetchesOpeningSeason = prefetchesOpeningSeason
         self.discoverySeed = isDiscoveryItem ? initialItem : nil
         self.usesDefaultExternalMetadataResolver = externalMetadataResolver == nil
 
@@ -1035,7 +1045,8 @@ public final class ItemDetailViewModel {
                 // starting a second request behind the first. Fire-and-forget: it must
                 // not hold up the publish above, and a superseded page cancels it via
                 // the generation checks inside `loadEpisodes`.
-                if let openingSeasonID = DetailOpeningSelection.openingSeasonID(
+                if prefetchesOpeningSeason,
+                   let openingSeasonID = DetailOpeningSelection.openingSeasonID(
                     children: fetchedChildren,
                     resumeSeasonID: serverResumeEpisode?.seasonID
                 ) {
@@ -1636,6 +1647,17 @@ public final class ItemDetailViewModel {
             provider: provider,
             sourceGeneration: sourceGeneration
         )
+        // The early start is an overlap, not a detached fire-and-forget: the page
+        // still settles only when the metadata it was waiting for has been applied.
+        // Without awaiting it, `load()` returned before cast/studios arrived (so a
+        // caller saw a half-enriched item), and cancelling `load()` no longer
+        // cancelled the fetch, letting late crew publish onto a page that had gone.
+        let metadata = detailMetadataTask
+        await withTaskCancellationHandler {
+            await metadata?.value
+        } onCancel: {
+            metadata?.cancel()
+        }
         _ = await trailersDone
         _ = await ratingsDone
         _ = await extrasDone
@@ -2599,7 +2621,8 @@ public final class ItemDetailViewModel {
                 let previousAttemptFailed = seasonLoadFailures.contains(seasonID)
                 if !needsForcedRefresh,
                    seasonEpisodes[seasonID] != nil,
-                   !previousAttemptFailed {
+                   !previousAttemptFailed,
+                   !snapshotSeasonIDs.contains(seasonID) {
                     return
                 }
                 let token = UUID()
@@ -2636,6 +2659,7 @@ public final class ItemDetailViewModel {
                         self.seasonLoadFailures.remove(seasonID)
                     }
                     self.seasonEpisodes[seasonID] = self.stampSeriesTMDb(into: episodes.map(self.tagged))
+                    self.snapshotSeasonIDs.remove(seasonID)
                     self.persistSnapshot()
                 }
                 seasonLoads[seasonID] = load
@@ -2906,6 +2930,7 @@ public final class ItemDetailViewModel {
             seasonEpisodes[openingSeasonID] = episodes
                 .prefix(Self.maxRestoredEpisodesPerSeason)
                 .map(tagged)
+            snapshotSeasonIDs.insert(openingSeasonID)
         }
         if snapshot.sources.count > 1 {
             let restored = prunedToActiveAccounts(snapshot.sources)
@@ -2990,6 +3015,22 @@ public final class ItemDetailViewModel {
                   let upcomingSchedule = snapshot.upcomingSchedule {
             detail.upcomingSchedule = upcomingSchedule
             state = .loaded(detail)
+        }
+        // The live item can beat the disk read, in which case the restore takes the
+        // "adopt enrichments" path above and the rail stayed empty until the live
+        // season fetch landed — the placeholder pass a revisit should never show.
+        // Fill the opening season from the snapshot when the live load has not
+        // already produced one; bounded exactly like `applySnapshot`.
+        if seasonEpisodes.isEmpty,
+           let openingSeasonID = DetailOpeningSelection.openingSeasonID(
+               children: state.value?.children ?? snapshot.children,
+               resumeSeasonID: serverResumeEpisode?.seasonID
+           ),
+           let episodes = snapshot.seasonEpisodes[openingSeasonID] {
+            seasonEpisodes[openingSeasonID] = episodes
+                .prefix(Self.maxRestoredEpisodesPerSeason)
+                .map(tagged)
+            snapshotSeasonIDs.insert(openingSeasonID)
         }
         if sources.count <= 1, snapshot.sources.count > 1 {
             let restored = prunedToActiveAccounts(snapshot.sources)

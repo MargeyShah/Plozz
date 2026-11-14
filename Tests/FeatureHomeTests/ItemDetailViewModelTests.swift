@@ -3722,7 +3722,9 @@ final class ItemDetailViewModelTests: XCTestCase {
             "show": [season("s1", "Book One: Water")],
             "s1": [episode("e1", number: 1), episode("e2", number: 2)]
         ]
-        let vm = ItemDetailViewModel(provider: provider, itemID: "show")
+        let vm = ItemDetailViewModel(
+            provider: provider, itemID: "show", prefetchesOpeningSeason: false
+        )
         await vm.load()
 
         XCTAssertNil(vm.episodes(for: "s1"))
@@ -4164,7 +4166,8 @@ final class ItemDetailViewModelTests: XCTestCase {
             sourceAccountID: "acct-9",
             onlineTrailerResolver: { _ in [] },
             playableVideoIDResolver: { _ in nil },
-            trailerCache: TrailerResolutionCache()
+            trailerCache: TrailerResolutionCache(),
+            prefetchesOpeningSeason: false
         )
 
         await vm.load()
@@ -4702,7 +4705,7 @@ final class ItemDetailViewModelTests: XCTestCase {
                        "Enabled cross-server source must remain in the restored picker")
     }
 
-    func testSnapshotEpisodesStayHiddenUntilLiveSeasonLoadCompletes() async {
+    func testSnapshotEpisodesPaintImmediatelyAndLiveLoadReplacesThem() async {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("plozz-watch-refresh-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -4733,13 +4736,18 @@ final class ItemDetailViewModelTests: XCTestCase {
             provider: provider,
             itemID: show.id,
             sourceAccountID: "share",
-            snapshotCache: cache
+            snapshotCache: cache,
+            prefetchesOpeningSeason: false
         )
         await vm.load()
         try? await Task.sleep(for: .milliseconds(100))
-        XCTAssertNil(
-            vm.episodes(for: seasonItem.id),
-            "A stale snapshot must not paint an episode rail that will change after arrival"
+        // A revisit paints the cached rail immediately: withholding it until the
+        // live season fetch lands is exactly the placeholder pass the viewer
+        // reported on every reopen. The snapshot's played state may be a moment
+        // stale, and the live load below replaces it.
+        XCTAssertEqual(
+            vm.episodes(for: seasonItem.id)?.map(\.id), [staleEpisode.id],
+            "A revisited series must paint its cached rail instead of a placeholder"
         )
 
         await vm.loadEpisodes(for: seasonItem.id)
@@ -5045,7 +5053,8 @@ final class ItemDetailViewModelTests: XCTestCase {
         let vm = ItemDetailViewModel(
             provider: provider, itemID: "showA", sourceAccountID: "jelly",
             initialSources: sources,
-            alternateProviderResolver: { _ in provider }
+            alternateProviderResolver: { _ in provider },
+            prefetchesOpeningSeason: false
         )
 
         await vm.load()
