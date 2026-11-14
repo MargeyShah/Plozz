@@ -155,6 +155,7 @@ struct PlozziOSHomeView: View {
     @Environment(\.plozziOSIsRunningOnMac) private var isRunningOnMac
     @Environment(\.plozziOSHomeIsFrontmost) private var homeIsFrontmost
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.plozzArtworkPolicy) private var artworkPolicy
     @Environment(\.locale) private var locale
     @Environment(HeroTrailerController.self) private var trailerController
     private let viewModel: HomeViewModel
@@ -1072,8 +1073,18 @@ struct PlozziOSHomeView: View {
         for item in items {
             guard !Task.isCancelled else { return }
             let references = item.artworkReferences(for: .logo)
-            guard !references.isEmpty else { continue }
-            await HeroLogoPreloader.warm(references: references)
+            // Warm the same sources the reveal gate will prepare. This used to warm
+            // only the provider's own logo, so a slide whose wordmark comes from the
+            // TMDb fallback (discovery titles, and anything whose server has no logo)
+            // fetched it on demand once the slide fronted — the reported "some items
+            // load their logo slower than others".
+            let fallback = PlozziOSHeroMetadata.tmdbLogoFallback(for: item)
+            guard !references.isEmpty || fallback != nil else { continue }
+            await HeroLogoPreloader.prepare(
+                references: references,
+                fallback: fallback,
+                policy: artworkPolicy
+            )
         }
     }
 
