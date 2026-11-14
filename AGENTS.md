@@ -47,6 +47,12 @@ behavior, check affected platforms and providers, and expand coverage when the
 evidence requires it. Do not describe a focused run, skipped test, or missing
 result as a full pass.
 
+For observing real behaviour on a simulator or a physical device — log capture,
+frame recording, in-app presentation diagnostics, and which paths need a human —
+follow [agent device debugging](docs/agent-device-debugging.md). It records the
+constraints (locked devices, unavailable screen recording, ~2.4 s screenshots) and
+the rule that transient states are gated on data, never on timers.
+
 For performance work, measure the real workload before and after under comparable
 conditions. Explain CPU, memory, I/O, and cancellation tradeoffs; a benchmark must
 complete its intended work to count. Use the

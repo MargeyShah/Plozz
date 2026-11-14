@@ -78,6 +78,25 @@ docs/ tools/
 
 Do not add ad-hoc foreground/background refresh logic to view bodies.
 
+### Never hide a transient state behind a wall-clock delay
+
+A loading affordance must be chosen from **known state**, not from "has it been
+long enough". Delays are untestable (they depend on network and device speed),
+they behave differently on the same build, and they turn a deterministic rule
+into a threshold nobody can verify. Two concrete cases:
+
+- The Home skeleton paints only when no snapshot exists to restore
+  (`hasPersistedSnapshot == false`); it is not armed after N milliseconds.
+- The detail episode rail paints its skeleton only when the viewer explicitly
+  switched season (`hasExplicitSeasonSelection`) and those episodes are not in
+  hand yet. A page's first load holds the rail's geometry and fills it in place.
+
+Both of these previously shipped with `Task.sleep` graces (250 ms, 2 s, 6 s).
+Each one produced a measured failure that a state rule does not: the skeleton
+still appeared whenever the real fetch outran the delay. If a transient state
+needs to be hidden, hide it while the *data* says it is provisional, not while a
+timer says so.
+
 ## Tests
 
 - Use named constants or shared fixtures for repeated test values, thresholds,
