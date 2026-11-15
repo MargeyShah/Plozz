@@ -49,6 +49,9 @@ jobs:
       - name: UI loading-state guard regression tests
         run: python3 -m unittest discover -s tools/tests -p 'test_ui_state_guard.py'
 
+      - name: Device timing-diff regression tests
+        run: python3 -m unittest discover -s tools/tests -p 'test_device_timing_diff.py'
+
       - name: CI shard partition guard
         run: |
           python3 tools/ci-shards.py package --count 3 --verify

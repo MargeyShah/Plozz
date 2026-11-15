@@ -114,6 +114,21 @@ tools/install-verified.sh <UDID> <path>/Plozz.app --force
 Installs need the device awake, and installing mid-measurement invalidates the
 run you are in — finish the capture first.
 
+**Installed-app Home timing diff:** the TestFlight app and the self-build are
+separate bundle identifiers, so both can stay installed. They emit the same
+`PLZBOOT HomeVM`/`HomeAgg` telemetry when launched with `PLZBOOT_STDOUT=1`; the
+runner launches each one, timestamps the console stream and writes a Markdown
+report plus raw JSON:
+
+```sh
+python3 tools/device-timing-diff.py --device <UDID> --runs 3
+```
+
+Pass `--self-build-configuration Release` when the self-build is optimized, and
+compare like configurations. Wall offsets include CoreDevice launch overhead;
+the app-side `HomeAgg`/row milliseconds are the better comparison. Latest
+measurements: [`docs/measurements/device-home-timing.md`](measurements/device-home-timing.md).
+
 **What is not available:** screen recording (`CoreDeviceError 1001 — Screen
 Recording capability not supported`), and `idevicescreenshot` from
 libimobiledevice cannot see the device (pairing mismatch). Budget ~2.4 s per
