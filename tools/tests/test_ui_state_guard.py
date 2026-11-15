@@ -88,6 +88,12 @@ class UILoadingStateGuardTests(unittest.TestCase):
         self.assertIn("ignoresGlobalCover: surfaceRole == .detail", hero)
         self.assertIn("let width = ignoresGlobalCover", hero)
         self.assertIn("? proxy.size.width", hero)
+        # The production detail page must not prefetch the opening season's
+        # episodes during the push; the rail loads when it is shown (upstream).
+        environment = (ROOT / "Sources/FeatureHomeCore/DetailOpenEnvironment.swift").read_text()
+        self.assertIn("prefetchesOpeningSeason: false", environment)
+        view_model = (ROOT / "Sources/FeatureHomeCore/ItemDetailViewModel.swift").read_text()
+        self.assertIn("prefetchesOpeningSeason: Bool = false", view_model)
 
     def test_allows_reserved_placeholder(self) -> None:
         path = self.write("Rail.swift", """

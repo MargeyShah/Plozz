@@ -676,10 +676,10 @@ public final class ItemDetailViewModel {
         snapshotCache: DetailSnapshotCache = .ephemeral,
         openingResolver: (@MainActor () async throws -> DetailOpeningResolution)? = nil,
         localizedDetailMetadataResolver: (@Sendable (MediaItem, String) async -> MetadataEnrichment)? = nil,
-        /// Prefetch the season the page opens on so its rail does not wait for a
-        /// second request after the season list publishes. Tests that exercise an
-        /// explicit `loadEpisodes` as the first request opt out.
-        prefetchesOpeningSeason: Bool = true
+        /// Opt-in: prefetch the season the page opens on. Off by default — the
+        /// rail loads when it is actually shown, matching upstream lazy loading;
+        /// eager prefetch competed with the page's first paint during the push.
+        prefetchesOpeningSeason: Bool = false
     ) {
         self.relatedTitlesLoader = relatedTitlesLoader
         self.editionOpeningSource = initialItem?.editionOpeningSource
