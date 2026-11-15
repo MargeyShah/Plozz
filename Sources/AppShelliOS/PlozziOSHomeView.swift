@@ -3353,7 +3353,6 @@ private struct PlozziOSFeaturedCollectionRail: View {
                     appModel.accountsProviders.provider(forAccountID: $0)
                 }
             )
-            .mediaArtworkZoomDestination(route.source)
         }
         .navigationDestination(item: $selection) { item in
             PlozziOSHomeCardDetail(
