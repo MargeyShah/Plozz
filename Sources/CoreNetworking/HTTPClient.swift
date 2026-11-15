@@ -177,9 +177,13 @@ enum HTTPDecodeDiagnostics {
 /// `URLSession`-backed `HTTPClient`.
 public struct URLSessionHTTPClient: HTTPClient {
     private let session: URLSession
+    /// Stable identity of this transport lane, used only in the coalescing key
+    /// so sessions with different timeouts/pools never share a transfer.
+    private let lane: String
 
     public init(session: URLSession = .plozzDefault) {
         self.session = session
+        self.lane = String(UInt(bitPattern: ObjectIdentifier(session)))
     }
 
     public func send(_ endpoint: Endpoint, baseURL: URL) async throws -> (Data, HTTPURLResponse) {
@@ -211,10 +215,29 @@ public struct URLSessionHTTPClient: HTTPClient {
         try OfflineMode.shared.requireNetworkAccess()
         var request = try Self.makeRequest(endpoint, baseURL: baseURL)
         let started = HTTPResponseDiagnostics.isCapturing ? ProcessInfo.processInfo.systemUptime : nil
+        let ledgerStarted = NetworkLedger.isEnabled ? ProcessInfo.processInfo.systemUptime : nil
         var capturedStatus: Int?
         var capturedNetworkCode: Int?
         var capturedBytes = 0
         var capturedFormat = PlaybackFailureDiagnostic.Format.unknown
+        var joinedSharedTransfer = false
+        defer {
+            if let ledgerStarted {
+                NetworkLedger.emit(NetworkLedger.makeLine(
+                    method: endpoint.method.rawValue,
+                    path: endpoint.redactsURLForLogging ? "<private>" : endpoint.path,
+                    status: capturedStatus,
+                    milliseconds: Int((ProcessInfo.processInfo.systemUptime - ledgerStarted) * 1_000),
+                    bytes: capturedBytes,
+                    coalesced: joinedSharedTransfer,
+                    route: HTTPResponseDiagnostics.effectiveRoute.rawValue,
+                    query: endpoint.redactsURLForLogging
+                        ? ""
+                        : NetworkLedger.querySummary(endpoint.queryItems),
+                    error: capturedNetworkCode
+                ))
+            }
+        }
         defer {
             if let started {
                 HTTPResponseDiagnostics.recordRequest(ResponseRequestDiagnostic(
@@ -260,6 +283,31 @@ public struct URLSessionHTTPClient: HTTPClient {
                 }
                 try Task.checkCancellation()
                 (data, response) = (receivedData, received)
+            } else if endpoint.method == .get,
+                      endpoint.allowsAutomaticAddressRetry,
+                      !endpoint.reportsUndeliveredRequests,
+                      let url = request.url {
+                // Identical in-flight GETs share one transfer. Headers are part
+                // of the key, so a different token/user never sees this response.
+                // Delivery evidence is excluded above: a caller that must prove
+                // its own request reached HTTP cannot join someone else's.
+                let key = HTTPRequestCoalescer.Key(
+                    method: endpoint.method.rawValue,
+                    url: url.absoluteString,
+                    headers: Self.coalescingHeaderFingerprint(endpoint.headers),
+                    lane: lane
+                )
+                let boxedDelegate = UncheckedSendableDelegate(delegate: delegate)
+                let boxedRequest = request
+                let session = self.session
+                let shared = try await HTTPRequestCoalescer.shared.perform(key: key) {
+                    let (body, response) = try await session.data(
+                        for: boxedRequest, delegate: boxedDelegate.delegate
+                    )
+                    return HTTPRequestCoalescer.Payload(data: body, response: response)
+                }
+                (data, response) = (shared.payload.data, shared.payload.response)
+                joinedSharedTransfer = shared.joined
             } else {
                 (data, response) = try await session.data(for: request, delegate: delegate)
             }
@@ -312,6 +360,15 @@ public struct URLSessionHTTPClient: HTTPClient {
         return (data, http)
     }
 
+    /// Stable, in-memory-only fingerprint of the headers that determine the
+    /// response. Used solely as part of the coalescing key; never logged.
+    static func coalescingHeaderFingerprint(_ headers: [String: String]) -> String {
+        headers
+            .map { "\($0.key.lowercased())=\($0.value)" }
+            .sorted()
+            .joined(separator: "\n")
+    }
+
     static func makeRequest(_ endpoint: Endpoint, baseURL: URL) throws -> URLRequest {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             throw AppError.invalidResponse
@@ -346,6 +403,13 @@ public struct URLSessionHTTPClient: HTTPClient {
             return .serverUnreachable
         }
     }
+}
+
+/// Carries a `URLSessionTaskDelegate` into the coalescer's unstructured task.
+/// The delegates in this file are already `@unchecked Sendable`; this only
+/// bridges the existential's missing `Sendable` conformance.
+private struct UncheckedSendableDelegate: @unchecked Sendable {
+    let delegate: (any URLSessionTaskDelegate)?
 }
 
 final class NoHTTPRedirectDelegate: HTTPDeliveryTaskDelegate, @unchecked Sendable {

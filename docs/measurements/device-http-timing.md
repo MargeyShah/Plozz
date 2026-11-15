@@ -53,3 +53,30 @@ gap. A matched TestFlight build of this exact commit (same bundle/session) is
 the remaining experiment; it requires the release/TestFlight credentials.
 
 The HTTP timing line was temporary and is not in the shipped build.
+
+## Per-transfer ledger (`PLZNET_STDOUT`)
+
+The transport now emits one line per HTTP transfer when the process is launched
+with `PLZNET_STDOUT=1`:
+
+```
+PLZNET GET path=/Users/<id>/Items status=200 ms=346 bytes=560 coalesced=0 \
+  route=collectionCandidates q=ParentId=9d7ad6af…,IncludeItemTypes=BoxSet,Limit=1,StartIndex=0
+```
+
+`ms` is the caller-visible transfer time, `coalesced=1` marks a caller that
+joined an identical in-flight GET instead of issuing its own, and `q` is a
+bounded summary of shape-defining query parameters (long id lists truncated,
+tokens never included). Capture it with:
+
+```
+xcrun devicectl device process launch --device <udid> --console \
+  --terminate-existing -e '{"PLZNET_STDOUT":"1","PLZBOOT_STDOUT":"1"}' \
+  <bundle-id>
+```
+
+Read it next to `HomeAgg.rowReady`: the row line says how long a row took, the
+ledger says which transfers composed it. The first device capture on 6313.9
+showed the collection-existence probe at 346 ms (down from 701 ms after
+dropping sort/fields/artwork) and `libraries` publishing at 347–484 ms instead
+of waiting ~700 ms.
