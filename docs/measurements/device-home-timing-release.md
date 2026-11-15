@@ -1,6 +1,6 @@
 # Device Home-load timing diff
 
-Captured **2026-11-15 06:19 UTC** from iPhone 17 Pro Max with `python3 tools/device-timing-diff.py --runs 5`.
+Captured **2026-11-15 06:32 UTC** from iPhone 17 Pro Max with `python3 tools/device-timing-diff.py --runs 5`.
 
 Both apps were launched with `PLZBOOT_STDOUT=1`, which mirrors the same `HomeVM` / `HomeAgg` telemetry the app already emits. Wall times start immediately before `devicectl`; app-side row times are the app's own millisecond measurements from `HomeVM.load START`.
 
@@ -12,33 +12,33 @@ Both apps were launched with `PLZBOOT_STDOUT=1`, which mirrors the same `HomeVM`
 
 | Metric | Median | Min | Max |
 | --- | ---: | ---: | ---: |
-| Launch → first telemetry | 721.2 ms | 641.4 ms | 984.9 ms |
-| Launch → Home load start | 915.3 ms | 828.1 ms | 1146.7 ms |
-| Launch → Home load done | 3184.0 ms | 3059.7 ms | 3505.5 ms |
-| App-side aggregate | 1562 ms | 1475 ms | 1759 ms |
-| `recentlyAdded` ready | 442 ms | 412 ms | 754 ms |
-| `libraries` ready | 442 ms | 412 ms | 754 ms |
-| `watchlist` ready | 683 ms | 597 ms | 950 ms |
-| `continueWatching` ready | 1562 ms | 1475 ms | 1759 ms |
+| Launch → first telemetry | 1168.6 ms | 709.2 ms | 1558.6 ms |
+| Launch → Home load start | 1369.0 ms | 918.1 ms | 1796.9 ms |
+| Launch → Home load done | 3849.0 ms | 3386.1 ms | 4067.3 ms |
+| App-side aggregate | 1690 ms | 1565 ms | 1988 ms |
+| `recentlyAdded` ready | 532 ms | 427 ms | 560 ms |
+| `libraries` ready | 532 ms | 427 ms | 560 ms |
+| `watchlist` ready | 705 ms | 612 ms | 788 ms |
+| `continueWatching` ready | 1690 ms | 1565 ms | 1914 ms |
 
 Observed states: `loaded, loaded, loaded, loaded, loaded`; silent refresh: `true, true, true, true, true`; accounts: `1`.
 
 ## Plozz Self-build
 
 - Bundle: `com.thatcube.Plozz.selfbuild`
-- Installed build: `2026.11.12 6296.1`
+- Installed build: `2026.11.12 6297.1`
 - Samples: 5
 
 | Metric | Median | Min | Max |
 | --- | ---: | ---: | ---: |
-| Launch → first telemetry | 742.9 ms | 692.6 ms | 892.8 ms |
-| Launch → Home load start | 996.0 ms | 887.1 ms | 1100.6 ms |
-| Launch → Home load done | 4024.3 ms | 3696.3 ms | 4263.7 ms |
-| App-side aggregate | 2418 ms | 2045 ms | 2583 ms |
-| `recentlyAdded` ready | 776 ms | 609 ms | 1177 ms |
-| `libraries` ready | 776 ms | 609 ms | 1177 ms |
-| `watchlist` ready | 818 ms | 742 ms | 1141 ms |
-| `continueWatching` ready | 2417 ms | 2045 ms | 2583 ms |
+| Launch → first telemetry | 1461.0 ms | 696.9 ms | 1652.9 ms |
+| Launch → Home load start | 1695.2 ms | 968.4 ms | 1854.4 ms |
+| Launch → Home load done | 4931.8 ms | 3808.6 ms | 5031.7 ms |
+| App-side aggregate | 2610 ms | 2034 ms | 2679 ms |
+| `recentlyAdded` ready | 909 ms | 702 ms | 1094 ms |
+| `libraries` ready | 909 ms | 702 ms | 1094 ms |
+| `watchlist` ready | 909 ms | 873 ms | 1062 ms |
+| `continueWatching` ready | 2610 ms | 2034 ms | 2679 ms |
 
 Observed states: `loaded, loaded, loaded, loaded, loaded`; silent refresh: `true, true, true, true, true`; accounts: `1`.
 
@@ -48,14 +48,14 @@ Positive values mean the self-build was slower on this run. The self-build is a 
 
 | Metric | TestFlight | Self-build | Delta |
 | --- | ---: | ---: | ---: |
-| Launch → first telemetry | 721.2 ms | 742.9 ms | 21.7 ms |
-| Launch → Home load start | 915.3 ms | 996.0 ms | 80.7 ms |
-| Launch → Home load done | 3184.0 ms | 4024.3 ms | 840.2 ms |
-| App-side aggregate | 1562 ms | 2418 ms | 856 ms |
-| `recentlyAdded` ready | 442 ms | 776 ms | 334 ms |
-| `libraries` ready | 442 ms | 776 ms | 334 ms |
-| `watchlist` ready | 683 ms | 818 ms | 135 ms |
-| `continueWatching` ready | 1562 ms | 2417 ms | 855 ms |
+| Launch → first telemetry | 1168.6 ms | 1461.0 ms | 292.4 ms |
+| Launch → Home load start | 1369.0 ms | 1695.2 ms | 326.2 ms |
+| Launch → Home load done | 3849.0 ms | 4931.8 ms | 1082.8 ms |
+| App-side aggregate | 1690 ms | 2610 ms | 920 ms |
+| `recentlyAdded` ready | 532 ms | 909 ms | 377 ms |
+| `libraries` ready | 532 ms | 909 ms | 377 ms |
+| `watchlist` ready | 705 ms | 909 ms | 204 ms |
+| `continueWatching` ready | 1690 ms | 2610 ms | 920 ms |
 
 ## Method notes
 
