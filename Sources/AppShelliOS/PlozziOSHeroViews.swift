@@ -1854,6 +1854,11 @@ private struct PlozziOSStableHomeHeroMetadata: View {
     let ratingPreferences: DetailPageSettings
     let scheduleLine: LocalizedStringResource?
     let logoFallback: HeroLogoFallback?
+    /// The logo choice locked when the foreground was prepared. A late
+    /// enrichment pass must not replace a visible title with a wordmark (or a
+    /// wordmark with a different one); that is the clear-text flicker.
+    var logoReferencesOverride: [ArtworkReference]? = nil
+    var logoFallbackOverride: HeroLogoFallback?? = nil
     let textSize: HeroTextSize
     @State private var descriptionText: String?
 
@@ -1865,6 +1870,8 @@ private struct PlozziOSStableHomeHeroMetadata: View {
         ratingPreferences: DetailPageSettings,
         scheduleLine: LocalizedStringResource?,
         logoFallback: HeroLogoFallback?,
+        logoReferencesOverride: [ArtworkReference]? = nil,
+        logoFallbackOverride: HeroLogoFallback?? = nil,
         textSize: HeroTextSize
     ) {
         self.presentation = presentation
@@ -1874,6 +1881,8 @@ private struct PlozziOSStableHomeHeroMetadata: View {
         self.ratingPreferences = ratingPreferences
         self.scheduleLine = scheduleLine
         self.logoFallback = logoFallback
+        self.logoReferencesOverride = logoReferencesOverride
+        self.logoFallbackOverride = logoFallbackOverride
         self.textSize = textSize
         _descriptionText = State(
             initialValue: HeroContentPolicy.homeDescription(for: presentation)
@@ -1888,7 +1897,8 @@ private struct PlozziOSStableHomeHeroMetadata: View {
             displayedArtworkID: displayedArtworkID,
             hidesRatings: hidesRatings,
             scheduleLine: scheduleLine,
-            logoFallback: logoFallback,
+            logoFallback: logoFallbackOverride ?? logoFallback,
+            logoReferencesOverride: logoReferencesOverride,
             descriptionOverride: .init(text: descriptionText),
             detailPageSettings: ratingPreferences,
             textSize: textSize
@@ -1955,6 +1965,12 @@ struct PlozziOSHomeHeroForeground: View {
     /// the column waits for the logo it is going to draw and then fades in once, so
     /// the slowest piece sets the moment for all of them.
     @State private var foregroundReady = false
+    /// The logo/text choice this slide revealed with. Freezing it prevents a
+    /// late enrichment logo from swapping a visible title (or a wordmark) for
+    /// something else while the viewer is looking at the hero.
+    @State private var frozenLogoChoice = false
+    @State private var frozenLogoReferences: [ArtworkReference] = []
+    @State private var frozenLogoFallback: HeroLogoFallback?
 
     let item: MediaItem
     let detailItem: MediaItem
@@ -1992,7 +2008,11 @@ struct PlozziOSHomeHeroForeground: View {
                 ),
                 ratingPreferences: appModel.settings.hero.settings.ratingPreferences,
                 scheduleLine: resolvedScheduleLine,
-                logoFallback: PlozziOSHeroMetadata.tmdbLogoFallback(for: item),
+                logoFallback: frozenLogoChoice
+                    ? frozenLogoFallback
+                    : PlozziOSHeroMetadata.tmdbLogoFallback(for: item),
+                logoReferencesOverride: frozenLogoChoice ? frozenLogoReferences : nil,
+                logoFallbackOverride: frozenLogoChoice ? .some(frozenLogoFallback) : nil,
                 textSize: appModel.settings.hero.settings.textSize
             )
             .environment(\.metadataTextScale, appModel.settings.hero.settings.textSize.scale)
@@ -2025,6 +2045,16 @@ struct PlozziOSHomeHeroForeground: View {
         // returned-to hero never spends a frame at zero opacity.
         .opacity(foregroundReady || HeroForegroundReadiness.isPrepared(foregroundReadinessKey) ? 1 : 0)
         .task(id: foregroundReadinessKey) {
+            // Lock the logo/text choice on the first pass, before the reveal.
+            // A later enrichment pass can add a clearer logo, but replacing the
+            // wordmark (or the visible title) after it is on screen reads as a
+            // clear-text flicker.
+            let sources = logoSources
+            if !frozenLogoChoice {
+                frozenLogoChoice = true
+                frozenLogoReferences = sources.references
+                frozenLogoFallback = sources.fallback
+            }
             // Returning from a detail page recreates this view, so the gate ran again and
             // faded an already-prepared slide in from transparent — a visible redraw on
             // every pop. A slide whose logo is already prepared reveals immediately, no
@@ -2037,7 +2067,6 @@ struct PlozziOSHomeHeroForeground: View {
             // the badge is part of the same first frame and fade as the wordmark. A
             // genuinely unknown schedule still resolves later and fades in on its own.
             await scheduleLines?.loadCached([detailItem, item])
-            let sources = logoSources
             let hasAnySource = !sources.references.isEmpty || sources.fallback != nil
             guard hasAnySource else {
                 HeroForegroundReadiness.markPrepared(foregroundReadinessKey)
@@ -2888,6 +2917,10 @@ struct PlozziOSHeroMetadata: View {
     /// visibly on a discovery item, which comes from Seerr/TMDb and so has no
     /// provider logo at all, while TMDb itself usually has one.
     var logoFallback: HeroLogoFallback? = nil
+    /// A selected Home slide freezes the logo choice it revealed with. Later
+    /// enrichment can add a clearer wordmark, but swapping the visible title for
+    /// it after the reveal is the clear-text flicker; the frozen choice wins.
+    var logoReferencesOverride: [ArtworkReference]? = nil
     /// A selected Home slide freezes its first fully prepared description. Later
     /// payload refreshes may update other chrome, but must not replace a visible
     /// overview with a newly arrived tagline.
@@ -2969,7 +3002,7 @@ struct PlozziOSHeroMetadata: View {
                         isRunningOnMac: isRunningOnMac && mode == .home
                     )
                     HeroLogoArtwork(
-                        references: titlePresentation.logoReferences,
+                        references: logoReferencesOverride ?? titlePresentation.logoReferences,
                         asyncFallbackURL: logoFallback,
                         displayedArtworkID: displayedArtworkID ?? presentation.itemID,
                         maxWidth: logoBox.width,

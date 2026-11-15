@@ -88,6 +88,10 @@ class UILoadingStateGuardTests(unittest.TestCase):
         self.assertIn("ignoresGlobalCover: surfaceRole == .detail", hero)
         self.assertIn("let width = ignoresGlobalCover", hero)
         self.assertIn("? proxy.size.width", hero)
+        # The Home hero must not swap a visible title/wordmark for a late logo
+        # after enrichment; that reads as clear-text flickering/competing slides.
+        self.assertIn("frozenLogoChoice", hero)
+        self.assertIn("logoReferencesOverride: frozenLogoChoice ? frozenLogoReferences : nil", hero)
         # The production detail page must not prefetch the opening season's
         # episodes during the push; the rail loads when it is shown (upstream).
         environment = (ROOT / "Sources/FeatureHomeCore/DetailOpenEnvironment.swift").read_text()
