@@ -520,8 +520,19 @@ struct PlozziOSHomeView: View {
                 }
                 var seen = Set<String>()
                 var items: [MediaItem] = []
-                for candidate in content.latest + content.watchlist + content.continueWatching
-                    where isFullPage(candidate)
+                var rowItems: [MediaItem] = []
+                for group in content.librarySections {
+                    for section in group.sections {
+                        rowItems.append(contentsOf: section.items)
+                    }
+                }
+                let serverItems: [MediaItem] = content.serverRows.flatMap { row in row.items }
+                let collectionItems: [MediaItem] = content.collectionRows.flatMap { row in row.items }
+                let candidates: [MediaItem] = content.latest + content.watchlist
+                    + content.continueWatching + rowItems + serverItems + collectionItems
+                for candidate in candidates.sorted(by: { lhs, rhs in
+                    (lhs.kind == .movie ? 0 : 1) < (rhs.kind == .movie ? 0 : 1)
+                }) where isFullPage(candidate)
                     && seen.insert(candidate.stablePresentationID).inserted {
                     items.append(candidate)
                 }
@@ -3693,7 +3704,7 @@ struct PlozziOSHomeMediaCard: View {
             } else if provider != nil || !appModel.accountsProviders.resolvedActiveAccounts.isEmpty {
                 MediaArtworkZoomLink(
                     id: item.stablePresentationID,
-                    usesZoom: isLandscape
+                    usesZoom: false
                 ) {
                     PlozziOSHomeCardDetail(
                         item: item, fallbackProvider: provider

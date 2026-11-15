@@ -62,7 +62,26 @@ public final class ItemDetailViewModel {
         public var serverResumeEpisode: MediaItem?
     }
 
-    public private(set) var state: LoadState<Detail> = .idle
+    public private(set) var state: LoadState<Detail> = .idle {
+        didSet {
+            guard FanoutDiagnostics.isEnabled, case let .loaded(detail) = state else { return }
+            FanoutDiagnostics.emit(
+                "DETAILSTATE t=\(Int(ProcessInfo.processInfo.systemUptime * 1000)) "
+                    + "id=\(detail.item.id) kind=\(detail.item.kind.rawValue) "
+                    + "active=\(activeItemID) source=\(activeSourceAccountID ?? "-") "
+                    + "children=\(detail.children.count) sources=\(sources.count) "
+                    + "discovery=\(isDiscoveryItem)"
+            )
+        }
+    }
+    /// Publishes a settled detail only when it actually differs. Several load
+    /// paths assigned `.loaded` twice in the same millisecond (measured on device),
+    /// which re-rendered the whole hero for an identical value.
+    private func publish(_ detail: Detail) {
+        guard state.value != detail else { return }
+        state = .loaded(detail)
+    }
+
     /// True while a cached detail page is being read back from disk. The read is
     /// off-actor, so it always lands a turn or two after the first frame; surfaces
     /// that gate on "no content yet" use this to hold instead of flashing a
@@ -730,7 +749,7 @@ public final class ItemDetailViewModel {
                       episode.sourceAccountID == self.activeSourceAccountID else { return nil }
                 return episode
             }
-            self.state = .loaded(Detail(item: seeded, children: [], serverResumeEpisode: resume))
+            self.publish(Detail(item: seeded, children: [], serverResumeEpisode: resume))
         }
     }
 
@@ -799,12 +818,12 @@ public final class ItemDetailViewModel {
             }
         }
         if isDiscoveryItem, let discoverySeed {
-            state = .loaded(Detail(item: discoverySeed, children: []))
+            publish(Detail(item: discoverySeed, children: []))
         } else if var detail = state.value, let nativeDetailItem,
                   nativeDetailItem.id == activeItemID,
                   nativeDetailItem.sourceAccountID == activeSourceAccountID {
             detail.item = tagged(nativeDetailItem)
-            state = .loaded(detail)
+            publish(detail)
         } else {
             state = .loading
         }
@@ -831,7 +850,7 @@ public final class ItemDetailViewModel {
                 initialSources = resolved.sources
                 self.openingResolver = nil
                 openingItem = resolved.item
-                state = .loaded(Detail(
+                publish(Detail(
                     item: resolved.item, children: [], serverResumeEpisode: resolved.resumeEpisode
                 ))
             } catch {
@@ -963,7 +982,7 @@ public final class ItemDetailViewModel {
             startDetailMetadataEnrichment(for: item, sourceGeneration: loadSourceGeneration)
 
             if item.kind == .collection {
-                state = .loaded(Detail(
+                publish(Detail(
                     item: taggedItem,
                     children: state.value?.children ?? [],
                     collectionMembersState: .loading
@@ -999,7 +1018,7 @@ public final class ItemDetailViewModel {
                 // exactly as it already does for a seeded open — so an empty-children
                 // first paint is safe and never strands the season picker.
                 let seededChildren = state.value?.children ?? []
-                state = .loaded(Detail(
+                publish(Detail(
                     item: taggedItem,
                     children: seededChildren,
                     childrenLoaded: state.value?.childrenLoaded ?? false,
@@ -1029,7 +1048,7 @@ public final class ItemDetailViewModel {
                 )
                 let fetchedChildren = await fetchChildren(loadProvider, of: item.id)
                 guard !Task.isCancelled, isCurrent() else { return }
-                state = .loaded(Detail(
+                publish(Detail(
                     item: tagged(state.value?.item ?? taggedItem),
                     children: fetchedChildren.map(tagged),
                     childrenLoaded: true,
@@ -1074,7 +1093,7 @@ public final class ItemDetailViewModel {
                 // Leaf kinds (movie/episode/video): the hero IS the content, so
                 // publish it immediately, then load trailers/ratings off the
                 // critical path of first paint.
-                state = .loaded(Detail(
+                publish(Detail(
                     item: taggedItem,
                     children: [],
                     childrenLoaded: true,
@@ -1128,7 +1147,7 @@ public final class ItemDetailViewModel {
                 state = .failed(failure)
             } else if detail.item.kind == .collection {
                 detail.collectionMembersState = .failed(failure)
-                state = .loaded(detail)
+                publish(detail)
             }
         }
         for seasonID in interruptedLanguageSeasonIDs.sorted() {
@@ -1188,7 +1207,7 @@ public final class ItemDetailViewModel {
         owned.availability = nil
         owned.downloadProgress = nil
         owned.hasRequestDownloadActivity = nil
-        state = .loaded(Detail(item: owned, children: []))
+        publish(Detail(item: owned, children: []))
         isDiscoveryItem = false
         PlozzLog.app.info(
             "Detail ownership probe: resolved library source id=\(seed.id) libraryID=\(selected.itemID)"
@@ -1236,7 +1255,7 @@ public final class ItemDetailViewModel {
         detail.externalAvailability =
             resolved.availability.isEmpty ? nil : resolved.availability
         detail.childrenLoaded = true
-        state = .loaded(detail)
+        publish(detail)
         hasPaintedFreshDetail = true
         // Discovery titles (AniList/Seerr/watchlist entries with no library item)
         // take this path instead of `load()`, and this path never wrote a snapshot.
@@ -1264,7 +1283,7 @@ public final class ItemDetailViewModel {
            !latest.item.usesProviderRatings {
             latest.item.ratings =
                 latest.item.ratings.mergedWithAuthoritative(externalRatings)
-            state = .loaded(latest)
+            publish(latest)
         }
         await trailer
         persistSnapshot()
@@ -1399,7 +1418,7 @@ public final class ItemDetailViewModel {
         latest.item.availability = status.status
         latest.item.downloadProgress = status.downloadProgress
         latest.item.hasRequestDownloadActivity = status.hasDownloadActivity
-        state = .loaded(latest)
+        publish(latest)
     }
 
     /// Public entry so the detail view can poll a discovery title's live Seerr
@@ -1583,7 +1602,7 @@ public final class ItemDetailViewModel {
                 detail.item.sources = updatingInventories(in: detail.item.sources).map {
                     stampedPrimarySource($0, from: detail.item, preservingWatchState: true)
                 }
-                state = .loaded(detail)
+                publish(detail)
                 sources = updatingInventories(in: sources).map {
                     stampedPrimarySource($0, from: detail.item, preservingWatchState: true)
                 }
@@ -1605,7 +1624,7 @@ public final class ItemDetailViewModel {
                     detail.item.sources = detail.item.sources.map {
                         stampedPrimarySource($0, from: detail.item, preservingWatchState: true)
                     }
-                    state = .loaded(detail)
+                    publish(detail)
                     sources = sources.map {
                         stampedPrimarySource($0, from: detail.item, preservingWatchState: true)
                     }
@@ -2021,7 +2040,7 @@ public final class ItemDetailViewModel {
                 }
                 return updated
             }
-            state = .loaded(detail)
+            publish(detail)
         }
         for (seasonID, episodes) in seasonEpisodes {
             seasonEpisodes[seasonID] = episodes.map { episode in
@@ -2109,7 +2128,7 @@ public final class ItemDetailViewModel {
         if item.kind == .collection {
             if case var .loaded(detail) = state {
                 detail.item = tagged(item)
-                state = .loaded(detail)
+                publish(detail)
             }
             await retryCollectionMembers()
             return
@@ -2123,7 +2142,7 @@ public final class ItemDetailViewModel {
         }
         guard !Task.isCancelled, isCurrent() else { return }
         let upcomingSchedule = state.value?.upcomingSchedule
-        state = .loaded(Detail(
+        publish(Detail(
             item: tagged(item),
             children: children.map(tagged),
             childrenLoaded: true,
@@ -2252,7 +2271,7 @@ public final class ItemDetailViewModel {
                 current.children = children.map(tagged)
                 current.serverResumeEpisode = resume.map(tagged)
             }
-            state = .loaded(current)
+            publish(current)
             sources = sources.map { source in
                 guard source.accountID == accountID, source.itemID == fetched.id else { return source }
                 var copy = source
@@ -2401,7 +2420,7 @@ public final class ItemDetailViewModel {
         let generation = sourceGeneration
         let itemID = detail.item.id
         detail.collectionMembersState = .loading
-        state = .loaded(detail)
+        publish(detail)
 
         do {
             var members: [MediaItem] = []
@@ -2435,7 +2454,7 @@ public final class ItemDetailViewModel {
             current.children = members.map(tagged)
             current.childrenLoaded = true
             current.collectionMembersState = members.isEmpty ? .empty : .loaded(members.count)
-            state = .loaded(current)
+            publish(current)
             persistSnapshot()
         } catch {
             guard !Task.isCancelled,
@@ -2445,7 +2464,7 @@ public final class ItemDetailViewModel {
                   isStillLoaded(detail.item, sourceGeneration: generation),
                   case var .loaded(current) = state else { return }
             current.collectionMembersState = .failed((error as? AppError) ?? .unknown(""))
-            state = .loaded(current)
+            publish(current)
         }
     }
 
@@ -2512,7 +2531,7 @@ public final class ItemDetailViewModel {
     private func applyUpcomingSchedule(_ record: SeriesScheduleRecord) {
         guard var detail = state.value, detail.upcomingSchedule != record else { return }
         detail.upcomingSchedule = record
-        state = .loaded(detail)
+        publish(detail)
         persistSnapshot()
     }
 
@@ -2528,7 +2547,7 @@ public final class ItemDetailViewModel {
               var detail = state.value else { return }
         detail.serverResumeEpisode = resume.map(tagged)
         resumeResolution.isResolving = false
-        state = .loaded(detail)
+        publish(detail)
     }
 
     private func fetchServerResumeEpisode(
@@ -2870,7 +2889,7 @@ public final class ItemDetailViewModel {
         serverRatingsTask = nil
         if var detail = state.value, detail.serverResumeEpisode != nil {
             detail.serverResumeEpisode = nil
-            state = .loaded(detail)
+            publish(detail)
         }
         seasonLoadingResumeSourceGeneration = nil
         snapshotRestoreTask?.cancel()
@@ -2903,7 +2922,7 @@ public final class ItemDetailViewModel {
         // A snapshot's children are a COMPLETED fetch persisted from a prior visit,
         // so mark them loaded — otherwise a revisited folder would flash its
         // loading placeholder (and, worse, never distinguish empty-from-loading).
-        state = .loaded(Detail(
+        publish(Detail(
             item: item,
             children: snapshot.children.map(tagged),
             childrenLoaded: true,
@@ -2999,11 +3018,11 @@ public final class ItemDetailViewModel {
             }
             if enriched != detail.item {
                 detail.item = enriched
-                state = .loaded(detail)
+                publish(detail)
             }
         }
         if let detail = state.value, detail.children.isEmpty, !snapshot.children.isEmpty {
-            state = .loaded(Detail(
+            publish(Detail(
                 item: detail.item,
                 children: snapshot.children.map(tagged),
                 childrenLoaded: true,
@@ -3014,7 +3033,7 @@ public final class ItemDetailViewModel {
                   detail.upcomingSchedule == nil,
                   let upcomingSchedule = snapshot.upcomingSchedule {
             detail.upcomingSchedule = upcomingSchedule
-            state = .loaded(detail)
+            publish(detail)
         }
         // The live item can beat the disk read, in which case the restore takes the
         // "adopt enrichments" path above and the rail stayed empty until the live
@@ -3157,7 +3176,7 @@ public final class ItemDetailViewModel {
         } else {
             detail.item.ratings = detail.item.ratings.mergedWithAuthoritative(ratings)
         }
-        state = .loaded(detail)
+        publish(detail)
         persistSnapshot()
     }
 
@@ -3180,7 +3199,7 @@ public final class ItemDetailViewModel {
         let enriched = DetailMetadataResolver.applying(enrichment, to: detail.item)
         guard enriched != detail.item else { return }
         detail.item = enriched
-        state = .loaded(detail)
+        publish(detail)
     }
 
     /// Confirms missing source facts with a bounded background probe.
@@ -3214,7 +3233,7 @@ public final class ItemDetailViewModel {
 
         let enrichedItem = detail.item.applyingSupplementalStreamFacts(facts)
         detail.item = enrichedItem
-        state = .loaded(detail)
+        publish(detail)
         sources = sources.map { stampedPrimarySource($0, from: enrichedItem, preservingWatchState: true) }
         persistSnapshot()
     }
@@ -3559,7 +3578,7 @@ public final class ItemDetailViewModel {
         if case var .loaded(detail) = state {
             detail.item.rejectedSourceIDs.formUnion(rejectedSourceIDs)
             detail.item.sources.removeAll { rejectedSourceIDs.contains($0.id) }
-            state = .loaded(detail)
+            publish(detail)
         }
         applyUnifiedWatchState()
     }
@@ -3779,7 +3798,7 @@ public final class ItemDetailViewModel {
         detail.item.isPlayed = unified.isPlayed
         detail.item.lastPlayedAt = unified.lastPlayedAt
         detail.item = applyingDetailWatchMutations(to: detail.item)
-        state = .loaded(detail)
+        publish(detail)
     }
 
     /// Label for the primary action button, reflecting resume vs. play.

@@ -1096,6 +1096,11 @@ private struct PlozziOSHeroBackdrop: View {
     /// Once the real backdrop has any picture, drop the card seed so the two can
     /// never be visible together (the "two images" on the way into a detail page).
     @State private var backdropResolved = false
+    /// The artwork this surface committed to. Metadata enrichment can add a better
+    /// reference a second after entry; swapping it re-lays out and re-tints the
+    /// hero, which reads as the hero moving/flickering. Freeze the first resolved
+    /// set until the subject changes.
+    @State private var frozenReferences: [ArtworkReference]?
     let itemID: String
     let height: CGFloat
     let showsScrim: Bool
@@ -1192,9 +1197,21 @@ private struct PlozziOSHeroBackdrop: View {
         }
     }
 
+    private var currentReferences: [ArtworkReference] {
+        presentation.artworkReferences(settings: artworkPolicy.settings, in: artworkPolicy.area)
+    }
+
+    /// Never freeze an empty candidate list: the first resolve can come from the
+    /// async fallback while the provider item has not supplied its backdrop yet,
+    /// and locking `[]` would blank the hero permanently.
+    private var activeReferences: [ArtworkReference] {
+        if let frozenReferences, !frozenReferences.isEmpty { return frozenReferences }
+        return currentReferences
+    }
+
     private var backdropImage: some View {
         FallbackAsyncImage(
-            references: presentation.artworkReferences(settings: artworkPolicy.settings, in: artworkPolicy.area),
+            references: activeReferences,
             prefersLandscape: style != .compactPortrait,
             maxAspectRatio: 3,
             variant: .heroBackdrop,
@@ -1206,6 +1223,9 @@ private struct PlozziOSHeroBackdrop: View {
             artworkPolicy: artworkPolicy.forPlacement(presentation.artworkPlacement),
             asyncFallbackURL: asyncFallbackURL,
             onResolveReference: { _ in
+                if frozenReferences == nil, !currentReferences.isEmpty {
+                    frozenReferences = currentReferences
+                }
                 guard !backdropResolved else { return }
                 withAnimation(.easeOut(duration: 0.2)) { backdropResolved = true }
             },
@@ -1224,7 +1244,10 @@ private struct PlozziOSHeroBackdrop: View {
         .reportingHeroArtwork(id: presentation.itemID)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .onChange(of: presentation.itemID) { _, _ in backdropResolved = false }
+        .onChange(of: presentation.itemID) { _, _ in
+            backdropResolved = false
+            frozenReferences = nil
+        }
     }
 
     @ViewBuilder

@@ -51,7 +51,7 @@ public struct MediaArtworkZoomLink<Destination: View, Label: View>: View {
 
     public init(
         id: String,
-        usesZoom: Bool = true,
+        usesZoom: Bool = false,
         @ViewBuilder destination: @escaping () -> Destination,
         @ViewBuilder label: @escaping () -> Label
     ) {
