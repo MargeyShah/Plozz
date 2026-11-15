@@ -275,6 +275,14 @@ private struct PlozziOSCanonicalItemDetailView: View {
     @State private var hasResolvedSeriesPlayTarget = false
     @State private var presentsSeriesDownloads = false
     @State private var heroPullDistance: CGFloat = 0
+    /// True for the duration of a native edge back-swipe. A small vertical
+    /// component of that pan used to reach the scroll view and stretch the hero
+    /// while the page was leaving, so the picture appeared to resize/bounce.
+    @State private var isInteractivePopActive = false
+    /// Whether the page's own scroll view is moving. Pull-stretch is a vertical
+    /// scroll gesture; geometry changes from a navigation or inset update must not
+    /// move the hero.
+    @State private var isHeroScrollActive = false
     private let seerService: SeerService?
     private var isDiscoveryItem: Bool { viewModel.isDiscoveryItem }
     private let initialSeasonID: String?
@@ -738,6 +746,18 @@ private struct PlozziOSCanonicalItemDetailView: View {
         }
 
         .scrollClipDisabled()
+        .scrollDisabled(isInteractivePopActive)
+        .background {
+            PlozziOSInteractivePopObserver(isActive: $isInteractivePopActive)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+        }
+        .onChange(of: isInteractivePopActive) { _, active in
+            if active { heroPullDistance = 0 }
+        }
+        .onScrollPhaseChange { _, phase in
+            isHeroScrollActive = phase == .interacting || phase == .decelerating
+        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y > trailerPauseThreshold
         } action: { _, isPastHalfHero in
@@ -748,6 +768,10 @@ private struct PlozziOSCanonicalItemDetailView: View {
                 + geometry.contentInsets.top
             return max(0, -topOffset)
         } action: { _, pullDistance in
+            // Only a vertical overscroll stretches the hero. While the native
+            // back-swipe owns the touch, the page must stay fixed.
+            guard !isInteractivePopActive else { return }
+            guard pullDistance == 0 || isHeroScrollActive else { return }
             heroPullDistance = pullDistance
         }
         .ignoresSafeArea(.container, edges: .top)

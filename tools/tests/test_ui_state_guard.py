@@ -60,6 +60,28 @@ class UILoadingStateGuardTests(unittest.TestCase):
         """)
         self.assertTrue(guard.check_reserved_geometry(path))
 
+    def test_title_navigation_stays_fixed_without_a_zoom_morph(self) -> None:
+        # A zoom destination scales the whole page with the interactive back-swipe,
+        # which reads as the hero resizing/bouncing while the finger is still down.
+        # Card routes were changed once but the path destinations kept the morph,
+        # so pin the whole app shell.
+        offenders = sorted(
+            path.relative_to(ROOT).as_posix()
+            for path in (ROOT / "Sources" / "AppShelliOS").rglob("*.swift")
+            if ".mediaArtworkZoomDestination(" in path.read_text()
+        )
+        self.assertEqual(offenders, [], "title routes must use the standard push")
+        zoom = (ROOT / "Sources" / "CoreUI" / "MediaArtworkZoom.swift").read_text()
+        self.assertIn("usesZoom: Bool = false,", zoom)
+        # The detail hero additionally freezes its pull-stretch for the duration of
+        # the native edge back-swipe: the system pan can deliver a small vertical
+        # component to the page's scroll view, which used to bounce the picture.
+        detail = (ROOT / "Sources" / "AppShelliOS" / "PlozziOSItemDetailView.swift").read_text()
+        self.assertIn("PlozziOSInteractivePopObserver(isActive: $isInteractivePopActive)", detail)
+        self.assertIn(".scrollDisabled(isInteractivePopActive)", detail)
+        self.assertIn("guard !isInteractivePopActive else { return }", detail)
+        self.assertIn("guard pullDistance == 0 || isHeroScrollActive else { return }", detail)
+
     def test_allows_reserved_placeholder(self) -> None:
         path = self.write("Rail.swift", """
         struct Rail: View {
