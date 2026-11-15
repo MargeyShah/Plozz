@@ -28,10 +28,6 @@ struct PlozziOSHomeScrollView<Hero: View, Rows: View>: View {
         // "images leave, page re-lays out" signature. Re-prove the fork's chrome
         // incrementally once the settled flicker is gone on phone AND tester.
         .modifier(PlozziOSReducedTransparencyScrollFade(enabled: heroActive))
-        .background {
-            PlozziOSStationaryNavigationSource()
-                .frame(width: 0, height: 0)
-        }
     }
 }
 
