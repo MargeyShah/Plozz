@@ -225,8 +225,9 @@ jobs:
     # The whole suite used to run in one 240-minute job, which the runner cap
     # killed. The focus scheme has a single test bundle, so shards are test
     # classes, derived from project.yml plus the sources by tools/ci-shards.py.
-    # Build + test bounds below leave 15 minutes for setup and diagnostics.
-    timeout-minutes: 120
+    # A cold hosted build alone can take over an hour on a fork cache; keep the
+    # job inside the runner cap with room for setup and diagnostics.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -244,7 +245,7 @@ jobs:
 
       - name: Run hosted focus shard ${{ matrix.shard }} of 3
         env:
-          PLOZZ_FOCUS_BUILD_TIMEOUT: "3600"
+          PLOZZ_FOCUS_BUILD_TIMEOUT: "5400"
           PLOZZ_FOCUS_TEST_TIMEOUT: "3000"
         run: |
           SELECTED=( $(python3 tools/ci-shards.py focus --index "${{ matrix.shard }}" --count 2) )
