@@ -62,48 +62,10 @@ struct PlozziOSNavigationPopProxy: UIViewControllerRepresentable {
         var onReselect: (() -> Void)?
         private var tabBarTap: UITapGestureRecognizer?
         private weak var observedTabBar: UITabBar?
-        /// Transparent window cover installed for the duration of a push. A second
-        /// tap during the slide-in would otherwise land on the destination's controls
-        /// (Play, a synopsis hit area, …) even though the card is what was tapped.
-        private weak var pushShield: UIView?
-
-        override func viewWillAppear(_ animated: Bool) {
-            super.viewWillAppear(animated)
-            removePushShield()
-        }
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            removePushShield()
             installTabReSelectionIfNeeded()
-        }
-
-        override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
-            installPushShieldIfNavigating()
-        }
-
-        private func installPushShieldIfNavigating() {
-            guard pushShield == nil,
-                  let navigation = enclosingNavigationController(),
-                  navigation.viewControllers.count > 1,
-                  let coordinator = transitionCoordinator else { return }
-            guard let window = navigation.view.window ?? view.window else { return }
-            let shield = UIView(frame: window.bounds)
-            shield.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            shield.backgroundColor = .clear
-            shield.isUserInteractionEnabled = true
-            window.addSubview(shield)
-            pushShield = shield
-            // A cancelled transition still completes through this callback.
-            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
-                self?.removePushShield()
-            }
-        }
-
-        private func removePushShield() {
-            pushShield?.removeFromSuperview()
-            pushShield = nil
         }
 
         private func enclosingNavigationController() -> UINavigationController? {
