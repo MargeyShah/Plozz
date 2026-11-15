@@ -501,6 +501,35 @@ struct PlozziOSHomeView: View {
             }
             PlozziOSSettingsToolbarItem(action: onShowSettings)
         }
+        .onAppear {
+            #if DEBUG
+            appModel.screenshotDirector.firstDetailItem = {
+                guard let content = viewModel.state.value else { return nil }
+                func isFullPage(_ item: MediaItem) -> Bool {
+                    item.kind == .movie || item.kind == .series
+                }
+                if let item = content.latest.first(where: isFullPage) { return item }
+                if let item = content.watchlist.first(where: isFullPage) { return item }
+                if let item = content.continueWatching.first(where: isFullPage) { return item }
+                return nil
+            }
+            appModel.screenshotDirector.detailItemAt = { index in
+                guard let content = viewModel.state.value else { return nil }
+                func isFullPage(_ item: MediaItem) -> Bool {
+                    item.kind == .movie || item.kind == .series
+                }
+                var seen = Set<String>()
+                var items: [MediaItem] = []
+                for candidate in content.latest + content.watchlist + content.continueWatching
+                    where isFullPage(candidate)
+                    && seen.insert(candidate.stablePresentationID).inserted {
+                    items.append(candidate)
+                }
+                guard items.indices.contains(index) else { return nil }
+                return items[index]
+            }
+            #endif
+        }
         .task(
             id: PlozziOSHomeLoadID(
                 visibility: appModel.settings.homeVisibility.visibility.intent,
@@ -2114,6 +2143,11 @@ struct PlozziOSHomeHeroCarousel: View {
             }
         }
         .onAppear(perform: installTrailerEndHandler)
+        .onAppear {
+            #if DEBUG
+            appModel.screenshotDirector.firstHomeItem = { items.first }
+            #endif
+        }
         .onDisappear {
             pointerActivity.reset()
             trailerController.clearEndHandler(ownerID: endHandlerOwnerID)
@@ -3657,7 +3691,10 @@ struct PlozziOSHomeMediaCard: View {
                 } label: { card }
                     .buttonStyle(.plain)
             } else if provider != nil || !appModel.accountsProviders.resolvedActiveAccounts.isEmpty {
-                MediaArtworkZoomLink(id: item.stablePresentationID) {
+                MediaArtworkZoomLink(
+                    id: item.stablePresentationID,
+                    usesZoom: isLandscape
+                ) {
                     PlozziOSHomeCardDetail(
                         item: item, fallbackProvider: provider
                     )
@@ -3891,8 +3928,12 @@ struct PlozziOSScreenshotRouter: View {
 
     private func perform() async {
         guard let request = director.request else { return }
+        // Clearing before the work started changed this `.task(id:)`'s identity
+        // and cancelled the burst mid-flight. Hold the request until the screen
+        // (and any capture) has actually finished.
+        let outcome = await reach(request)
         director.request = nil
-        director.finish(await reach(request))
+        director.finish(outcome)
     }
 
     /// Reaches the requested screen and answers with what the capture script
@@ -3939,6 +3980,27 @@ struct PlozziOSScreenshotRouter: View {
             PlozziOSScreenshotSeed.pausesPlayback = pause
             PlozziOSScreenshotSeed.pendingPlayerSeek = pause ? seconds : nil
             director.startPlayback?(item, seconds)
+
+        case let .burstFirst(index, frames, fps):
+            guard let item = director.detailItemAt?(index)
+                    ?? (index == 0 ? director.firstDetailItem?() : nil)
+                    ?? (index == 0 ? director.firstHomeItem?() : nil)
+            else { return notFound }
+            await popToRoot()
+            return await director.captureDetailEntryBurst(
+                item: item, frames: frames, fps: fps
+            ) {
+                director.navigateToItem?(item)
+            }
+
+        case let .burst(title, frames, fps):
+            guard let item = await find(title) else { return notFound }
+            await popToRoot()
+            return await director.captureDetailEntryBurst(
+                item: item, frames: frames, fps: fps
+            ) {
+                director.navigateToItem?(item)
+            }
 
         case let .rotate(landscape):
             await rotate(landscape: landscape)
