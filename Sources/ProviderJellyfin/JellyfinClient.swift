@@ -393,15 +393,14 @@ public struct JellyfinClient: Sendable {
     /// the provider fold both classes into one Continue Watching feed, matching
     /// Plex parity.
     ///
-    /// `EnableResumable=true` matches Jellyfin's own clients and avoids a gap
-    /// where a series disappears from both feeds: the server omits a series from
-    /// NextUp when its next episode has any resume position, while Plozz's own
-    /// brief-play threshold can hide that same episode from Resume. The combined
-    /// Continue Watching feed dedupes Resume-first, so overlap is harmless.
-    /// `EnableRewatching=false` avoids resurfacing fully-watched series.
-    /// The resumable companion is capped at one 100-item page; draining every
-    /// resumable page made the Home fan-out roughly 850 ms slower without
-    /// changing what a rail can show.
+    /// `EnableResumable=false` keeps NextUp complementary rather than overlapping:
+    /// in-progress episodes already come back from `/Items/Resume`. The brief-play
+    /// gap is handled client-side by retaining the Resume episode as a suggestion
+    /// (see `JellyfinProvider.retainingBrieflyPlayedEpisodes`), so the Home feed
+    /// keeps the cheap query TestFlight uses. `EnableRewatching=false` avoids
+    /// resurfacing fully-watched series.
+    /// The companion is capped at one 100-item page; draining every page made the
+    /// Home fan-out slower without changing what a rail can show.
     func nextUpItems(
         userID: String, limit: Int, parentID: String? = nil, seriesID: String? = nil
     ) async throws -> [BaseItemDto] {
@@ -431,9 +430,8 @@ public struct JellyfinClient: Sendable {
             URLQueryItem(name: "UserId", value: userID),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "MediaTypes", value: "Video"),
-            URLQueryItem(name: "EnableResumable", value: "true"),
+            URLQueryItem(name: "EnableResumable", value: seriesID == nil ? "false" : "true"),
             URLQueryItem(name: "EnableRewatching", value: "false"),
-            URLQueryItem(name: "EnableUserData", value: "true"),
             URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
         if let startIndex {

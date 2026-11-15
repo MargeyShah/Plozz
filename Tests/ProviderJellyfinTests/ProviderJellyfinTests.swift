@@ -379,27 +379,29 @@ final class JellyfinProviderMappingTests: XCTestCase {
                        "Continue Watching must fold NextUp after the in-progress Resume items (Plex On Deck parity)")
 
         let query = try XCTUnwrap(stub.queryItems(forPathSuffix: "/Shows/NextUp"))
-        XCTAssertEqual(query.first(where: { $0.name == "EnableResumable" })?.value, "true",
-                       "NextUp must match Jellyfin's own clients and include resumable suggestions")
-        XCTAssertEqual(query.first(where: { $0.name == "EnableUserData" })?.value, "true",
-                       "A resumable NextUp-only card must retain its saved progress")
+        XCTAssertEqual(query.first(where: { $0.name == "EnableResumable" })?.value, "false",
+                       "NextUp must exclude resumable items so it complements, not duplicates, Resume")
     }
 
-    func testContinueWatchingKeepsNextUpWhenResumeOmitsResumableEpisode() async throws {
+    func testContinueWatchingKeepsBrieflyPlayedEpisodeAsSuggestion() async throws {
         let stub = StubHTTPClient()
-        stub.stub(pathSuffix: "/Users/u1/Items/Resume", json: #"{"Items":[],"TotalRecordCount":0}"#)
-        stub.stub(pathSuffix: "/Shows/NextUp", json: """
-        {"Items":[{"Id":"next-resumable","Name":"Episode 7","Type":"Episode","SeriesId":"series",
-        "IndexNumber":7,"UserData":{"PlaybackPositionTicks":100000000,"Played":false}}],
+        stub.stub(pathSuffix: "/Users/u1/Items/Resume", json: """
+        {"Items":[{"Id":"brief","Name":"Episode 7","Type":"Episode","SeriesId":"series",
+        "IndexNumber":7,"RunTimeTicks":36000000000,
+        "UserData":{"PlaybackPositionTicks":100000000,"Played":false}}],
         "TotalRecordCount":1}
         """)
-        stub.stub(pathSuffix: "/Users/u1/Items", json: #"{"Items":[],"TotalRecordCount":0}"#)
+        stub.stub(pathSuffix: "/Shows/NextUp", json: #"{"Items":[],"TotalRecordCount":0}"#)
         let provider = JellyfinProvider(session: makeSession(), http: stub)
 
         let items = try await provider.continueWatching(limit: 10)
 
-        XCTAssertEqual(items.map(\.id), ["next-resumable"])
-        XCTAssertEqual(items.first?.resumePosition, 10)
+        XCTAssertEqual(items.map(\.id), ["brief"])
+        XCTAssertNil(items.first?.resumePosition,
+                     "A brief play must stay visible as a suggestion without a misleading progress bar")
+        let query = try XCTUnwrap(stub.queryItems(forPathSuffix: "/Shows/NextUp"))
+        XCTAssertEqual(query.first(where: { $0.name == "EnableResumable" })?.value, "false",
+                       "The fast complementary query must remain; the client handles the brief-play gap")
     }
 
     func testUnlimitedNextUpUsesOneBoundedCompanionPage() async throws {

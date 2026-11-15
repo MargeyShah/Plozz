@@ -247,10 +247,27 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
         // must be able to survive the `limit` cut on its stamped recency rather than
         // being dropped merely because in-progress Resume items filled the limit
         // first (r6-jf-precap).
-        let stamped = merged.map(map(item:)).map { stampingSeriesRecency($0, using: seriesDates) }
+        let stamped = merged.map(map(item:))
+            .map(retainingBrieflyPlayedEpisodes)
+            .map { stampingSeriesRecency($0, using: seriesDates) }
         logContinueWatchingFeed(merged, endpoint: "Items/Resume + Shows/NextUp")
         let ordered = orderedByEffectiveRecency(stamped)
         return limit == Int.max ? ordered : Array(ordered.prefix(limit))
+    }
+
+    /// A brief play is hidden from the Home row by the shared resume threshold,
+    /// but Jellyfin omits that episode from `NextUp` because it has a saved
+    /// position. Clearing the tiny position on the Resume copy keeps the series
+    /// visible as a suggestion without enabling the expensive resumable NextUp
+    /// query. Series-specific resume keeps the real position.
+    private func retainingBrieflyPlayedEpisodes(_ item: MediaItem) -> MediaItem {
+        guard item.kind == .episode,
+              let position = item.resumePosition, position > 0,
+              position < ContinueWatchingPolicy.minimumResumePosition(duration: item.runtime)
+        else { return item }
+        var copy = item
+        copy.resumePosition = nil
+        return copy
     }
 
     public func resumeEpisode(inSeries seriesID: String) async throws -> MediaItem? {
