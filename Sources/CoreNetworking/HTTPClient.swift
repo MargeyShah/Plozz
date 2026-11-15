@@ -394,7 +394,7 @@ final class SameOriginHTTPRedirectDelegate: HTTPDeliveryTaskDelegate, @unchecked
 public extension URLSession {
     /// Session tuned for tvOS: short-ish timeouts so the UI can fail fast and
     /// show a graceful "server unreachable" state instead of hanging.
-    static var plozzDefault: URLSession {
+    static let plozzDefault: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 20
@@ -406,7 +406,7 @@ public extension URLSession {
         config.httpMaximumConnectionsPerHost = 8
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return OfflineNetworkSession.make(configuration: config)
-    }
+    }()
 
     /// Dedicated lane for FOREGROUND, user-blocking fetches — specifically opening
     /// a detail page (`item`/`metadata`). It has its OWN connection pool, so a
@@ -418,7 +418,7 @@ public extension URLSession {
     /// ForResource` (30s) would even fire — this isolated pool removes that queue
     /// entirely. Short timeouts so a genuinely slow server fails fast into a
     /// graceful error instead of a long blank hang.
-    static var plozzInteractive: URLSession {
+    static let plozzInteractive: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 10
         config.timeoutIntervalForResource = 12
@@ -426,12 +426,12 @@ public extension URLSession {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.waitsForConnectivity = false
         return OfflineNetworkSession.make(configuration: config)
-    }
+    }()
 
     /// Session for probing discovery candidates: very short timeouts so we can
     /// race several candidate URLs per server and fail fast on the wrong ones
     /// without stalling the scan. Does not wait for connectivity.
-    static var plozzDiscovery: URLSession {
+    static let plozzDiscovery: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 2.5
         config.timeoutIntervalForResource = 3
@@ -439,7 +439,7 @@ public extension URLSession {
         config.waitsForConnectivity = false
         config.allowsConstrainedNetworkAccess = true
         return OfflineNetworkSession.make(configuration: config)
-    }
+    }()
 }
 
 public extension JSONDecoder {
