@@ -26,6 +26,16 @@ client-side).
 The provider mapping/decode adds only tens of milliseconds; the row time is the
 HTTP time. The self-build is not spending the gap in SwiftUI or mapping.
 
+## What the metric does not measure
+
+`HomeAgg.request`/`fanout` times the **background network refresh**, not the
+first row paint. The self-build restores Home content from its on-disk snapshot
+and paints the Continue Watching cards immediately; the refresh that these
+numbers time happens behind the already-visible row. TestFlight can show its
+loading/empty row until its own request resolves. That is why the viewer sees
+the self-build row load faster even though its `continueWatching` refresh
+completes later. Do not use the aggregate below as the visible-row latency.
+
 ## Interpretation
 
 The local server, user, and query are the same, so signing or entitlements alone
