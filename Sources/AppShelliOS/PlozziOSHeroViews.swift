@@ -696,7 +696,15 @@ struct PlozziOSHeroStage<Foreground: View>: View {
         }
         let background = Group {
             if showsBackdrop {
-                PlozziOSReflectedHeroStage(height: height, ancestorScale: pullScale) { _ in
+                PlozziOSReflectedHeroStage(
+                    height: height,
+                    ancestorScale: pullScale,
+                    // A detail page slides in and out under a navigation
+                    // transition. Its global x is the transition offset, not a
+                    // sidebar cover; treating it as one re-crops the artwork on
+                    // every frame (the hero visibly resizing on entry and back).
+                    ignoresGlobalCover: surfaceRole == .detail
+                ) { _ in
                     PlozziOSHeroBackdrop(
                         presentation: presentation,
                         seedArtwork: seedArtwork,
@@ -3379,6 +3387,9 @@ private struct PlozziOSReflectedHeroStage<
 
     let height: CGFloat
     var ancestorScale: CGFloat = 1
+    /// Detail pages must size the artwork from their own layout, not from the
+    /// window position: the interactive push/pop moves that position every frame.
+    var ignoresGlobalCover = false
     @ViewBuilder let content: (CGFloat) -> Content
     @ViewBuilder let reflection: (CGFloat, CGFloat) -> Reflection
 
@@ -3387,18 +3398,23 @@ private struct PlozziOSReflectedHeroStage<
             let scaledGlobalMinX = proxy.frame(in: .global).minX
             let horizontalScaleGrowth = proxy.size.width
                 * (max(ancestorScale, 1) - 1) / 2
-            let globalMinX = scaledGlobalMinX + horizontalScaleGrowth
-            let width = windowWidth ?? proxy.size.width
-            let locallyCoveredWidth = max(
-                proxy.safeAreaInsets.leading,
-                globalMinX
-            )
-            let coveredWidth = max(
-                locallyCoveredWidth,
-                sidebarGeometry.isVisible
-                    ? sidebarGeometry.coveredWidth
-                    : 0
-            )
+            let globalMinX = ignoresGlobalCover
+                ? 0
+                : scaledGlobalMinX + horizontalScaleGrowth
+            let width = ignoresGlobalCover
+                ? proxy.size.width
+                : (windowWidth ?? proxy.size.width)
+            let locallyCoveredWidth = ignoresGlobalCover
+                ? 0
+                : max(proxy.safeAreaInsets.leading, globalMinX)
+            let coveredWidth = ignoresGlobalCover
+                ? 0
+                : max(
+                    locallyCoveredWidth,
+                    sidebarGeometry.isVisible
+                        ? sidebarGeometry.coveredWidth
+                        : 0
+                )
             let usableWidth = max(width - coveredWidth, 1)
             let mainOffset = coveredWidth - globalMinX
             ZStack(alignment: .topLeading) {
@@ -3421,6 +3437,7 @@ private struct PlozziOSReflectedHeroStage<
             }
             .onChange(of: locallyCoveredWidth, initial: true) {
                 _, locallyCoveredWidth in
+                guard !ignoresGlobalCover else { return }
                 sidebarGeometry.recordCoveredWidth(locallyCoveredWidth)
             }
             .overlay {

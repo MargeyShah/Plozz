@@ -81,6 +81,13 @@ class UILoadingStateGuardTests(unittest.TestCase):
         self.assertIn(".scrollDisabled(isInteractivePopActive)", detail)
         self.assertIn("guard !isInteractivePopActive else { return }", detail)
         self.assertIn("guard pullDistance == 0 || isHeroScrollActive else { return }", detail)
+        # A detail hero must size from its own layout. The navigation transition
+        # moves its global x every frame, and using that as "covered width"
+        # re-crops the artwork (the hero visibly resizing on push and back).
+        hero = (ROOT / "Sources/AppShelliOS/PlozziOSHeroViews.swift").read_text()
+        self.assertIn("ignoresGlobalCover: surfaceRole == .detail", hero)
+        self.assertIn("let width = ignoresGlobalCover", hero)
+        self.assertIn("? proxy.size.width", hero)
 
     def test_allows_reserved_placeholder(self) -> None:
         path = self.write("Rail.swift", """
