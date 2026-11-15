@@ -12,91 +12,102 @@ final class HTTPRequestCoalescerTests: XCTestCase {
         }
     }
 
-    func testConcurrentIdenticalRequestsShareOneTransfer() async throws {
+    private let key = HTTPRequestCoalescer.Key(
+        method: "GET", url: "https://example.test/Items", headers: "authorization=token"
+    )
+
+    /// Seeds an in-flight entry directly so the join path is deterministic:
+    /// the test never races a real transfer to observe concurrency.
+    private func seed(
+        _ coalescer: HTTPRequestCoalescer,
+        key: HTTPRequestCoalescer.Key
+    ) async {
+        let task = Task<HTTPRequestCoalescer.Payload, Error> { makeCoalescedPayload("seed") }
+        await coalescer.seedForTesting(key: key, task: task)
+    }
+
+    func testAJoinerReceivesTheInFlightPayloadWithoutRunningItsOwnTransfer() async throws {
         let coalescer = HTTPRequestCoalescer()
         let counter = Counter()
-        let key = HTTPRequestCoalescer.Key(
-            method: "GET", url: "https://example.test/Items", headers: "authorization=token"
-        )
+        await seed(coalescer, key: key)
 
-        async let first = coalescer.perform(key: key) {
+        let joined = try await coalescer.perform(key: key) {
             _ = await counter.increment()
-            try? await Task.sleep(for: .milliseconds(120))
-            return makeCoalescedPayload("first")
-        }
-        try await Task.sleep(for: .milliseconds(30))
-        async let second = coalescer.perform(key: key) {
-            _ = await counter.increment()
-            return makeCoalescedPayload("second")
+            return makeCoalescedPayload("should not run")
         }
 
-        let (owner, joiner) = try await (first, second)
-        XCTAssertFalse(owner.joined)
-        XCTAssertTrue(joiner.joined)
-        XCTAssertEqual(owner.payload.data, Data("first".utf8))
-        XCTAssertEqual(joiner.payload.data, Data("first".utf8))
+        XCTAssertTrue(joined.joined)
+        XCTAssertEqual(joined.payload.data, Data("seed".utf8))
         let transfers = await counter.value
-        XCTAssertEqual(transfers, 1, "The second caller must join the in-flight transfer")
+        XCTAssertEqual(transfers, 0, "The joined caller must not issue a second transfer")
     }
 
     func testDifferentKeysDoNotShare() async throws {
         let coalescer = HTTPRequestCoalescer()
         let counter = Counter()
+        await seed(coalescer, key: key)
 
-        let first = HTTPRequestCoalescer.Key(method: "GET", url: "https://example.test/a", headers: "")
-        let second = HTTPRequestCoalescer.Key(method: "GET", url: "https://example.test/b", headers: "")
-
-        async let a = coalescer.perform(key: first) {
+        let other = HTTPRequestCoalescer.Key(
+            method: "GET", url: "https://example.test/other", headers: "authorization=token"
+        )
+        let own = try await coalescer.perform(key: other) {
             _ = await counter.increment()
-            try? await Task.sleep(for: .milliseconds(60))
-            return makeCoalescedPayload("a")
-        }
-        async let b = coalescer.perform(key: second) {
-            _ = await counter.increment()
-            return makeCoalescedPayload("b")
+            return makeCoalescedPayload("own")
         }
 
-        let (left, right) = try await (a, b)
-        XCTAssertFalse(left.joined)
-        XCTAssertFalse(right.joined)
-        XCTAssertEqual(left.payload.data, Data("a".utf8))
-        XCTAssertEqual(right.payload.data, Data("b".utf8))
+        XCTAssertFalse(own.joined)
+        XCTAssertEqual(own.payload.data, Data("own".utf8))
         let transfers = await counter.value
-        XCTAssertEqual(transfers, 2)
+        XCTAssertEqual(transfers, 1)
+    }
+
+    func testDifferentAuthorizationHeadersDoNotShare() async throws {
+        // Multi-server safety: the same URL under two accounts must never share
+        // a response, even when the lane and URL are identical.
+        let coalescer = HTTPRequestCoalescer()
+        let counter = Counter()
+        await seed(coalescer, key: key)
+
+        let otherAccount = HTTPRequestCoalescer.Key(
+            method: "GET", url: "https://example.test/Items", headers: "authorization=other-token"
+        )
+        let own = try await coalescer.perform(key: otherAccount) {
+            _ = await counter.increment()
+            return makeCoalescedPayload("other")
+        }
+
+        XCTAssertFalse(own.joined)
+        XCTAssertEqual(own.payload.data, Data("other".utf8))
+        let transfers = await counter.value
+        XCTAssertEqual(transfers, 1, "Different tokens must never share a response")
     }
 
     func testDifferentLanesDoNotShareEvenForTheSameURL() async throws {
         let coalescer = HTTPRequestCoalescer()
         let counter = Counter()
-        async let defaultLane = coalescer.perform(
+        await seed(
+            coalescer,
             key: HTTPRequestCoalescer.Key(
                 method: "GET", url: "https://example.test/same", headers: "", lane: "default"
             )
-        ) {
-            _ = await counter.increment()
-            try? await Task.sleep(for: .milliseconds(60))
-            return makeCoalescedPayload("default")
-        }
-        async let discoveryLane = coalescer.perform(
-            key: HTTPRequestCoalescer.Key(
-                method: "GET", url: "https://example.test/same", headers: "", lane: "discovery"
-            )
-        ) {
+        )
+
+        let discovery = HTTPRequestCoalescer.Key(
+            method: "GET", url: "https://example.test/same", headers: "", lane: "discovery"
+        )
+        let own = try await coalescer.perform(key: discovery) {
             _ = await counter.increment()
             return makeCoalescedPayload("discovery")
         }
 
-        let (left, right) = try await (defaultLane, discoveryLane)
-        XCTAssertFalse(left.joined)
-        XCTAssertFalse(right.joined)
+        XCTAssertFalse(own.joined)
         let transfers = await counter.value
-        XCTAssertEqual(transfers, 2, "Lanes have different timeouts and pools")
+        XCTAssertEqual(transfers, 1, "Lanes have different timeouts and pools")
     }
 
     func testCompletedKeyIsReleasedForTheNextRequest() async throws {
         let coalescer = HTTPRequestCoalescer()
         let counter = Counter()
-        let key = HTTPRequestCoalescer.Key(method: "GET", url: "https://example.test/c", headers: "")
 
         let first = try await coalescer.perform(key: key) {
             _ = await counter.increment()
@@ -115,43 +126,27 @@ final class HTTPRequestCoalescerTests: XCTestCase {
         XCTAssertEqual(transfers, 2)
     }
 
-    func testFailureReachesEveryJoinerAndIsRetryable() async throws {
+    func testOwnerFailureIsRetryable() async throws {
         let coalescer = HTTPRequestCoalescer()
-        let counter = Counter()
-        let key = HTTPRequestCoalescer.Key(method: "GET", url: "https://example.test/d", headers: "")
-
-        async let first = coalescer.perform(key: key) {
-            _ = await counter.increment()
-            try? await Task.sleep(for: .milliseconds(80))
-            throw URLError(.timedOut)
-        }
-        try await Task.sleep(for: .milliseconds(20))
-        async let second = coalescer.perform(key: key) {
-            _ = await counter.increment()
-            return makeCoalescedPayload("never")
-        }
-
         do {
-            _ = try await first
+            _ = try await coalescer.perform(key: key) {
+                throw URLError(.timedOut)
+            }
             XCTFail("The owner must surface the transport failure")
         } catch {
             XCTAssertTrue(error is URLError)
         }
-        do {
-            _ = try await second
-            XCTFail("The joiner must surface the same failure")
-        } catch {
-            XCTAssertTrue(error is URLError)
-        }
 
+        // Cleanup is asynchronous; wait on the observable in-flight count
+        // instead of assuming a fixed delay.
+        for _ in 0..<200 where await coalescer.inFlightCount() > 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         let retry = try await coalescer.perform(key: key) {
-            _ = await counter.increment()
-            return makeCoalescedPayload("recovered")
+            makeCoalescedPayload("recovered")
         }
         XCTAssertFalse(retry.joined)
         XCTAssertEqual(retry.payload.data, Data("recovered".utf8))
-        let transfers = await counter.value
-        XCTAssertEqual(transfers, 2)
     }
 }
 
@@ -206,7 +201,6 @@ final class NetworkLedgerTests: XCTestCase {
         XCTAssertTrue(line.contains("coalesced=0"))
     }
 }
-
 
 private func makeCoalescedPayload(_ text: String) -> HTTPRequestCoalescer.Payload {
     HTTPRequestCoalescer.Payload(

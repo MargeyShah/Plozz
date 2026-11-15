@@ -93,6 +93,12 @@ public actor HTTPRequestCoalescer {
         entries.count
     }
 
+    /// Installs an already-running transfer without starting an owner so tests
+    /// can exercise the join path deterministically. Internal by design.
+    func seedForTesting(key: Key, task: Task<Payload, Error>) {
+        entries[key] = Entry(id: UUID(), task: task)
+    }
+
     private func remove(_ key: Key, id: UUID) {
         if entries[key]?.id == id {
             entries[key] = nil
