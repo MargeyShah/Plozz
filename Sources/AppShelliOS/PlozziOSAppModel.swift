@@ -35,6 +35,29 @@ import UIKit
 @MainActor
 @Observable
 final class PlozziOSAppModel {
+
+    /// One scoped detail-snapshot cache per profile/account identity, memoized for
+    /// the app's lifetime. The iOS detail pages previously used
+    /// `DetailSnapshotCache.ephemeral`, so nothing they loaded was restored: every
+    /// visit rebuilt the page instead of painting the cached hero/seasons.
+    @ObservationIgnored private let detailCacheFactory = DetailSnapshotCacheFactory()
+
+    /// The cache for the active profile and its current servers. Switching profile
+    /// or Plex Home user switches scope, so one household member never restores
+    /// another's cached page.
+    var detailSnapshotCache: DetailSnapshotCache {
+        let accounts = accountsProviders.homeAccounts.map(\.account)
+        let profile = profiles.activeProfile
+        let material = profile.plexPlaybackIdentityKey(for: accounts)
+            + "|" + accounts.map(\.connectionScopeKey).sorted().joined(separator: "|")
+        return detailCacheFactory.cache(
+            for: DetailSnapshotCacheScope(
+                profileID: profiles.activeProfileID,
+                identityMaterial: material
+            )
+        )
+    }
+
     let music: PlozziOSMusicRuntime? = AppReleaseChannel.current.isBeta ? PlozziOSMusicRuntime() : nil
     private let appAdmission: AppAdmissionModel
     let offlineMode: PlozziOSOfflineModeModel
@@ -465,7 +488,7 @@ final class PlozziOSAppModel {
     private(set) var requiresLaunchProfileSelection: Bool
     private(set) var settings: PlozziOSSettingsModel
     @ObservationIgnored
-    private var applicationIsActive = true
+    private(set) var applicationIsActive = true
     @ObservationIgnored
     private var downloadProfileGeneration = 0
     @ObservationIgnored
@@ -896,6 +919,9 @@ final class PlozziOSAppModel {
         accountsProviders.tokenResolver = { [weak self] accountID in
             self?.plexHomeUsers.resolvedToken(for: accountID)
         }
+        accountsProviders.onLocalAccountAuthentication = { [weak self] accountID in
+            self?.providerCredentialSync.didAuthenticateLocally(accountID: accountID)
+        }
         accountsProviders.onAccountsInvalidated = { [weak self] in
             self?.mediaItemActionHandler.invalidateAccountCaches()
             self?.universalWatchlistProfileID = nil
@@ -1314,6 +1340,7 @@ final class PlozziOSAppModel {
         sceneSessionIDs = sceneSessionIDs.filter { connected.contains($0.key) }
         if let transition = applicationLifecycle.replaceScenes(scenes) {
             applicationIsActive = transition.isActive
+            if !transition.isActive { portableCredentialPublisher.cancelPendingPublication() }
             if transition.isActive { retryWatchOutboxIfAllowed() }
         }
     }
@@ -2202,6 +2229,18 @@ final class PlozziOSAppModel {
                   ) else { continue }
             await session.ongoingSync?.synchronize(manual: false)
         }
+    }
+
+    /// Raises the Local Network alert from the app's own process, once, on a
+    /// calm foreground screen. A re-signed install (unsigned IPA + a
+    /// sideloading tool) is a new signed identity, so the grant the previous
+    /// install earned does not carry over; leaving the alert to the first
+    /// playback request lets the player present it mid-transition and then time
+    /// out with `NSURLError -1001` if it is missed. Gated on a configured
+    /// account because a fresh install has nothing on the LAN to reach yet.
+    func requestLocalNetworkAccessIfNeeded() {
+        guard !Self.isRunningUnitTests, !accountsProviders.accounts.isEmpty else { return }
+        Task { _ = await LocalNetworkAuthorization.requestIfNeeded() }
     }
 
     private var historySyncReaders: [any TrackerHistorySyncReading] {

@@ -7,6 +7,20 @@ The Music tab is integrated into the tvOS shell and, in development/TestFlight
 builds only, the iOS/iPadOS shell. App Store builds do not create the mobile
 music runtime or probe music libraries.
 
+The mobile Music landing page puts its large title and the shell's shared circular
+profile button in one scrolling header. The header remains available during
+loading, empty, and failed states. Pushed music pages retain their own native
+navigation and actions.
+Header insets, action sizing and spacing come from
+[the shared mobile header](../CoreUI/README.md), with no Music-specific top offset.
+The mobile landing page and browse grids use the shared `AppBackground` inside
+their navigation stack, following the app theme and Gradient Backgrounds setting.
+Artwork-led detail pages and the player keep their separate backgrounds.
+Mobile browsing rails reuse Home's section headings, adaptive page insets,
+section spacing and scroll clearance. Album, playlist and recent-track captions
+use the shared poster typography; artist labels use the same title metrics while
+retaining their circular artwork.
+
 Development/TestFlight source selection also offers **Navidrome (Subsonic)**.
 It joins the same music browser and player without adding video destinations.
 Plex/Jellyfin/Emby music remains available through their normal account sign-in;
@@ -124,6 +138,11 @@ The overlay stays outside that reservation so its position does not move.
 Both docks emphasize play/pause (30-point glyph) over previous/next (22 in the
 wide dock, 24 in the compact dock) and shuffle/repeat (18), without changing
 control spacing or hit regions.
+In tall regular-width windows, the expanded artwork, metadata, scrubber and
+transport form one vertically centered group with bounded internal spacing.
+Opening lyrics or the queue preserves that grouping in the player column;
+landscape and compact-width players retain their existing spacing. The utility
+row remains at the safe-area bottom.
 Both dock sizes reuse the expanded player's scaling play/pause transition and
 press feedback. Play/pause retains its press scaling and haptics without a
 circular background highlight, in both the docks and expanded player.
@@ -154,15 +173,20 @@ playlist-entry selection identity, and a neutral current-track highlight.
 `iOS/MobileMusicDetail.swift` caps content width at 1,000 points and stacks the
 hero/actions at accessibility text sizes. Page headings scroll with content;
 Plozz's native navigation bar and back gesture remain in place.
-As in Mozz, compact heroes extend through the top safe area; wide framed heroes
-fade from the deep page color into the artwork color. Only foreground content
-clears the native navigation inset, avoiding a separate dark navigation band.
+Compact and wide framed heroes start with the artwork color through the top safe
+area; the following content fades into a darker, muted base, including for dark
+artwork. Only foreground content clears the native navigation inset, avoiding
+a separate dark navigation band.
+Framed heroes draw above the following section so artwork shadows can fade into
+its background without a hard edge or extra layout spacing.
 Native back controls remain, without an additional navigation-bar background or
 iOS 26 top-edge scrim over the hero.
 
 The detail backdrop uses the same policy-resolved, cached bitmap as its hero,
 with a dark two-tone palette that keeps text legible when Gradient Backgrounds
-is enabled, including in Black mode. Disabling gradients uses the flat app theme
+is enabled. Black mode retains 75% of that background's color contribution using the
+shared theme intensity, without dimming the artwork or controls.
+Disabling gradients uses the flat app theme
 and its foreground contrast, with framed artwork still visible. The player
 override never changes these pages. Reduce Motion disables artist overscroll
 stretch and the active-track equalizer animation. Video and tvOS details are

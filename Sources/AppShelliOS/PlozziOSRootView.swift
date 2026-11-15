@@ -112,6 +112,23 @@ public struct PlozziOSRootView: View {
                     .task { consumeDeferredPairingURL() }
             }
         }
+        .signInSyncPermission(
+            appModel.providerCredentialSync.publicationPermission,
+            canPresent: setupPresentationReady && appModel.isActiveProfileAuthorized
+                && !appModel.managementRequiresParentalPIN && !appModel.profiles.activeProfile.needsSetup
+                && !needsDiagnosticConsent && !appModel.syncSetup.needsOnboardingChoice
+                && appModel.initialSetupRestoration.phase == .hidden
+                && !appModel.isSettingsPresented && !releaseNotes.hasPendingStartupNotes
+                && appModel.pendingSyncSetupOffer == nil,
+            sourceNames: { $0.accounts.map { "\($0.server.name) — \($0.userName)" }.joined(separator: "\n") }
+        ) { request, allow in
+            if appModel.providerCredentialSync.resolvePublicationPermission(request, allow: allow) {
+                appModel.scheduleCloudPublish()
+            } else {
+                appModel.transientStatusPresenter.present(
+                    icon: "exclamationmark.triangle", text: "Couldn't save sign-in sync permission.")
+            }
+        }
         .onChange(
             of: appModel.isActiveProfileAuthorized && !appModel.profiles.activeProfile.needsSetup
                 && !appModel.isOfflineMode && appModel.initialSetupRestoration.phase == .hidden,
@@ -864,6 +881,7 @@ private struct PlozziOSScenePhaseEffects: View {
                 if newPhase == .active {
                     appModel.accountsProviders.retryUnconfirmedCredentials()
                     appModel.syncCloudOnForeground()
+                    appModel.requestLocalNetworkAccessIfNeeded()
                     Task { await appModel.synchronizeTrackerHistoryOnForeground() }
                 }
             }
@@ -884,6 +902,7 @@ private struct PendingPairing: Identifiable {
 enum PlozziOSDestination: Identifiable, Hashable {
     case home
     case watchlist
+    case upcoming
     case discover
     case liveTV
     case downloads
@@ -899,6 +918,7 @@ enum PlozziOSDestination: Identifiable, Hashable {
         switch self {
         case .home: "home"
         case .watchlist: "watchlist"
+        case .upcoming: "upcoming"
         case .discover: "discover"
         case .liveTV: "liveTV"
         case .downloads: "downloads"
@@ -914,6 +934,7 @@ enum PlozziOSDestination: Identifiable, Hashable {
         switch rawValue {
         case "home": self = .home
         case "watchlist": self = .watchlist
+        case "upcoming": self = .upcoming
         case "discover": self = .discover
         case "liveTV": self = .liveTV
         case "downloads": self = .downloads
@@ -937,6 +958,7 @@ enum PlozziOSDestination: Identifiable, Hashable {
         switch self {
         case .home: "Home"
         case .watchlist: "Watchlist"
+        case .upcoming: "Upcoming"
         case .discover: "Discover"
         case .liveTV: "Live TV"
         case .downloads: "Downloads"
@@ -957,6 +979,7 @@ enum PlozziOSDestination: Identifiable, Hashable {
         switch self {
         case .home: "house"
         case .watchlist: "bookmark"
+        case .upcoming: "calendar"
         case .discover: "sparkles"
         case .liveTV: "antenna.radiowaves.left.and.right"
         case .downloads: "arrow.down.circle"
@@ -988,27 +1011,32 @@ private struct PlozziOSScreenshotTabRouter: View {
 }
 
 struct PlozziOSNavigationBackground: ViewModifier {
+    var hidesRegularTabBackdrop = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.plozziOSIsRunningOnMac) private var isRunningOnMac
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.plozzReduceTransparency) private var reduceTransparency
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        let hidesTabBackdrop = isRunningOnMac || (hidesRegularTabBackdrop && horizontalSizeClass == .regular)
         if #available(iOS 26.0, *) {
             let opaqueChrome = systemReduceTransparency || reduceTransparency
             content
-                .toolbarBackground(isRunningOnMac || opaqueChrome ? .hidden : .automatic, for: .tabBar)
+                .toolbarBackground(hidesTabBackdrop || opaqueChrome ? .hidden : .automatic, for: .tabBar)
                 // Hide only the full-width edge backdrop; native controls keep their opaque treatment.
                 .scrollEdgeEffectHidden(isRunningOnMac || opaqueChrome, for: .top)
                 .scrollEdgeEffectHidden(opaqueChrome, for: .bottom)
         } else {
             content
-                .toolbarBackground(isRunningOnMac ? .hidden : .automatic, for: .tabBar)
+                .toolbarBackground(hidesTabBackdrop ? .hidden : .automatic, for: .tabBar)
         }
     }
 }
 
 struct PlozziOSTabShell: View {
+    @Environment(\.locale) private var locale
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.themePalette) private var palette
     @Environment(\.plozzReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
@@ -1028,11 +1056,63 @@ struct PlozziOSTabShell: View {
     @State private var retainsExplicitWatchlistEntry = false
     @State private var retainsExplicitDownloadEntry = false
     @State private var downloadNavigationID: UUID?
+    @State private var searchFocusRequest = 0
+    @State private var searchReplaceQueryRequest = 0
+    @State private var navigationRootRequest = 0
     @State private var hasChosenNavigationDestination = false
+    @State private var scrollToTopRequest = 0
     let homeViewModelBox: LazyViewState<HomeViewModel>
+    var upcomingFeedLoader:
+        (@Sendable (@escaping @MainActor @Sendable ([UpcomingRelease]) -> Void) async throws -> UpcomingFeedSnapshot)?
     var sharedHomeViewModel: HomeViewModel {
         homeViewModelBox.value(forKey: homeContentIdentity, onDiscard: { $0.invalidate() }) {
             Self.makeHomeViewModel(appModel: appModel)
+        }
+    }
+
+    private var upcomingScopeKey: String {
+        UpcomingFeedLoader.scopeKey(
+            profileID: appModel.profiles.activeProfileID,
+            accounts: appModel.upcomingAccounts,
+            requestIdentity: appModel.profiles.activeProfile.seerrRequestIdentity,
+            connectionRevision: appModel.seerService.connectionRevision,
+            language: locale.identifier, regionCode: Locale.current.region?.identifier
+        )
+    }
+
+    private func refreshUpcoming() async {
+        let scope = upcomingScopeKey
+        let accounts = appModel.upcomingAccounts
+        let saved = appModel.resolvedUniversalWatchlistItems(candidates: [])
+        let region = Locale.current.region?.identifier
+        let language = locale.identifier
+        let identity = appModel.profiles.activeProfile.seerrRequestIdentity
+        let seer = appModel.seerService
+        let cacheScope = UpcomingFeedLoader.scopeKey(
+            profileID: appModel.profiles.activeProfileID, accounts: accounts,
+            requestIdentity: identity, connectionRevision: nil, language: language,
+            regionCode: region, requestServerURL: seer.savedBaseURLString
+        )
+        let isCurrent: @MainActor @Sendable () -> Bool = {
+            appModel.isLiveTVProfileAuthorized && upcomingScopeKey == scope
+        }
+        await sharedHomeViewModel.upcoming.refresh(
+            scope: scope, namespace: appModel.profiles.activeNamespace,
+            cacheScope: upcomingFeedLoader == nil ? cacheScope : nil,
+            rehydrate: appModel.mediaItemActionHandler.rehydratePersistedArtwork,
+            isCurrent: isCurrent
+        ) { progress in
+            if let upcomingFeedLoader {
+                return try await upcomingFeedLoader(progress)
+            }
+            return try await UpcomingFeedLoader.load(
+                accounts: accounts, watchlist: saved, regionCode: region,
+                interval: UpcomingFeedLoader.window(),
+                requestedMovies: {
+                    try await seer.personallyRequestedMovies(identity: identity, language: language)
+                },
+                isCurrent: isCurrent, onProgress: progress
+            )
         }
     }
     /// The profile picker opened deliberately (from Settings) rather than at
@@ -1122,6 +1202,7 @@ struct PlozziOSTabShell: View {
                 switch key {
                 case NavigationLibraryLayout.homeKey: return .home
                 case NavigationLibraryLayout.watchlistKey: return .watchlist
+                case NavigationLibraryLayout.upcomingKey: return .upcoming
                 case NavigationLibraryLayout.discoverKey: return .discover
                 case NavigationLibraryLayout.liveTVKey: return .liveTV
                 case NavigationLibraryLayout.searchKey: return .search
@@ -1181,7 +1262,13 @@ struct PlozziOSTabShell: View {
     private var destinationSelection: Binding<PlozziOSDestination> {
         Binding(
             get: { effectiveSelectedDestination },
-            set: openDestination
+            set: { destination in
+                if usesOpaqueBottomBar, destination == effectiveSelectedDestination,
+                   destination != .settings, !isShowingMorePage {
+                    scrollToTopRequest &+= 1
+                }
+                openDestination(destination)
+            }
         )
     }
 
@@ -1196,7 +1283,19 @@ struct PlozziOSTabShell: View {
 
     private func selectDestination(_ destination: PlozziOSDestination) {
         isShowingMorePage = false
-        selectedDestination = resolvedDestination(destination)
+        let wasShowingSearch = effectiveSelectedDestination == .search
+        let resolved = resolvedDestination(destination)
+        selectedDestination = resolved
+        guard resolved == .search else { return }
+        // Pressing Search always lands in the field with the keyboard, whether the
+        // viewer is coming from another tab or pressing Search again while already
+        // there. A re-tap also starts a new search, so the previous query is cleared
+        // instead of being left behind the keyboard.
+        searchFocusRequest &+= 1
+        // Pressing Search means "search", even when a detail page was pushed on top
+        // of the search results: return that stack to its root first, then focus.
+        navigationRootRequest &+= 1
+        if wasShowingSearch { searchReplaceQueryRequest &+= 1 }
     }
 
     private func consumeStandaloneEntryIfNeeded() {
@@ -1232,6 +1331,32 @@ struct PlozziOSTabShell: View {
         } else {
             NavigationStack {
                 destinationContent(for: destination, keepsNavigationBar: isOverflow)
+                    // Keep the stack itself directly hosted by Tab so iPad can merge its toolbar.
+                    .plozzOpaqueNavigationChrome()
+                    // Search results push a detail page through a view-based link, so
+                    // the Search tab needs UIKit to pop back to its root when the tab
+                    // is pressed. Inert for every other destination.
+                    .background {
+                        PlozziOSNavigationPopProxy(
+                            request: navigationRootRequest,
+                            isSearch: destination == .search,
+                            onReselect: destination == .search
+                                ? {
+                                    // A re-tap never reaches the TabView binding, so
+                                    // the shell is told explicitly: focus the field,
+                                    // clear the previous query, return to the results.
+                                    if FanoutDiagnostics.isEnabled {
+                                        FanoutDiagnostics.emit(
+                                            "TABRESELECT t=\(Int(ProcessInfo.processInfo.systemUptime * 1000))"
+                                        )
+                                    }
+                                    selectDestination(.search)
+                                }
+                                : nil
+                        )
+                        .frame(width: 0, height: 0)
+                        .allowsHitTesting(false)
+                    }
                     .toolbar {
                         if isOverflow, destination != .downloads {
                             PlozziOSOverflowBackToolbarItem(action: overflowNavigation.returnToMore)
@@ -1239,8 +1364,8 @@ struct PlozziOSTabShell: View {
                     }
                     .environment(\.plozziOSIsOverflowDestination, isOverflow)
                     .environment(\.plozziOSOverflowNavigation, overflowNavigation)
+                    .plozzOpaqueNavigationChrome()
             }
-            .plozzOpaqueNavigationChrome()
             .id(destination == .downloads ? downloadNavigationID : nil)
         }
     }
@@ -1255,7 +1380,7 @@ struct PlozziOSTabShell: View {
         switch destination {
         case .music:
             if let music = appModel.music {
-                PlozziOSMusicDestination(appModel: appModel, music: music)
+                PlozziOSMusicDestination(appModel: appModel, music: music, onShowSettings: showSettings)
             }
         case .home:
             PlozziOSDestinationView(
@@ -1282,6 +1407,13 @@ struct PlozziOSTabShell: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .tabBar)
             .background { AppBackground(palette: palette) }
+            .background {
+                PlozziOSHomeSidebarOverlapProbe(
+                    enabled: effectiveSelectedDestination == .home && !isShowingMorePage,
+                    geometryModel: sidebarGeometry
+                )
+                .frame(width: 0, height: 0)
+            }
         case .watchlist:
             PlozziOSDestinationView(
                 destination: .watchlist,
@@ -1293,6 +1425,11 @@ struct PlozziOSTabShell: View {
             .plozziOSItemNavigation(appModel: appModel)
             .toolbarBackground(.hidden, for: .navigationBar)
             .background { AppBackground(palette: palette) }
+        case .upcoming:
+            UpcomingView(model: sharedHomeViewModel.upcoming, interval: UpcomingFeedLoader.window())
+                .plozziOSItemNavigation(appModel: appModel)
+                .toolbarBackground(.automatic, for: .navigationBar)
+                .background { AppBackground(palette: palette) }
         case .discover:
             PlozziOSDiscoverView(appModel: appModel, onShowSettings: showSettings)
                 .plozziOSItemNavigation(appModel: appModel)
@@ -1452,7 +1589,8 @@ struct PlozziOSTabShell: View {
             recentlyAppliedRecency: { [weak appModel] in
                 await appModel?.appliedWatchRecency() ?? [:]
             },
-            mediaItemActionHandler: appModel.mediaItemActionHandler
+            mediaItemActionHandler: appModel.mediaItemActionHandler,
+            accountsAreResolved: appModel.accountsProviders.hasResolvedAccounts
         )
     }
 
@@ -1477,7 +1615,13 @@ struct PlozziOSTabShell: View {
         }
 
         .tabViewStyle(.sidebarAdaptable)
-        .modifier(PlozziOSNavigationBackground())
+        .environment(\.plozziOSSearchFocusRequest, searchFocusRequest)
+        .environment(\.plozziOSSearchReplaceQueryRequest, searchReplaceQueryRequest)
+        .environment(\.plozziOSNavigationRootRequest, navigationRootRequest)
+        .tint(palette.primaryText)
+        .modifier(PlozziOSNavigationBackground(
+            hidesRegularTabBackdrop: effectiveSelectedDestination == .home && !isShowingMorePage
+        ))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if usesOpaqueBottomBar {
                 PlozzOpaqueTabBar(items: tabDestinations, selection: destinationSelection) {
@@ -1496,11 +1640,19 @@ struct PlozziOSTabShell: View {
                     && appModel.music?.player.controller.hasActivePlayback == true,
                 musicDockUsesBottomBar: !usesVerticalToolbar,
                 hasOpaqueBottomBar: usesOpaqueBottomBar,
-                overflowNavigation: overflowNavigation
+                overflowNavigation: overflowNavigation,
+                scrollToTopRequest: scrollToTopRequest,
+                onPageReselection: UpcomingView.scrollToToday
             )
             .frame(width: 0, height: 0)
         }
         .environment(sharedHomeViewModel)
+        .task(id: "\(upcomingScopeKey)|\(sharedHomeViewModel.upcoming.refreshRevision)|\(appModel.isLiveTVProfileAuthorized)") {
+            await refreshUpcoming()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { sharedHomeViewModel.upcoming.refreshIfStale() }
+        }
         .environment(\.homeContentSnapshot, sharedHomeViewModel)
         .onChange(of: appModel.allowsHomeContentLoading, initial: true) { _, allowed in
             if !allowed { sharedHomeViewModel.cancelPendingLoad() }
@@ -1665,13 +1817,6 @@ struct PlozziOSTabShell: View {
             if destination != .downloads { retainsExplicitDownloadEntry = false }
         }
         .background { AppBackground(palette: palette) }
-        .background(alignment: .topLeading) {
-            PlozziOSHomeSidebarOverlapProbe(
-                enabled: effectiveSelectedDestination == .home && !isShowingMorePage,
-                geometryModel: sidebarGeometry
-            )
-            .frame(width: 0, height: 0)
-        }
         .background {
             // Switching tabs is the shell's job, so the capture rig's tab requests
             // are consumed here rather than in the Home stack. A zero-size leaf, so
@@ -1919,6 +2064,8 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
     var musicDockUsesBottomBar = true
     var hasOpaqueBottomBar = false
     var overflowNavigation: PlozziOSOverflowNavigation?
+    var scrollToTopRequest = 0
+    var onPageReselection: ((UIScrollView) -> Bool)?
 
     func makeUIViewController(context: Context) -> Controller { Controller() }
 
@@ -1932,7 +2079,9 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         controller.musicDockUsesBottomBar = musicDockUsesBottomBar
         controller.hasOpaqueBottomBar = hasOpaqueBottomBar
         controller.overflowNavigation = overflowNavigation
+        controller.onPageReselection = onPageReselection
         controller.install()
+        controller.receiveScrollToTopRequest(scrollToTopRequest)
     }
 
     static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
@@ -1942,6 +2091,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         controller.onSettingsVisibilityChange = nil
         controller.onBottomBarVisibilityChange = nil
         controller.overflowNavigation = nil
+        controller.onPageReselection = nil
     }
 
     final class Controller: UIViewController, UITabBarControllerDelegate, UITableViewDelegate, UINavigationControllerDelegate {
@@ -1953,6 +2103,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         var reservesMusicDockSpace = false
         var musicDockUsesBottomBar = true
         var hasOpaqueBottomBar = false
+        var onPageReselection: ((UIScrollView) -> Bool)?
         private final class MusicInset {
             weak var controller: UIViewController?
             var amount: CGFloat = 0
@@ -1969,6 +2120,7 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
         private var reportedBottomBarVisibility: Bool?
         private var reportedOverflowVisibility: Bool?
         private var previousTabBarHidden: Bool?
+        private var lastScrollToTopRequest: Int?
         private weak var owner: UITabBarController?
         private weak var previousDelegate: (any UITabBarControllerDelegate)?
         private weak var overflowTable: UITableView?
@@ -2315,7 +2467,10 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
                 action?()
                 return false
             }
-            return previousDelegate?.tabBarController?(tabBarController, shouldSelectTab: tab) ?? true
+            let reselectsCurrentTab = tabBarController.selectedTab === tab
+            let allowed = previousDelegate?.tabBarController?(tabBarController, shouldSelectTab: tab) ?? true
+            if allowed && reselectsCurrentTab { scrollSelectedPageToTop() }
+            return allowed
         }
 
         func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
@@ -2324,7 +2479,51 @@ struct PlozziOSSettingsTabAction: UIViewControllerRepresentable {
                 action?()
                 return false
             }
-            return previousDelegate?.tabBarController?(tabBarController, shouldSelect: viewController) ?? true
+            let reselectsCurrentTab = tabBarController.selectedViewController === viewController
+            let allowed = previousDelegate?.tabBarController?(tabBarController, shouldSelect: viewController) ?? true
+            if allowed && reselectsCurrentTab && viewController !== tabBarController.moreNavigationController {
+                scrollSelectedPageToTop()
+            }
+            return allowed
+        }
+
+        func receiveScrollToTopRequest(_ request: Int) {
+            defer { lastScrollToTopRequest = request }
+            guard let previous = lastScrollToTopRequest, previous != request else { return }
+            scrollSelectedPageToTop()
+        }
+
+        private func scrollSelectedPageToTop() {
+            guard let owner, var selected = owner.selectedViewController else { return }
+            if selected === owner.moreNavigationController {
+                guard let destination = owner.moreNavigationController.topViewController,
+                      destination !== owner.moreNavigationController.viewControllers.first else { return }
+                selected = destination
+            }
+            guard selected.presentedViewController == nil,
+                  let root = selected.viewIfLoaded else { return }
+
+            // The outer vertical scroller owns the page; nested horizontal media
+            // rails and other retained tabs must keep their positions.
+            func pageScroll(in view: UIView) -> UIScrollView? {
+                guard !view.isHidden, view.alpha > 0.01 else { return nil }
+                if let scroll = view as? UIScrollView,
+                   scroll.isScrollEnabled,
+                   scroll.convert(scroll.bounds, to: root).intersects(root.bounds),
+                   scroll.alwaysBounceVertical || scroll.contentSize.height
+                    + scroll.adjustedContentInset.top + scroll.adjustedContentInset.bottom > scroll.bounds.height {
+                    return scroll
+                }
+                return view.subviews.lazy.compactMap { pageScroll(in: $0) }.first
+            }
+            guard let scroll = pageScroll(in: root) else { return }
+            if onPageReselection?(scroll) == true { return }
+            let top = -scroll.adjustedContentInset.top
+            guard scroll.contentOffset.y > top else { return }
+            scroll.setContentOffset(
+                CGPoint(x: scroll.contentOffset.x, y: top),
+                animated: !UIAccessibility.isReduceMotionEnabled
+            )
         }
 
         override func responds(to selector: Selector!) -> Bool {
@@ -2377,7 +2576,7 @@ private struct PlozziOSDestinationView: View {
                 viewModel: sharedHomeViewModel,
                 onShowSettings: onShowSettings
             )
-        case .discover, .liveTV, .library, .allLibraries, .music:
+        case .discover, .upcoming, .liveTV, .library, .allLibraries, .music:
             EmptyView()
         case .search:
             PlozziOSSearchView(

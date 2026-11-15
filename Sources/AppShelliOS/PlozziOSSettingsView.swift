@@ -511,7 +511,7 @@ private struct PlozziOSSettingsSplitView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: MobileSettingsMetrics.sectionSpacing) {
                     // Live media-share scan/enrich progress. Renders nothing when
                     // idle, so Settings is unchanged unless a share is working.
                     ShareScanStatusHeader(
@@ -1014,13 +1014,17 @@ private struct PlozziOSSettingsVersionSection<ReleaseLink: View>: View {
 private struct PlozziOSDeveloperInfoSection: View {
     var body: some View {
         SettingsSectionGroup("Device & Build") {
-            ForEach(DeveloperInfo.snapshot()) { item in
+            ForEach(DeveloperInfo.snapshot(
+                localNetwork: LocalNetworkAuthorization.recordedState.diagnosticLabel
+            )) { item in
                 LabeledContent(item.label, value: item.value)
             }
             LabeledContent("OS", value: ProcessInfo.processInfo.operatingSystemVersionString)
             Button {
                 UIPasteboard.general.string = DeveloperInfo.copyText(
-                    DeveloperInfo.snapshot(),
+                    DeveloperInfo.snapshot(
+                        localNetwork: LocalNetworkAuthorization.recordedState.diagnosticLabel
+                    ),
                     extra: [DeveloperInfoItem(
                         id: "os",
                         label: "OS",
@@ -1081,7 +1085,7 @@ private struct PlozziOSSettingsCompactMenu: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: MobileSettingsMetrics.sectionSpacing) {
                 navigationTitles(NavigationLibraryLayout.settingsKey, default: Text("Settings"))
                     .font(.largeTitle.bold())
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -2205,7 +2209,9 @@ struct PlozziOSMusicPlayerSettingsView: View {
         List {
             SettingsSectionGroup("Appearance") {
                 CompactMusicStylePicker(selection: $model.appearance) { appearance in
-                    MusicPlayerStylePreview(appearance: appearance)
+                    MusicPlayerStylePreview(
+                        appearance: appearance, cornerRadius: MobileSettingsMetrics.previewContentCornerRadius
+                    )
                 }
                 .settingsSearchAnchor("music-style")
                 .accessibilityIdentifier("music-player-appearance")
@@ -2715,6 +2721,14 @@ struct PlozziOSPlaybackSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .settingsSearchGroup(["lossless-audio", "identify-songs"])
+            if AppReleaseChannel.current.isBeta {
+                SettingsSectionGroup("Video") {
+                    Toggle("P7 FEL → P8.1 conversion", isOn: $model.settings.dolbyVisionFELConversion)
+                    Text("Approximates enhancement-layer brightness without full FEL reconstruction. Turn off to use HDR10.")
+                        .settingsHelperText()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             SettingsSectionGroup("Discs") {
                 VStack(alignment: .leading, spacing: 6) {
                     Picker("Disc playback", selection: $model.settings.discPlayback) {

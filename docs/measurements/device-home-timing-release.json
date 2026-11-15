@@ -1,0 +1,1601 @@
+{
+  "capturedAt": "2026-11-15T09:13:31.848204+00:00",
+  "runs": [
+    {
+      "lines": [
+        [
+          620.7416249671951,
+          "Launched application with com.thatcube.Plozz bundle identifier."
+        ],
+        [
+          625.2607919741422,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          934.0402079978958,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1131.1660829233006,
+          "PLZBOOT HomeVM.load START vm=11260682782399539040 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1228.3493749564514,
+          "PLZBOOT HeroAvailability title=Overgeared key=anilist:series:212888|anime|series|text-language-v1:en|anime-anilist:212888|anime-mal:64340|aniList:6:212888|myAnimeList:5:64340 offers=2 events=0 line=no"
+        ],
+        [
+          1263.444707961753,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1650.6038749357685,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=167"
+        ],
+        [
+          1836.1816669348627,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=351"
+        ],
+        [
+          1867.8562080021948,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=382"
+        ],
+        [
+          1878.4812079975381,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=389"
+        ],
+        [
+          1996.415082947351,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=508"
+        ],
+        [
+          2007.4379169382155,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=520"
+        ],
+        [
+          2007.4474170105532,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=520"
+        ],
+        [
+          2007.4501249473542,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2007.4522499926388,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2207.5024580117315,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=721"
+        ],
+        [
+          2207.5250829802826,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=721"
+        ],
+        [
+          2215.8160000108182,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          3161.7242499487475,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=1675"
+        ],
+        [
+          3176.585291977972,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=1693"
+        ],
+        [
+          3183.7805829709396,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          3183.7863749824464,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=1694"
+        ],
+        [
+          3538.0238329526037,
+          "PLZBOOT HomeVM.load DONE vm=11260682782399539040 empty=false merged=false cw=47 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 1694,
+        "aggregate_ms": 1694,
+        "bundle": "com.thatcube.Plozz",
+        "complete": true,
+        "first_boot_wall_ms": 934.0402079978958,
+        "home_done_wall_ms": 3538.0238329526037,
+        "home_start_wall_ms": 1131.1660829233006,
+        "requests": [
+          {
+            "ms": 167,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 351,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 382,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 389,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 508,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 721,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1675,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 1693,
+        "row_libraries_ms": 520,
+        "row_recentlyAdded_ms": 520,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 721,
+        "rows": {
+          "continueWatching": 1693,
+          "libraries": 520,
+          "recentlyAdded": 520,
+          "watchlist": 721
+        },
+        "run": 1,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          698.5552500700578,
+          "Launched application with com.thatcube.Plozz.selfbuild bundle identifier."
+        ],
+        [
+          702.330750063993,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          791.181500069797,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1026.4332090737298,
+          "PLZBOOT HomeVM.load START vm=6192431746601693682 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1322.2508750623092,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1999.1251670289785,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=448"
+        ],
+        [
+          2065.0075000012293,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=513"
+        ],
+        [
+          2133.02220904734,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=582"
+        ],
+        [
+          2141.452500014566,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=583"
+        ],
+        [
+          2400.7903339806944,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=848"
+        ],
+        [
+          2410.854959045537,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=857"
+        ],
+        [
+          2410.8662500511855,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=857"
+        ],
+        [
+          2410.868917009793,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2410.8712499728426,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2505.7577090337873,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=950"
+        ],
+        [
+          2505.767500028014,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=951"
+        ],
+        [
+          2518.785584019497,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          4333.485541981645,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2783"
+        ],
+        [
+          4352.172542014159,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2802"
+        ],
+        [
+          4369.8082090122625,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          4369.8186670662835,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2803"
+        ],
+        [
+          4720.322750043124,
+          "PLZBOOT HomeVM.load DONE vm=6192431746601693682 empty=false merged=false cw=54 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2803,
+        "aggregate_ms": 2803,
+        "bundle": "com.thatcube.Plozz.selfbuild",
+        "complete": true,
+        "first_boot_wall_ms": 791.181500069797,
+        "home_done_wall_ms": 4720.322750043124,
+        "home_start_wall_ms": 1026.4332090737298,
+        "requests": [
+          {
+            "ms": 448,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 513,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 582,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 583,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 848,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 950,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 2783,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2802,
+        "row_libraries_ms": 857,
+        "row_recentlyAdded_ms": 857,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 951,
+        "rows": {
+          "continueWatching": 2802,
+          "libraries": 857,
+          "recentlyAdded": 857,
+          "watchlist": 951
+        },
+        "run": 1,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          628.0678749317303,
+          "Launched application with com.thatcube.Plozz bundle identifier."
+        ],
+        [
+          632.1984169771895,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          778.5205829422921,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          921.298416913487,
+          "PLZBOOT HomeVM.load START vm=14731955658447760001 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1071.2649999186397,
+          "PLZBOOT HeroAvailability title=Black Clover Season 2 key=anilist:series:195604|anime|series|text-language-v1:en|anime-anilist:195604|anime-mal:61967|aniList:6:195604|myAnimeList:5:61967 offers=0 events=0 line=no"
+        ],
+        [
+          1111.5981669863686,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1518.3197079459205,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=207"
+        ],
+        [
+          1669.9477919610217,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=358"
+        ],
+        [
+          1716.3036249112338,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=411"
+        ],
+        [
+          1725.8539169561118,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=417"
+        ],
+        [
+          1837.98033290077,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=532"
+        ],
+        [
+          1847.718624980189,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=542"
+        ],
+        [
+          1847.7294580079615,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=542"
+        ],
+        [
+          1859.9462918937206,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          1859.9592079408467,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2073.4562079887837,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=766"
+        ],
+        [
+          2082.223624922335,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=766"
+        ],
+        [
+          2082.2337499121204,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          3029.7989998944104,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=1723"
+        ],
+        [
+          3046.280291979201,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=1741"
+        ],
+        [
+          3054.3962919618934,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          3054.406291921623,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=1741"
+        ],
+        [
+          3412.3896249802783,
+          "PLZBOOT HomeVM.load DONE vm=14731955658447760001 empty=false merged=false cw=47 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 1741,
+        "aggregate_ms": 1741,
+        "bundle": "com.thatcube.Plozz",
+        "complete": true,
+        "first_boot_wall_ms": 778.5205829422921,
+        "home_done_wall_ms": 3412.3896249802783,
+        "home_start_wall_ms": 921.298416913487,
+        "requests": [
+          {
+            "ms": 207,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 358,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 411,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 417,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 532,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 766,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1723,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 1741,
+        "row_libraries_ms": 542,
+        "row_recentlyAdded_ms": 542,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 766,
+        "rows": {
+          "continueWatching": 1741,
+          "libraries": 542,
+          "recentlyAdded": 542,
+          "watchlist": 766
+        },
+        "run": 2,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          662.9940829006955,
+          "Launched application with com.thatcube.Plozz.selfbuild bundle identifier."
+        ],
+        [
+          665.4702499508858,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          749.6530419448391,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          982.3381250025705,
+          "PLZBOOT HomeVM.load START vm=2307052927269824933 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1207.178624928929,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1931.2452499289066,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=563"
+        ],
+        [
+          1948.1847499264404,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=580"
+        ],
+        [
+          2039.2337499652058,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=667"
+        ],
+        [
+          2064.016499905847,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=693"
+        ],
+        [
+          2273.8329999847338,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=906"
+        ],
+        [
+          2290.4279169160873,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=917"
+        ],
+        [
+          2290.489499922842,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=917"
+        ],
+        [
+          2305.014416924678,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2305.022916989401,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2305.0252919783816,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=928"
+        ],
+        [
+          2305.0274580018595,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=929"
+        ],
+        [
+          2314.924457925372,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          3618.1783749489114,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2249"
+        ],
+        [
+          3652.6388749480247,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2286"
+        ],
+        [
+          3661.835458013229,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          3661.84562491253,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2286"
+        ],
+        [
+          4021.8107919208705,
+          "PLZBOOT HomeVM.load DONE vm=2307052927269824933 empty=false merged=false cw=54 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2286,
+        "aggregate_ms": 2286,
+        "bundle": "com.thatcube.Plozz.selfbuild",
+        "complete": true,
+        "first_boot_wall_ms": 749.6530419448391,
+        "home_done_wall_ms": 4021.8107919208705,
+        "home_start_wall_ms": 982.3381250025705,
+        "requests": [
+          {
+            "ms": 563,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 580,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 667,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 693,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 906,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 928,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 2249,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2286,
+        "row_libraries_ms": 917,
+        "row_recentlyAdded_ms": 917,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 929,
+        "rows": {
+          "continueWatching": 2286,
+          "libraries": 917,
+          "recentlyAdded": 917,
+          "watchlist": 929
+        },
+        "run": 2,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          584.225041908212,
+          "Launched application with com.thatcube.Plozz bundle identifier."
+        ],
+        [
+          590.1911249384284,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          685.0058749550954,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          882.0363749982789,
+          "PLZBOOT HomeVM.load START vm=16229580169271423390 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1028.178499895148,
+          "PLZBOOT HeroAvailability title=STEEL BALL RUN JoJo's Bizarre Adventure 2nd - 3rd STAGE key=anilist:series:210482|anime|series|text-language-v1:en|anime-anilist:210482|anime-mal:61469|aniList:6:210482|myAnimeList:5:61469 offers=15 events=0 line=no"
+        ],
+        [
+          1055.9171669883654,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1417.2452919883654,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=208"
+        ],
+        [
+          1622.8802499826998,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=412"
+        ],
+        [
+          1635.7834169175476,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=427"
+        ],
+        [
+          1653.370166895911,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=444"
+        ],
+        [
+          1840.0420419638976,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=631"
+        ],
+        [
+          1856.8700419273227,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=645"
+        ],
+        [
+          1856.8795839091763,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=645"
+        ],
+        [
+          1863.8403340009972,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          1863.8464169343933,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          1929.2480419389904,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=720"
+        ],
+        [
+          1939.436208922416,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=721"
+        ],
+        [
+          1939.4433749839664,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          2950.909166946076,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=1742"
+        ],
+        [
+          2966.2129170028493,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=1757"
+        ],
+        [
+          2974.588666926138,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          2974.597749998793,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=1757"
+        ],
+        [
+          3334.4829590059817,
+          "PLZBOOT HomeVM.load DONE vm=16229580169271423390 empty=false merged=false cw=47 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 1757,
+        "aggregate_ms": 1757,
+        "bundle": "com.thatcube.Plozz",
+        "complete": true,
+        "first_boot_wall_ms": 685.0058749550954,
+        "home_done_wall_ms": 3334.4829590059817,
+        "home_start_wall_ms": 882.0363749982789,
+        "requests": [
+          {
+            "ms": 208,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 412,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 427,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 444,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 631,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 720,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1742,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 1757,
+        "row_libraries_ms": 645,
+        "row_recentlyAdded_ms": 645,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 721,
+        "rows": {
+          "continueWatching": 1757,
+          "libraries": 645,
+          "recentlyAdded": 645,
+          "watchlist": 721
+        },
+        "run": 3,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          615.29587500263,
+          "Launched application with com.thatcube.Plozz.selfbuild bundle identifier."
+        ],
+        [
+          618.1024169782177,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          752.5903329951689,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          997.6179579971358,
+          "PLZBOOT HomeVM.load START vm=8912846839068438466 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1285.893291933462,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1708.9986249338835,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=353"
+        ],
+        [
+          2039.7387499688193,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=683"
+        ],
+        [
+          2048.1560829794034,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=685"
+        ],
+        [
+          2280.2832080051303,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=924"
+        ],
+        [
+          2507.596542011015,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=1147"
+        ],
+        [
+          2519.2203749902546,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=1148"
+        ],
+        [
+          2519.2241249606013,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          2519.225624972023,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=1151"
+        ],
+        [
+          2519.2272500135005,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=1160"
+        ],
+        [
+          2519.2283749347553,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=1160"
+        ],
+        [
+          2519.229666911997,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2519.230791949667,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          4234.2977919615805,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2878"
+        ],
+        [
+          4257.2008749702945,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2902"
+        ],
+        [
+          4269.7131669847295,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          4269.723791978322,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2902"
+        ],
+        [
+          4623.6252499511465,
+          "PLZBOOT HomeVM.load DONE vm=8912846839068438466 empty=false merged=false cw=54 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2902,
+        "aggregate_ms": 2902,
+        "bundle": "com.thatcube.Plozz.selfbuild",
+        "complete": true,
+        "first_boot_wall_ms": 752.5903329951689,
+        "home_done_wall_ms": 4623.6252499511465,
+        "home_start_wall_ms": 997.6179579971358,
+        "requests": [
+          {
+            "ms": 353,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 683,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 685,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 924,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 1147,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1151,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 2878,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2902,
+        "row_libraries_ms": 1160,
+        "row_recentlyAdded_ms": 1160,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 1148,
+        "rows": {
+          "continueWatching": 2902,
+          "libraries": 1160,
+          "recentlyAdded": 1160,
+          "watchlist": 1148
+        },
+        "run": 3,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          716.9602910289541,
+          "Launched application with com.thatcube.Plozz bundle identifier."
+        ],
+        [
+          720.7817500457168,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          827.4407080607489,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1019.1783329937607,
+          "PLZBOOT HomeVM.load START vm=17153439223918455138 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1202.2978749591857,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1669.9740410549566,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=282"
+        ],
+        [
+          1878.9510410279036,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=492"
+        ],
+        [
+          1887.015416054055,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=494"
+        ],
+        [
+          1900.8755830582231,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=514"
+        ],
+        [
+          2091.3443750469014,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=704"
+        ],
+        [
+          2104.1364580160007,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=717"
+        ],
+        [
+          2104.1429999750108,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=717"
+        ],
+        [
+          2104.1458749677986,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2104.148249956779,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2191.7405830463395,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=804"
+        ],
+        [
+          2191.749250050634,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=805"
+        ],
+        [
+          2199.6788330143318,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          3516.1407500272617,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2128"
+        ],
+        [
+          3553.750375052914,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2166"
+        ],
+        [
+          3561.595291015692,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          3561.6019580047578,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2172"
+        ],
+        [
+          3911.7640829645097,
+          "PLZBOOT HomeVM.load DONE vm=17153439223918455138 empty=false merged=false cw=47 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2172,
+        "aggregate_ms": 2172,
+        "bundle": "com.thatcube.Plozz",
+        "complete": true,
+        "first_boot_wall_ms": 827.4407080607489,
+        "home_done_wall_ms": 3911.7640829645097,
+        "home_start_wall_ms": 1019.1783329937607,
+        "requests": [
+          {
+            "ms": 282,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 492,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 494,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 514,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 704,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 804,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 2128,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2166,
+        "row_libraries_ms": 717,
+        "row_recentlyAdded_ms": 717,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 805,
+        "rows": {
+          "continueWatching": 2166,
+          "libraries": 717,
+          "recentlyAdded": 717,
+          "watchlist": 805
+        },
+        "run": 4,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          683.7033329065889,
+          "Launched application with com.thatcube.Plozz.selfbuild bundle identifier."
+        ],
+        [
+          686.9482499314472,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          784.2123329173774,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1017.1077499398962,
+          "PLZBOOT HomeVM.load START vm=5796641312438327761 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1258.0579579807818,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1853.689832962118,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=386"
+        ],
+        [
+          2176.8392499070615,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=709"
+        ],
+        [
+          2261.7169169243425,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=795"
+        ],
+        [
+          2280.305166961625,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=813"
+        ],
+        [
+          2487.4587079975754,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=1020"
+        ],
+        [
+          2499.159749946557,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=1021"
+        ],
+        [
+          2499.166291905567,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=1021"
+        ],
+        [
+          2499.1690419847146,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          2513.716374989599,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=1036"
+        ],
+        [
+          2513.7232079869136,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=1036"
+        ],
+        [
+          2513.72570800595,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2513.728041900322,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          3891.1606249166653,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2422"
+        ],
+        [
+          3908.8054168969393,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2442"
+        ],
+        [
+          3935.2087499573827,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          3935.2234998950735,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2442"
+        ],
+        [
+          4291.09624994453,
+          "PLZBOOT HomeVM.load DONE vm=5796641312438327761 empty=false merged=false cw=54 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2442,
+        "aggregate_ms": 2442,
+        "bundle": "com.thatcube.Plozz.selfbuild",
+        "complete": true,
+        "first_boot_wall_ms": 784.2123329173774,
+        "home_done_wall_ms": 4291.09624994453,
+        "home_start_wall_ms": 1017.1077499398962,
+        "requests": [
+          {
+            "ms": 386,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 709,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 795,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 813,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 1020,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1021,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 2422,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2442,
+        "row_libraries_ms": 1036,
+        "row_recentlyAdded_ms": 1036,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 1021,
+        "rows": {
+          "continueWatching": 2442,
+          "libraries": 1036,
+          "recentlyAdded": 1036,
+          "watchlist": 1021
+        },
+        "run": 4,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          561.2620000028983,
+          "Launched application with com.thatcube.Plozz bundle identifier."
+        ],
+        [
+          575.154000078328,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          683.4315410815179,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          879.5062910066918,
+          "PLZBOOT HomeVM.load START vm=16288812419435021636 accounts=1 state=loaded silent=true"
+        ],
+        [
+          987.025500042364,
+          "PLZBOOT HeroAvailability title=VisionQuest key=tmdb:series:213375|tvShow|series|text-language-v1:en|tmdb:6:213375 offers=1 events=0 line=no"
+        ],
+        [
+          1075.5322499899194,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1430.6966250296682,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=187"
+        ],
+        [
+          1594.0962909953669,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=351"
+        ],
+        [
+          1727.6495409896597,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=486"
+        ],
+        [
+          1744.0672080265358,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=486"
+        ],
+        [
+          1850.7569580106065,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=607"
+        ],
+        [
+          1861.467375070788,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=618"
+        ],
+        [
+          1861.4769160049036,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=618"
+        ],
+        [
+          1861.4822910167277,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          1861.4998750854284,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          1958.7131660664454,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=715"
+        ],
+        [
+          1967.6971660228446,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=715"
+        ],
+        [
+          1967.7067500306293,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          2905.5309160612524,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=1662"
+        ],
+        [
+          2924.0728750592098,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=1679"
+        ],
+        [
+          2930.4107080679387,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          2930.419458076358,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=1679"
+        ],
+        [
+          3291.0034160595387,
+          "PLZBOOT HomeVM.load DONE vm=16288812419435021636 empty=false merged=false cw=47 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 1679,
+        "aggregate_ms": 1679,
+        "bundle": "com.thatcube.Plozz",
+        "complete": true,
+        "first_boot_wall_ms": 683.4315410815179,
+        "home_done_wall_ms": 3291.0034160595387,
+        "home_start_wall_ms": 879.5062910066918,
+        "requests": [
+          {
+            "ms": 187,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 351,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 486,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 486,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 607,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 715,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 1662,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 1679,
+        "row_libraries_ms": 618,
+        "row_recentlyAdded_ms": 618,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 715,
+        "rows": {
+          "continueWatching": 1679,
+          "libraries": 618,
+          "recentlyAdded": 618,
+          "watchlist": 715
+        },
+        "run": 5,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    },
+    {
+      "lines": [
+        [
+          610.7258750125766,
+          "Launched application with com.thatcube.Plozz.selfbuild bundle identifier."
+        ],
+        [
+          612.3555420199409,
+          "Waiting for the application to terminate\u2026"
+        ],
+        [
+          754.3424169998616,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          972.1578330500051,
+          "PLZBOOT HomeVM.load START vm=3961322851452483911 accounts=1 state=loaded silent=true"
+        ],
+        [
+          1282.7551249647513,
+          "PLZBOOT ensurePlexIdentity profile=com.plozz.profile.default plexAccounts=0 withBinding=0 gen=0"
+        ],
+        [
+          1735.2986249607056,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=359"
+        ],
+        [
+          2058.735458063893,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=676"
+        ],
+        [
+          2101.073917001486,
+          "PLZBOOT HomeAgg.request row=server-sections provider=jellyfin ms=726"
+        ],
+        [
+          2134.3711250228807,
+          "PLZBOOT HomeAgg.request row=recentlyAdded provider=jellyfin ms=760"
+        ],
+        [
+          2415.4857080429792,
+          "PLZBOOT HomeAgg.request row=libraries provider=jellyfin ms=1038"
+        ],
+        [
+          2427.9049170436338,
+          "PLZBOOT HomeAgg.rowReady row=recentlyAdded ms=1046"
+        ],
+        [
+          2427.9175420524552,
+          "PLZBOOT HomeAgg.rowReady row=libraries ms=1046"
+        ],
+        [
+          2427.9202920151874,
+          "PLZBOOT HomeVM.rowReady row=libraries"
+        ],
+        [
+          2427.92345804628,
+          "PLZBOOT HomeVM.rowReady row=recentlyAdded"
+        ],
+        [
+          2442.414583056234,
+          "PLZBOOT HomeAgg.request row=watchlist provider=jellyfin ms=1068"
+        ],
+        [
+          2442.4236670602113,
+          "PLZBOOT HomeAgg.rowReady row=watchlist ms=1069"
+        ],
+        [
+          2454.7417080029845,
+          "PLZBOOT HomeVM.rowReady row=watchlist"
+        ],
+        [
+          4195.409083040431,
+          "PLZBOOT HomeAgg.request row=continueWatching provider=jellyfin ms=2821"
+        ],
+        [
+          4214.538333006203,
+          "PLZBOOT HomeAgg.rowReady row=continueWatching ms=2840"
+        ],
+        [
+          4230.290125007741,
+          "PLZBOOT HomeVM.rowReady row=continueWatching"
+        ],
+        [
+          4230.299500050023,
+          "PLZBOOT HomeAgg.fanout accounts=1 ms=2840"
+        ],
+        [
+          4585.981957963668,
+          "PLZBOOT HomeVM.load DONE vm=3961322851452483911 empty=false merged=false cw=54 latest=20 wl=0 libs=4 sections=0"
+        ]
+      ],
+      "sample": {
+        "accounts": 1,
+        "aggregate": 2840,
+        "aggregate_ms": 2840,
+        "bundle": "com.thatcube.Plozz.selfbuild",
+        "complete": true,
+        "first_boot_wall_ms": 754.3424169998616,
+        "home_done_wall_ms": 4585.981957963668,
+        "home_start_wall_ms": 972.1578330500051,
+        "requests": [
+          {
+            "ms": 359,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 676,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 726,
+            "provider": "jellyfin",
+            "row": "server-sections"
+          },
+          {
+            "ms": 760,
+            "provider": "jellyfin",
+            "row": "recentlyAdded"
+          },
+          {
+            "ms": 1038,
+            "provider": "jellyfin",
+            "row": "libraries"
+          },
+          {
+            "ms": 1068,
+            "provider": "jellyfin",
+            "row": "watchlist"
+          },
+          {
+            "ms": 2821,
+            "provider": "jellyfin",
+            "row": "continueWatching"
+          }
+        ],
+        "row_continueWatching_ms": 2840,
+        "row_libraries_ms": 1046,
+        "row_recentlyAdded_ms": 1046,
+        "row_server-sections_ms": null,
+        "row_watchlist_ms": 1069,
+        "rows": {
+          "continueWatching": 2840,
+          "libraries": 1046,
+          "recentlyAdded": 1046,
+          "watchlist": 1069
+        },
+        "run": 5,
+        "silent": true,
+        "start": {
+          "accounts": 1,
+          "silent": true,
+          "state": "loaded"
+        },
+        "state": "loaded"
+      }
+    }
+  ]
+}

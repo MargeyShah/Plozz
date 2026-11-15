@@ -2,19 +2,100 @@
 import CoreModels
 import CoreNetworking
 import CoreUI
+import AppRuntime
 import FeatureAuth
 @testable import FeatureHomeCore
 import HeroUI
+import MetadataKit
 import Observation
 import ProviderJellyfin
 import ProviderPlex
 import SwiftUI
 import UIKit
+import Vision
 import XCTest
 @testable import AppShelliOS
 
 @MainActor
 final class HomeLoadingLayoutTests: XCTestCase {
+    func testLiveDiscoveryHeroRestoresVisiblePlayAndRatings() async throws {
+        let broker = try LiveHomeReadOnlyAccount.broker()
+        struct MetadataConfiguration: Decodable { let tmdbToken: String }
+        let (data, response) = try await URLSession.shared.data(for: URLRequest(url: broker, timeoutInterval: 15))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw AppError.invalidResponse }
+        let config = try JSONDecoder().decode(MetadataConfiguration.self, from: data)
+        let http = LiveHomeReadOnlyHTTP()
+        let account = try await LiveHomeReadOnlyAccount.connect(.jellyfin, http: http)
+        let discovery = try await TMDbDiscoveryProvider(access: .directToken(config.tmdbToken))
+            .discover(.init(limit: 16))
+        XCTAssertFalse(discovery.isEmpty)
+        let enricher = HeroMetadataEnricher(
+            accounts: [account], targetSelector: {
+                PlaybackSourceSelection.bestPlayItem($0, accounts: [account], identitySources: { _ in [] })
+            },
+            libraryTargetResolver: heroLibraryTargetResolver(in: [account], identitySources: { _ in [] })
+        )
+        let recovered = await enricher.enrich(discovery, preservingPinnedSeries: { discovery })
+        let pair = try XCTUnwrap(zip(discovery, recovered).first {
+            $0.1.kind == .series && $0.1.locallyValidatedPlayableSource
+                && $0.1.ratings.contains { $0.source == .community }
+        })
+        let seed = pair.0
+        let visible = try XCTUnwrap(HeroLiveMerge.merge(
+            showing: [seed], fresh: [pair.1], limit: 1, pinnedItemIDs: [seed.id],
+            preservesPinnedItems: true
+        ).items.first)
+        let root = PlaybackSourceSelection.bestPlayItem(visible, accounts: [account], identitySources: { _ in [] })
+        let resolvedPlay = await HeroPlayTargetResolver.playbackTarget(for: root, provider: account.provider)
+        let play = try XCTUnwrap(resolvedPlay)
+        XCTAssertEqual(play.kind, .episode)
+        let year = String(try XCTUnwrap(visible.productionYear))
+        let rating = try XCTUnwrap(visible.ratings.first { $0.source == .community })
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.app.settings.hero.settings.showsRatings = true
+        fixture.app.settings.spoilers.settings.hideRatingsUntilWatched = false
+        let previousMetadata = fixture.app.metadataProviderSettingsModel.settings
+        fixture.app.metadataProviderSettingsModel.settings = .init(
+            orderMode: .custom, disabledOrder: MetadataSourceAttribution.all.map(\.id)
+        )
+        defer { fixture.app.metadataProviderSettingsModel.settings = previousMetadata }
+        for upgraded in [false, true] {
+            let item = upgraded ? play : seed
+            let subject = upgraded ? visible : seed
+            fixture.mount(
+                PlozziOSHomeHeroForeground(
+                    item: item, detailItem: subject, watchlistItem: subject,
+                    presentation: HeroPresentation(item: subject, artworkStyle: .compactPortrait, surface: .home),
+                    style: .compactPortrait, onPlay: { _ in }
+                )
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+            )
+            try await fixture.settle()
+            let image = renderedImage(fixture.window)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = upgraded ? "Live Discovery Home recovered" : "Live Discovery Home cold index"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US"]
+            try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage)).perform([request])
+            let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+            let hasPlay = lines.contains { $0 == "Play" || $0.hasPrefix("Play ") }
+            XCTAssertEqual(hasPlay, upgraded, "The production Home foreground must visibly regain its Play action.")
+            if upgraded {
+                XCTAssertTrue(lines.contains { $0.contains(year) }, "The library year must render.")
+                XCTAssertTrue(lines.contains { $0.contains(rating.displayValue) }, "A native library rating must render.")
+            }
+        }
+        let counts = await http.counts()
+        XCTAssertEqual(counts.blocked, 0)
+        print("LIVE_IOS_HERO realDiscovery=true realJellyfin=true coldIndex=true visiblePlay=true visibleRatings=true realEpisode=true reads=\(counts.reads)")
+    }
+
     func testLiveJellyfinCompletedEpisodeRemainsOnHome() async throws {
         guard let address = ProcessInfo.processInfo.environment["PLOZZ_LIVE_REFRESH_BROKER"] else {
             throw XCTSkip("Requires the authorized internal history-mutation broker.")
@@ -488,6 +569,9 @@ final class HomeLoadingLayoutTests: XCTestCase {
                     let resolved = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
                         in: width, inset: 36, metrics: metrics, cardStyle: style
                     )
+                    XCTAssertEqual(PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                        in: width, inset: 36, metrics: metrics, cardStyle: style, isContinueWatching: true
+                    ), resolved)
                     XCTAssertEqual(resolved.fittingDesktopRail(in: width, cardStyle: style), resolved)
                     for (artwork, maximum) in [
                         (resolved.posterWidth, metrics.posterWidth),
@@ -513,6 +597,141 @@ final class HomeLoadingLayoutTests: XCTestCase {
             XCTAssertEqual(maximum, minimum * 1.18, accuracy: 0.001)
             XCTAssertEqual(density.iOSHomeLibraryWidth(horizontalSizeClass: .regular, isRunningOnMac: true),
                            metrics.landscapeWidth)
+        }
+    }
+
+    func testIPadContinueWatchingMatchesPosterPeekAcrossWidthsAndPreferences() {
+        for density in UIDensity.allCases {
+            for typeSize in [DynamicTypeSize.large, .accessibility3] {
+                let metrics = PlozzMetrics.touch(density: density, dynamicTypeSize: typeSize)
+                for cardStyle in [CardStyle.borderless, .framed] {
+                    for width in stride(from: CGFloat(360), through: 1366, by: 17) {
+                        let inset: CGFloat = width < 600 ? 22 : 36
+                        let posters = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                            in: width, inset: inset, metrics: metrics, cardStyle: cardStyle
+                        )
+                        let fitted = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                            in: width, inset: inset, metrics: metrics, cardStyle: cardStyle,
+                            isContinueWatching: true
+                        )
+                        XCTAssertEqual(fitted.posterWidth, posters.posterWidth)
+                        XCTAssertEqual(fitted.posterHeight, posters.posterHeight)
+                        XCTAssertEqual(posters.landscapeWidth, metrics.landscapeWidth)
+                        XCTAssertEqual(posters.continueWatchingWidth, metrics.continueWatchingWidth)
+                        let refitted = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                            in: width, inset: inset, metrics: fitted, cardStyle: cardStyle,
+                            isContinueWatching: true
+                        )
+                        let frameInset = cardStyle == .framed ? metrics.cardInset : 0
+                        let available = width - inset + frameInset
+                        let posterStride = posters.posterWidth + 2 * frameInset + 12
+                        let posterPeek = available.truncatingRemainder(dividingBy: posterStride)
+                        for seriesArtwork in [false, true] {
+                            let artwork = fitted.artworkSize(for: .landscape, showsSeriesArtwork: seriesArtwork)
+                            XCTAssertEqual(
+                                refitted.artworkSize(for: .landscape, showsSeriesArtwork: seriesArtwork),
+                                artwork, "Nested row reservations must not resize Continue Watching again."
+                            )
+                            let cardStride = artwork.width + 2 * frameInset + 12
+                            let count = floor(available / cardStride + 0.000001)
+                            XCTAssertGreaterThanOrEqual(count, 1)
+                            XCTAssertEqual(available - count * cardStride, posterPeek, accuracy: 0.001)
+                        }
+                    }
+                }
+            }
+        }
+        for (width, expectedCount) in [(CGFloat(600), 2), (768, 2), (900, 3), (1194, 4), (1366, 4)] {
+            for cardStyle in [CardStyle.borderless, .framed] {
+                let base = PlozzMetrics.touch(density: .standard)
+                let fitted = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                    in: width, inset: 36, metrics: base, cardStyle: cardStyle, isContinueWatching: true
+                )
+                let frameInset = cardStyle == .framed ? base.cardInset : 0
+                let count = floor((width - 36 + frameInset) / (fitted.continueWatchingWidth + 2 * frameInset + 12))
+                XCTAssertEqual(Int(count), expectedCount, "Viewport \(width), \(cardStyle)")
+                let largerText = PlozziOSHomeRailLayout<EmptyView>.posterMetrics(
+                    in: width, inset: 36,
+                    metrics: .touch(density: .standard, dynamicTypeSize: .accessibility3),
+                    cardStyle: cardStyle, isContinueWatching: true
+                )
+                XCTAssertGreaterThan(largerText.continueWatchingWidth, fitted.continueWatchingWidth)
+            }
+        }
+    }
+
+    func testRenderedIPadContinueWatchingKeepsWholeCardsAndPosterPeek() async throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("The iPad-only rail layout requires an iPad simulator.")
+        }
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let url = try XCTUnwrap(URL(string: "https://ipad-rail.invalid/\(UUID()).png"))
+        let artwork = UIGraphicsImageRenderer(size: CGSize(width: 320, height: 480)).image { context in
+            UIColor(red: 0.05, green: 0.65, blue: 1, alpha: 1).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 320, height: 480))
+        }
+        let cache = try XCTUnwrap(ArtworkSession.shared.configuration.urlCache)
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: url, statusCode: 200, httpVersion: nil,
+            headerFields: ["Content-Type": "image/png", "Cache-Control": "max-age=86400"]
+        ))
+        cache.storeCachedResponse(
+            CachedURLResponse(response: response, data: try XCTUnwrap(artwork.pngData())),
+            for: URLRequest(url: url)
+        )
+        defer { cache.removeCachedResponse(for: URLRequest(url: url)) }
+        let items = (0..<12).map {
+            MediaItem(id: "ipad-peek-\($0)", title: "Movie", kind: .movie,
+                      posterURL: url, backdropURL: url, allowsTitleBasedMetadataMatching: false)
+        }
+        for (width, expectedCount) in [(CGFloat(600), 2), (768, 2), (1194, 4)] {
+            for cardStyle in [CardStyle.borderless, .framed] {
+                var posterPeek: CGFloat?
+                for mode in 0..<3 {
+                    fixture.mount(
+                        ScrollView {
+                            PlozziOSHomeMediaRail(
+                                title: Text(verbatim: "Collection"), items: items,
+                                style: mode == 0 ? .poster : .landscape, appModel: fixture.app,
+                                showsResumeChip: mode != 0, showsSeriesArtwork: mode == 2
+                            )
+                        }
+                        .environment(\.plozzCardStyle, cardStyle)
+                        .environment(\.plozzArtworkSettings, ArtworkSettings(preference: .library))
+                        .environment(\.plozziOSHomeViewportWidth, width),
+                        width: width
+                    )
+                    try await fixture.settle()
+                    var image = renderedImage(fixture.window)
+                    var runs = try blueArtworkRuns(in: image, y: 100)
+                    let deadline = ContinuousClock.now + .seconds(3)
+                    while runs.isEmpty, ContinuousClock.now < deadline {
+                        try await fixture.settle()
+                        image = renderedImage(fixture.window)
+                        runs = try blueArtworkRuns(in: image, y: 100)
+                    }
+                    let attachment = XCTAttachment(image: image)
+                    attachment.name = "ipad-peek-\(Int(width))-\(cardStyle)-mode-\(mode)"
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                    let first = try XCTUnwrap(runs.first)
+                    let last = try XCTUnwrap(runs.last)
+                    XCTAssertEqual(first.lowerBound, 36, accuracy: 1.5)
+                    XCTAssertEqual(last.upperBound, width, accuracy: 1)
+                    let peek = last.upperBound - last.lowerBound
+                    if mode == 0 {
+                        posterPeek = peek
+                    } else {
+                        XCTAssertEqual(runs.count, expectedCount + 1)
+                        XCTAssertEqual(peek, try XCTUnwrap(posterPeek), accuracy: 1.5)
+                        for run in runs.dropLast() {
+                            XCTAssertEqual(run.upperBound - run.lowerBound,
+                                           first.upperBound - first.lowerBound, accuracy: 1.5)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1171,7 +1390,10 @@ final class HomeLoadingLayoutTests: XCTestCase {
         let model = HomeViewModel(accounts: [], profileNamespace: fixture.profileID)
         defer { model.invalidate() }
         let choice = try XCTUnwrap(HomeRowChoice.shared.first { $0.id == .global(.continueWatching) })
-        for width in [CGFloat(390), 768] {
+        for (width, seriesArtwork) in [
+            (CGFloat(390), true), (768, true), (1194, true), (768, false), (1194, false)
+        ] {
+            fixture.app.settings.homeVisibility.setContinueWatchingShowsSeriesArtwork(seriesArtwork)
             for layout in ContinueWatchingCardLayout.allCases {
                 fixture.app.settings.homeVisibility.setContinueWatchingLayout(layout)
                 for captions in [true, false] {
@@ -1188,7 +1410,9 @@ final class HomeLoadingLayoutTests: XCTestCase {
                             ScrollView {
                                 PlozziOSHomeRowSlot(
                                     presentation: presentation, captions: fixture.app.settings.cardStyle.captions,
-                                    continueWatchingLayout: layout, continueWatchingUsesSeriesArtwork: true
+                                    continueWatchingLayout: layout,
+                                    continueWatchingUsesSeriesArtwork:
+                                        fixture.app.settings.homeVisibility.continueWatchingUsesSeriesArtwork
                                 ) {
                                     PlozziOSHomeRowView(
                                         row: row, appModel: fixture.app, viewModel: model,

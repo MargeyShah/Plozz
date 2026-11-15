@@ -216,6 +216,7 @@ public struct LiveTVProgramDetails: Codable, Equatable, Sendable {
 @MainActor
 @Observable
 private final class LiveTVPrototypePreferencesState {
+    var cleanChannelNames = LiveTVViewSettings().cleanChannelNames
     var recentChannelIDs: [String] = []
     var favoriteIDs: Set<String> = []
     var favoriteMultiviews: [LiveTVMultiviewFavorite] = []
@@ -231,6 +232,7 @@ private final class LiveTVPrototypePreferencesState {
 private final class LiveTVPrototypeGuideState {
     var programs: [String: [LiveTVPrototypeProgram]] = [:]
     var knownChannelIDs: Set<String> = []
+    var pendingChannelIDs: Set<String> = []
 }
 
 private struct LiveTVCatalogIndex<Entry: Identifiable> {
@@ -350,6 +352,15 @@ public final class LiveTVPrototypeModel {
         didSet {
             guard sort != oldValue else { return }
             refreshVisibleChannels(refreshCategoryCounts: false)
+        }
+    }
+
+    public var cleanChannelNames: Bool {
+        get { preferences.cleanChannelNames }
+        set {
+            guard preferences.cleanChannelNames != newValue else { return }
+            preferences.cleanChannelNames = newValue
+            rebuildCatalog()
         }
     }
 
@@ -628,9 +639,10 @@ public final class LiveTVPrototypeModel {
         if guideOnly { refreshVisibleChannels() }
     }
 
-    public func setKnownGuideChannels(_ ids: Set<String>) {
-        guard knownGuideChannelIDs != ids else { return }
+    public func setKnownGuideChannels(_ ids: Set<String>, pending: Set<String> = []) {
+        guard knownGuideChannelIDs != ids || guideState.pendingChannelIDs != pending else { return }
         knownGuideChannelIDs = ids
+        guideState.pendingChannelIDs = pending
         catalogRevision &+= 1
         if guideOnly { refreshVisibleChannels() }
     }
@@ -700,7 +712,7 @@ public final class LiveTVPrototypeModel {
             recentChannelIDs: recentChannelIDs,
             hiddenChannels: hiddenChannels,
             favoriteOrder: favoriteOrder + (favorites.contains(id) ? [id] : []),
-            favoriteChannels: favoriteChannels + (channelsByID[id].map { [.init(id: id, name: $0.name)] } ?? []),
+            favoriteChannels: favoriteChannels + (channelsByID[id].map { [.init(id: id, name: savedName(for: $0))] } ?? []),
             channelOverrides: channelOverrides, browse: browsePreferences, favoriteMultiviews: favoriteMultiviews,
             organization: organization
         )) else { return }
@@ -737,7 +749,7 @@ public final class LiveTVPrototypeModel {
     public func hideChannel(_ channel: LiveTVPrototypeChannel) -> Bool {
         let current = currentPreferences
         guard !current.hiddenChannelIDs.contains(channel.id) else { return true }
-        guard persistPreferences(current.hidingChannel(id: channel.id, name: channel.name)) else {
+        guard persistPreferences(current.hidingChannel(id: channel.id, name: savedName(for: channel))) else {
             return false
         }
         refreshOrganization()
@@ -748,6 +760,13 @@ public final class LiveTVPrototypeModel {
 
     public func dismissPreferencesIssue() {
         preferencesIssue = nil
+    }
+
+    private func savedName(for channel: LiveTVPrototypeChannel) -> String {
+        // Recovery labels must remain reversible even while the source is unavailable.
+        channelOverrides[channel.id]?.name
+            ?? suppliedChannels?.first(where: { $0.id == channel.id })?.name
+            ?? channel.name
     }
 
     @discardableResult
@@ -1129,17 +1148,20 @@ public final class LiveTVPrototypeModel {
         channels = suppliedChannels ?? []
         #endif
         let channelOverrides = channelOverrides
-        if !channelOverrides.isEmpty {
+        if cleanChannelNames || !channelOverrides.isEmpty {
             channels = channels.map { channel in
-                guard let value = channelOverrides[channel.id] else { return channel }
+                let value = channelOverrides[channel.id]
+                let name = value?.name ?? (cleanChannelNames && channel.source == .iptv
+                    ? IPTVChannelName.cleaned(channel.name) : channel.name)
+                guard value != nil || name != channel.name else { return channel }
                 return LiveTVPrototypeChannel(
-                    id: channel.id, number: channel.number, name: value.name ?? channel.name,
-                    category: value.category ?? channel.category, symbol: channel.symbol, accent: channel.accent,
+                    id: channel.id, number: channel.number, name: name,
+                    category: value?.category ?? channel.category, symbol: channel.symbol, accent: channel.accent,
                     source: channel.source, tagline: channel.tagline, logoURL: channel.logoURL,
                     streamURL: channel.streamURL, logoNeedsDarkBackground: channel.logoNeedsDarkBackground,
                     guideID: channel.guideID, guideName: channel.guideName, httpHeaders: channel.httpHeaders,
-                    playlistSourceID: channel.playlistSourceID, language: value.language ?? channel.language,
-                    country: value.country ?? channel.country, groups: value.category.map { [$0] } ?? channel.groups,
+                    playlistSourceID: channel.playlistSourceID, language: value?.language ?? channel.language,
+                    country: value?.country ?? channel.country, groups: value?.category.map { [$0] } ?? channel.groups,
                     plozzChannelMood: channel.plozzChannelMood
                 )
             }
@@ -1377,7 +1399,9 @@ public final class LiveTVPrototypeModel {
     private func hasGuide(for channel: LiveTVPrototypeChannel) -> Bool {
         // Imported channels use only provider listings, never synthetic schedules.
         if usesPublicStreams {
-            return knownGuideChannelIDs.contains(channel.id) || importedPrograms[channel.id]?.isEmpty == false
+            // Filtering must not hide channels before demand loading can discover their guide.
+            return knownGuideChannelIDs.contains(channel.id) || guideState.pendingChannelIDs.contains(channel.id)
+                || importedPrograms[channel.id]?.isEmpty == false
         }
         #if DEBUG
         switch scenario {

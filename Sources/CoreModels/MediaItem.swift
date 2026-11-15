@@ -1560,16 +1560,16 @@ public struct MediaItem: Codable, Hashable, Identifiable, Sendable {
 
     /// The episode's place in the run — `S4 · E1`.
     ///
-    /// The one owner for the dotted season/episode label used across the app.
-    /// Callers holding loose numbers use the static formatter below so the
-    /// separator and spacing cannot drift. `nil` unless both are known: a
-    /// half-built "S4" says nothing useful.
+    /// The one owner for the dotted season/episode designation used across the
+    /// app. ``subtitle`` delegates here, and callers holding loose numbers use
+    /// the static formatter below so the separator and spacing cannot drift.
+    /// `nil` unless both are known: a half-built "S4" says nothing useful.
     public var seasonEpisodeLabel: String? {  // l10n:content — "S"/"E" abbreviations are hand-built formatting, not copy
         Self.seasonEpisodeLabel(season: seasonNumber, episode: episodeNumber)
     }
 
-    /// Formats a season/episode designation in the app-wide dotted style —
-    /// `S4 · E1` — or `nil` unless both numbers are known.
+    /// Formats the app-wide dotted designation — `S4 · E1` — or `nil` unless
+    /// both numbers are known.
     public static func seasonEpisodeLabel(season: Int?, episode: Int?) -> String? {  // l10n:content — hand-built numbering, not copy
         guard let season, let episode else { return nil }
         return "S\(season) · E\(episode)"

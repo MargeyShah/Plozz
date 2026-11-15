@@ -260,6 +260,7 @@ public final class PlayerViewModel {
     /// The item already selected by the UI. When it has a completed local copy,
     /// playback can start without first contacting the provider.
     private let offlineItem: MediaItem?
+    private let initialPlaybackItem: MediaItem?
     @ObservationIgnored private var discEntryOverride: DiscPlaybackBehavior?
     @ObservationIgnored private var discRegionOverride: UInt32?
     @ObservationIgnored private var discVideoSelection: (source: PlaybackSource, playlist: Int, featureResume: TimeInterval)?
@@ -354,6 +355,15 @@ public final class PlayerViewModel {
     /// community marker sources to consult.
     private let playbackSettings: PlaybackSettings
     public var volumeBrightnessGesturesEnabled: Bool { playbackSettings.volumeBrightnessGestures }
+    @ObservationIgnored private var dolbyVisionFELOverride: Bool?
+
+    public func setDolbyVisionFELConversion(_ enabled: Bool) {
+        guard !didStop, phase == .ready, controls.felConversion.isAvailable,
+              controls.felConversion.isEnabled != enabled else { return }
+        dolbyVisionFELOverride = enabled
+        controls.felConversion.isEnabled = enabled
+        restartStreamingRendition()
+    }
 
     func isTabEnabled(_ tab: PlayerOptionalTab) -> Bool {
         playbackSettings[keyPath: tab.visibilityKeyPath]
@@ -455,6 +465,9 @@ public final class PlayerViewModel {
     /// store, fallback account id, and the profile toggles; a `nil` store disables
     /// the feature (tests, previews).
     private let seriesMemory: SeriesTrackMemory
+    #if canImport(UIKit)
+    @ObservationIgnored private var manuallySelectedVideoZoom: PlayerVideoZoom?
+    #endif
     /// Loads server-detected skip segments once playback is ready; cancelled on
     /// stop. Best-effort — a failure leaves the skip button simply unavailable.
     private var segmentsTask: Task<Void, Never>?
@@ -795,6 +808,7 @@ public final class PlayerViewModel {
         self.playbackSourceAccountID =
             episodeItem?.sourceAccountID ?? offlineItem?.sourceAccountID ?? seriesAccountFallbackID
         self.offlineItem = offlineItem
+        self.initialPlaybackItem = episodeItem ?? offlineItem
         self.discEntryOverride = offlineItem?.discPlaybackOverride ?? episodeItem?.discPlaybackOverride
             ?? ((offlineItem ?? episodeItem)?.discMenuAvailability?.canAttempt == false ? .playVideo : nil)
         self.mediaSourceID = mediaSourceID
@@ -807,7 +821,7 @@ public final class PlayerViewModel {
         self.spoilerSettings = spoilerSettings
         self.seriesMemory = SeriesTrackMemory(
             store: seriesTrackStore,
-            accountFallbackID: seriesAccountFallbackID,
+            accountFallbackID: self.playbackSourceAccountID,
             rememberAudio: playbackSettings.rememberAudioTrackPerSeries,
             rememberSubtitle: playbackSettings.rememberSubtitleTrackPerSeries
         )
@@ -899,6 +913,14 @@ public final class PlayerViewModel {
             host: self, publisher: nowPlayingPublisher ?? NowPlayingSession()
         )
         configureEngineCallbacks()
+        #if canImport(UIKit)
+        controls.videoZoom.onUserChange = { [weak self] zoom in
+            guard let self, !self.didStop, let request = self.request,
+                  !request.usesUnidentifiedDiscTimeline else { return }
+            self.manuallySelectedVideoZoom = zoom
+            self.seriesMemory.recordVideoZoom(zoom, for: request.item)
+        }
+        #endif
         if let continuation {
             intendsPlayback = continuation.intendsPlayback
             controls.intendsPause = !continuation.intendsPlayback
@@ -1116,7 +1138,16 @@ public final class PlayerViewModel {
         // A credits marker may still be resolving whether post-credits content
         // exists. Never auto-advance before that decision is known; otherwise an
         // episode with after-credits content would be skipped.
-        if controls.skipSegments.hasPostCredits || controls.skipSegments.isResolvingPostCredits {
+        //
+        // An EOF *before* the timeline ends is the credits boundary: a known
+        // after-credits tail has not played yet, so do not advance. An EOF at the
+        // real end of the timeline is the ordinary end of the whole episode
+        // (tail included), so autoplay applies again; suppressing there dismissed
+        // the player even when nothing was left to watch.
+        let atTimelineEnd = engine.duration > 0
+            && engine.currentTime >= engine.duration - 0.5
+        if controls.skipSegments.isResolvingPostCredits
+            || (controls.skipSegments.hasPostCredits && !atTimelineEnd) {
             shouldDismiss = true
             return
         }
@@ -1256,6 +1287,11 @@ public final class PlayerViewModel {
     private func enrichSeriesIDs() async {
         if let seriesIDResolver, var current = request,
            let raw = await seriesIDResolver(), !raw.isEmpty {
+            guard !didStop, let latest = request,
+                  latest.item.id == current.item.id,
+                  latest.item.sourceAccountID == current.item.sourceAccountID,
+                  latest.playSessionID == current.playSessionID else { return }
+            current = latest
             let map: [(ProviderIDNamespace, String)] = [
                 (.imdb, "SeriesImdb"), (.tmdb, "SeriesTmdb"), (.tvdb, "SeriesTvdb"),
                 (.myAnimeList, "SeriesMal"), (.aniList, "SeriesAniList"),
@@ -1321,6 +1357,11 @@ public final class PlayerViewModel {
         phase = .loading
         controls.infoCard.chapters = []
         stopSongWatch()  // a new item starts without the last song
+        // Playback may be the first local-network operation after a re-signed
+        // install (cached rows, a deep link straight into an item). Ask from the
+        // app process without gating bring-up on the answer; the foreground
+        // hook in the iOS shell normally got there first.
+        Task { _ = await LocalNetworkAuthorization.requestIfNeeded() }
         let bringUpStart = Date()
         bringUpStartedAt = bringUpStart
         HandoffDiagnostics.emit(
@@ -1568,7 +1609,15 @@ public final class PlayerViewModel {
             options.startPosition = itemID == self.itemID ? startPosition : 0
             if itemID == self.itemID, let retry = streamingQuality.fallbackCodec { options.codec = retry }
             let source = itemID == self.itemID ? (streamingMediaSourceID ?? mediaSourceID) : mediaSourceID
-            if let item = offlineItem {
+            let preferenceItem: MediaItem?
+            if let known = offlineCandidate ?? initialPlaybackItem, known.id == itemID {
+                preferenceItem = known
+            } else if seriesMemory.store != nil {
+                preferenceItem = try await provider.item(id: itemID)
+            } else {
+                preferenceItem = nil
+            }
+            if let item = preferenceItem {
                 options.preferredAudioLanguages = preferredAudioLanguages(
                     for: item, originalLanguage: await resolvedOriginalAudioLanguage(for: item)
                 )
@@ -1971,9 +2020,9 @@ public final class PlayerViewModel {
         subtitlePolicy.effectiveRule(for: ContentClassifier.subtitleCategory(for: item))
     }
 
-    // MARK: - Per-series remembered track selections
+    // MARK: - Remembered title preferences
 
-    /// The remembered audio language for this item's series (gated on the toggle).
+    /// Remembered movie/series language; only series memory is gated by its toggle.
     private func rememberedAudioLanguage(for item: MediaItem) -> String? {
         seriesMemory.rememberedAudioLanguage(for: item)
     }
@@ -1981,13 +2030,6 @@ public final class PlayerViewModel {
     /// The remembered subtitle decision for this item's series (gated on the toggle).
     private func rememberedSubtitle(for item: MediaItem) -> RememberedSubtitleSelection? {
         seriesMemory.rememberedSubtitle(for: item)
-    }
-
-    /// Records the viewer's manual audio-language pick for the current series.
-    private func recordSeriesAudioSelection(language: String?) {
-        guard let request, !request.usesUnidentifiedDiscTimeline else { return }
-        let item = request.item
-        seriesMemory.recordAudioSelection(language: language, for: item)
     }
 
     /// Records the viewer's manual subtitle pick (a language, or Off) for the series.
@@ -2001,12 +2043,18 @@ public final class PlayerViewModel {
     /// the series' external ids onto the item, then applies any imported choice to
     /// live playback (the engine/subtitle side effects the memory can't do itself).
     private func reconcileSeriesMemoryAcrossServers() {
-        guard let request, !request.usesUnidentifiedDiscTimeline else { return }
+        guard !didStop, let request, !request.usesUnidentifiedDiscTimeline else { return }
         let item = request.item
+        #if canImport(UIKit)
+        let changedZoom = manuallySelectedVideoZoom != nil
+        #else
+        let changedZoom = false
+        #endif
         let outcome = seriesMemory.reconcile(
             item: item,
             viewerChangedAudio: subtitleController.viewerChangedAudioThisSession,
-            viewerChangedSubtitle: subtitleController.viewerChangedSubtitleThisSession
+            viewerChangedSubtitle: subtitleController.viewerChangedSubtitleThisSession,
+            viewerChangedVideoZoom: changedZoom
         )
         if let language = outcome.importedAudioLanguage {
             subtitleController.queueImportedAudio(language: language)
@@ -2017,7 +2065,27 @@ public final class PlayerViewModel {
             // Plozzigen (tracks arrive later → onTracksChanged re-applies).
             subtitleController.applyInitialSubtitleForNewLoad(for: request)
         }
+        #if canImport(UIKit)
+        if let zoom = outcome.importedVideoZoom {
+            controls.videoZoom.restoreForPlayback(
+                zoom, automaticDefault: true, supportsActivePicture: engine.supportsActivePictureAnalysis
+            )
+        }
+        #endif
     }
+
+    #if canImport(UIKit)
+    private func restoreTitleVideoZoom(for request: PlaybackRequest) {
+        let eligible = !request.usesUnidentifiedDiscTimeline
+            && seriesMemory.supportsTitlePreferences(for: request.item)
+        let remembered = eligible
+            ? manuallySelectedVideoZoom ?? seriesMemory.rememberedVideoZoom(for: request.item) : nil
+        controls.videoZoom.restoreForPlayback(
+            remembered, automaticDefault: eligible,
+            supportsActivePicture: engine.supportsActivePictureAnalysis
+        )
+    }
+    #endif
 
     /// Loads an already-resolved request on the routed engine and finishes the
     /// bring-up (ready state, start report, track menu). Shared by the initial
@@ -2031,6 +2099,9 @@ public final class PlayerViewModel {
         endTemporarySpeedBoost()
         stopSongWatch()
         var request = request
+        request.dolbyVisionFELConversion = dolbyVisionFELOverride ?? playbackSettings.dolbyVisionFELConversion
+        controls.felConversion.isEnabled = request.dolbyVisionFELConversion
+        controls.felConversion.isAvailable = false
         dynamicRangeLoadGeneration &+= 1
         let rangeLoadGeneration = dynamicRangeLoadGeneration
         controls.infoCard.chapters = playbackSettings.chaptersInPlayer
@@ -2060,6 +2131,9 @@ public final class PlayerViewModel {
             return
         }
         let actualEngineKind = engineHandoff.commitEngineForPlayback(engineKind)
+        #if canImport(UIKit)
+        restoreTitleVideoZoom(for: self.request ?? request)
+        #endif
         if request.usesUnidentifiedDiscTimeline && actualEngineKind != .plozzigen {
             phase = .failed(.unknown("This disc's menu format is not supported."))
             return
@@ -2114,6 +2188,7 @@ public final class PlayerViewModel {
         // not after an awaited provider report. System elapsed time extrapolates
         // from this rate, so advertising a rate the engine clamps would drift.
         controls.engineCapabilities = engine.capabilities
+        controls.felConversion.isAvailable = engine.canChangeDolbyVisionFELConversion
         if engine.capabilities.contains(.playbackSpeed) {
             controls.playbackSpeed = min(controls.playbackSpeed, engine.maximumPlaybackSpeed)
             engine.setPlaybackSpeed(controls.playbackSpeed)
@@ -2243,7 +2318,8 @@ public final class PlayerViewModel {
         let seriesIDResolver = seriesIDResolver
         let community = communitySkipMarkers
         segmentsTask = Task { @MainActor [weak self] in
-            let server = ((try? await provider.mediaSegments(for: itemID)) ?? []).squashingDuplicateKinds()
+            let server = ((try? await provider.mediaSegments(for: itemID)) ?? [])
+                .normalizedSkipMarkers(duration: duration)
             guard !Task.isCancelled else { return }
             let serverMerged = server.mergedForPlayback(duration: duration, explicitPostCredits: nil)
             self?.controls.skipSegments.segments = serverMerged.segments
@@ -2259,7 +2335,7 @@ public final class PlayerViewModel {
                 for: item, sources: sources, duration: duration,
                 provider: provider, seriesIDResolver: seriesIDResolver, service: community
             )
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, !fallback.isEmpty else {
                 self?.controls.skipSegments.isResolvingPostCredits = false
                 return
             }
@@ -3038,10 +3114,10 @@ public final class PlayerViewModel {
 
     /// Selects an audio track from the menu. Owned by ``SubtitleTrackController``.
     public func selectAudioOption(id: Int) {
-        if streamingOptions != nil, request?.isTranscoding == true,
-           let track = request?.audioTracks.first(where: { $0.id == id }) {
-            recordSeriesAudioSelection(language: track.language)
-            trackSelectAudioTrack(track)
+        if streamingOptions != nil, let request, request.isTranscoding,
+           let track = request.audioTracks.first(where: { $0.id == id }) {
+            guard trackSelectAudioTrack(track) else { return }
+            subtitleController.recordManualAudioSelection(track, request: request)
             return
         }
         subtitleController.selectAudioOption(id: id)
@@ -3295,8 +3371,9 @@ extension PlayerViewModel: SubtitleTrackControllerHost {
         effectiveSubtitleRule(for: item)
     }
 
-    func trackRecordAudioSelection(language: String?) {
-        recordSeriesAudioSelection(language: language)
+    func trackRecordAudioSelection(language: String?, request: PlaybackRequest?) {
+        guard !didStop, let request, !request.usesUnidentifiedDiscTimeline else { return }
+        seriesMemory.recordAudioSelection(language: language, for: request.item)
     }
 
     @discardableResult
@@ -3528,7 +3605,20 @@ extension PlayerViewModel: EngineHandoffCoordinatorHost {
     static func streamingFailure(
         _ error: AppError, evidence: StreamingPlaybackFailure? = nil, streamWasSupplied: Bool = true
     ) -> StreamingQualityError? {
-        if let evidence { return .playback(evidence) }
+        if let evidence {
+            if LocalNetworkAuthorization.recordedState == .denied,
+               evidence.kind == .timedOut || evidence.kind == .network {
+                // The most common "player is broken" report on a freshly
+                // re-signed install is actually a Local Network denial: the
+                // grant is bound to the signed identity, so a sideloaded
+                // re-sign starts from denied/undecided. Name it in logs so a
+                // diagnostics capture points at the permission, not the codec.
+                PlozzLog.playback.error(
+                    "Playback failed while Local Network access is denied; enable it in Settings ▸ Privacy & Security ▸ Local Network"
+                )
+            }
+            return .playback(evidence)
+        }
         switch error {
         case .serverUnreachable: return .playback(.init(kind: .network))
         case .unauthorized, .invalidCredentials: return .authenticationRequired

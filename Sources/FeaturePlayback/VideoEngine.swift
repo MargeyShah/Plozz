@@ -79,6 +79,7 @@ public struct PlayerEngineCapabilities: OptionSet, Sendable {
 ///    lives above the engine, not inside it.
 @MainActor
 public protocol VideoEngine: AnyObject {
+    var canChangeDolbyVisionFELConversion: Bool { get }
     #if canImport(UIKit)
     var discMenu: DiscMenuPlaybackState? { get }
     func discVideos() async throws -> [DiscVideo]
@@ -88,6 +89,9 @@ public protocol VideoEngine: AnyObject {
     func installSongTap() -> AsyncStream<SongTapChunk>?
     func removeSongTap()
     var supportsActivePictureAnalysis: Bool { get }
+    /// Stable through seeks and analysis resets; changes on source replacement or stop.
+    /// Nil disables retaining the last confirmed picture through unavailable samples.
+    var activePictureSourceID: UUID? { get }
     func sampleActivePicture() async -> VideoActivePictureState
     func stopActivePictureAnalysis()
     /// Optional association for system Now Playing; custom decoders use the
@@ -387,6 +391,7 @@ public protocol VideoEngine: AnyObject {
 }
 
 public extension VideoEngine {
+    var canChangeDolbyVisionFELConversion: Bool { false }
     #if canImport(UIKit)
     var discMenu: DiscMenuPlaybackState? { nil }
     func discVideos() async throws -> [DiscVideo] { throw CocoaError(.featureUnsupported) }
@@ -394,6 +399,7 @@ public extension VideoEngine {
     func installSongTap() -> AsyncStream<SongTapChunk>? { nil }
     func removeSongTap() {}
     var supportsActivePictureAnalysis: Bool { false }
+    var activePictureSourceID: UUID? { nil }
     func sampleActivePicture() async -> VideoActivePictureState { .unsupported }
     func stopActivePictureAnalysis() {}
     var subtitlePresentationTime: TimeInterval { currentTime }

@@ -40,7 +40,12 @@ public struct NavigationContentAvailability: Equatable, Sendable {
 
     public var automaticallyHiddenKeys: Set<String> {
         var hidden: Set<String> = []
-        if !hasHomeContent { hidden.insert(NavigationLibraryLayout.homeKey) }
+        if !hasHomeContent {
+            hidden.insert(NavigationLibraryLayout.homeKey)
+            // The Upcoming agenda is server-library content; a live-only profile
+            // has nothing to show there, so it follows Home's automatic hiding.
+            hidden.insert(NavigationLibraryLayout.upcomingKey)
+        }
         if !hasSearchContent { hidden.insert(NavigationLibraryLayout.searchKey) }
         if !hasWatchlistItems { hidden.insert(NavigationLibraryLayout.watchlistKey) }
         return hidden

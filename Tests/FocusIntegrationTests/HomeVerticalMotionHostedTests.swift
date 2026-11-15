@@ -87,15 +87,28 @@ final class HomeVerticalMotionHostedTests: XCTestCase {
             window.rootViewController = nil
             previous?.makeKeyAndVisible()
         }
-        try await Task.sleep(for: .milliseconds(400))
         let system = try XCTUnwrap(UIFocusSystem.focusSystem(for: stage.view))
+        // Wait for the initial native focus instead of assuming 400 ms is
+        // enough: a loaded hosted runner can present the window later, and a
+        // missed starting focus makes every later hand-off assertion look
+        // broken. Bounded, observable, no fixed sleep.
+        let initialFocus = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated { stage.contains(system.focusedItem, in: stage.hero) }
+            }, object: nil
+        )
+        await fulfillment(of: [initialFocus], timeout: 10)
         XCTAssertTrue(stage.contains(system.focusedItem, in: stage.hero))
         var motionFrames = 0
         stage.onBoundaryPhase = { phase in
             if phase == "native-motion-frame" { motionFrames += 1 }
         }
         for expanded in [false, true] {
-            stage.present(expanded: expanded, focus: true)
+            if expanded {
+                stage.resetToFeatured(focus: true)
+            } else {
+                stage.present(expanded: false, focus: true)
+            }
             XCTAssertEqual(state.isExpanded, expanded)
             XCTAssertNotEqual(state.nativeRowsExpanded, expanded, "Native chrome must not block focus admission.")
             XCTAssertTrue(stage.contains(system.focusedItem, in: expanded ? stage.hero : stage.rows))
@@ -104,6 +117,10 @@ final class HomeVerticalMotionHostedTests: XCTestCase {
                 try await Task.sleep(for: .milliseconds(10))
             }
             XCTAssertEqual(state.nativeRowsExpanded, expanded)
+            let paintedOffset = try XCTUnwrap(stage.rows.view.layer.presentation()).transform.m42
+            XCTAssertGreaterThan(paintedOffset, 0.5)
+            XCTAssertLessThan(paintedOffset, state.motion.distance - 0.5,
+                              "Returning to the hero must render intermediate frames, not jump to the top.")
             try await Task.sleep(for: .seconds(1))
         }
         XCTAssertEqual(motionFrames, 2, "Each origin change must follow an observed moving compositor frame.")
@@ -328,7 +345,7 @@ final class HomeVerticalMotionHostedTests: XCTestCase {
                     MainActor.assumeIsolated { stage.contains(system.focusedItem, in: host) }
                 }, object: nil
             )
-            await fulfillment(of: [focused], timeout: 2)
+            await fulfillment(of: [focused], timeout: 10)
             XCTAssertEqual(stage.state.isExpanded, expanded)
             if usingSwipes || usingTouch {
                 let target = try XCTUnwrap(system.focusedItem)

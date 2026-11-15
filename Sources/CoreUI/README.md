@@ -1,5 +1,30 @@
 # CoreUI
 
+`PosterCardView.captionSubtitle` supplies localized, caller-owned context in the
+normal caption and accessibility value without mutating media metadata. Omitting
+it preserves the standard provider subtitle and runtime.
+`PosterCardView.statusCue` and `MediaRowView.statusCue` accept `Text` so callers
+can distinguish localized labels from preformatted content such as release dates.
+Combined release cues keep their localized subtitle deferred until rendering.
+On iOS, `PosterCardView` supplies the card visuals, not a tap handler. Callers
+must wrap it in a native button or navigation link; `MediaArtworkZoomButton`
+supports closure-driven selection with the shared artwork transition. tvOS
+selection remains owned by the card's focus control.
+
+`PlozziOSPageHeader` owns the mobile scrolling header's 20-point horizontal
+insets, 44-point minimum height and 12-point action spacing. Callers must not
+add another top or horizontal inset. `plozziOSPageAction` gives each button or
+menu its own 44-point native circular glass surface and full-size label hit
+target, instead of relying on different intrinsic button/menu paddings. It
+uses the existing shared frosted surface when glass is unavailable or transparency
+is reduced, keeping the same control bounds rather than reintroducing native
+bordered button/menu padding differences. Profile photos have a two-point surround. Native vertical toolbar
+items may use their 48-point size based on the actual toolbar orientation,
+not the OS version; horizontal headers remain 44 points.
+Home places its horizontal mute/profile group inside one native toolbar item,
+so toolbar item padding cannot change the shared action gap. Native vertical
+toolbar placement and iPad tab/sidebar integration stay with the system.
+
 `HomeRowPreviewView` renders the actual Home rail presentation, not a separately
 scaled card sample. TV uses `MediaRowView`; mobile Home and the preview share
 `PlozziOSHomeRailLayout`, `PlozziOSMediaSection` and `PlozziOSMediaRailScroll`.
@@ -31,6 +56,26 @@ cache that every feature module reuses on tvOS and iOS/iPadOS — guarded behind
 `#if canImport(SwiftUI)` so the package still compiles on Linux for tests.
 
 ## Responsibility
+
+Mobile Settings roots and detail pages share `MobileSettingsMetrics`: 16-point
+page/row insets, 28-point section gaps, 52-point minimum rows and 26-point
+continuous group corners. Rows grow with their content and Dynamic Type.
+`SettingsIconLabelStyle` supplies title anchors for one-pixel group separators:
+they start at the actual text column, mirror in RTL, and run to the trailing
+edge. Text-only rows use the standard inset. Groups consume their own anchors
+so nested groups cannot move a parent's separators. Native controls, theme
+surfaces and tvOS focus geometry remain unchanged.
+Mobile leading icons use medium-weight monochrome symbols in the same primary
+text color as their titles. Supporting text and chevrons retain secondary
+emphasis; tvOS keeps its existing icon and focus treatment.
+
+New tvOS Settings pages enter their first content control, not the header Back
+button. `settingsPageEntryFocus` requests that control only on first entry and
+leaves search targeting and retained-parent restoration alone. Until native
+focus enters the page, `SettingsBackButton` renders the same enabled native
+control in a non-interactive hosting view; it does not dim the button. The
+original SwiftUI button returns as soon as entry succeeds. Keep the header's
+full-width focus section so Up from right-aligned controls still reaches Back.
 
 TV Settings editors can use `settingsPageBackConfirmation` to request confirmation
 for both the header Back button and remote Back on the current page. Pass `nil`
@@ -805,8 +850,10 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
   24 artwork-identity-keyed palettes. Replaced/cancelled sources cannot publish
   stale colours or clear another source. Only the background leaf observes the
   colour array; no full-screen clock, blur, or per-frame page invalidation runs.
-  Reduce Motion disables the palette crossfade. Dark uses a softer wash and Black
-  retains more visible colour while staying darker; Light's palette is unchanged.
+  Reduce Motion disables the palette crossfade. Black retains 75% of the original decorative
+  gradient contribution through `ThemePalette.backgroundGradientIntensity`,
+  including stock and artwork-tinted page backgrounds, native sampled fills,
+  and theme previews. Dark, Light, flat fills, artwork and foregrounds are unchanged.
   Fullscreen Hero Home uses half the artwork tint's saturation on both platforms,
   retaining its hue and brightness without desaturating the hero image. Showcase,
   detail pages, and untinted stock gradients retain their existing treatment.
@@ -998,6 +1045,10 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
 - **Provider marks** — IPTV uses coral-red while Media Share keeps teal.
   `ProviderBrandMark` owns their shared icon and badge tints, including deeper
   colors on white focus cards and brighter colors on black focus cards.
+  When an IPTV source supplies `siteURL`, it uses the source origin's favicon
+  on TV and mobile, falling back to the shared IPTV mark if unavailable.
+  Requests omit source credentials, cookies, paths, and query parameters;
+  no third-party favicon service is used.
   Silo retains its multicolor logo over a warm-stone (`#CDB795`) tint at the
   same 18% badge opacity as the other providers. Its narrow artwork is 15%
   larger within the unchanged badge bounds.
@@ -1048,6 +1099,9 @@ Density, Dynamic Type, and the minimum height follow the same shared metric.
 - **Touch action feedback** — `TouchFeedback` gives mobile skip actions a light
   impact and committed scrubs / explicit reorder moves a selection tick. Native
   List drag reordering retains system feedback without a second app vibration.
+  Pull resistance can request intensity-scaled weighted tension ticks and a distinct
+  rigid pop. The gesture owns milestone and one-shot gating; all output remains
+  silent while the app is inactive or the device does not support haptics.
   Watchlist actions acknowledge the press immediately with a light tap and stay
   silent on success; an error haptic accompanies a failed save and rollback.
   Their shared toast uses "Added to Watchlist" / "Removed from Watchlist" for

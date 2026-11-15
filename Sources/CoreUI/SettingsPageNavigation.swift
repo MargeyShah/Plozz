@@ -167,6 +167,15 @@ public extension EnvironmentValues {
         get { self[SettingsPageContextKey.self] }
         set { self[SettingsPageContextKey.self] = newValue }
     }
+
+    var settingsPageCoverWrapper: (@MainActor @Sendable (AnyView) -> AnyView)? {
+        get { self[SettingsPageCoverWrapperKey.self] }
+        set { self[SettingsPageCoverWrapperKey.self] = newValue }
+    }
+}
+
+private struct SettingsPageCoverWrapperKey: EnvironmentKey {
+    static let defaultValue: (@MainActor @Sendable (AnyView) -> AnyView)? = nil
 }
 
 /// Retains every parent while one current page owns input, accessibility and Back.
@@ -181,6 +190,7 @@ public struct SettingsPageStack<Route: Hashable, Root: View, Destination: View>:
     let destination: (Route) -> Destination
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.settingsPageCoverWrapper) private var coverWrapper
     @State private var contentViewport: HomeRowPreviewViewport?
 
     public init(
@@ -225,19 +235,27 @@ public struct SettingsPageStack<Route: Hashable, Root: View, Destination: View>:
             navigation.completeFullScreenDismissal()
             onSubpagesDismiss?()
         }) {
-            GeometryReader { geometry in
-                subpages(in: geometry.size)
-            }
-            .safeAreaPadding(.top, 36)
-            .ignoresSafeArea(.container, edges: .vertical)
-            .background {
-                SettingsPageBackground()
-                    .environment(\.settingsInWorkspace, false)
+            if let coverWrapper {
+                coverWrapper(AnyView(coverContent))
+            } else {
+                coverContent
             }
         }
         .mask { Rectangle().ignoresSafeArea(.container) }
         .onChange(of: reduceMotion, initial: true) { _, value in
             navigation.animationsEnabled = !value
+        }
+    }
+
+    private var coverContent: some View {
+        GeometryReader { geometry in
+            subpages(in: geometry.size)
+        }
+        .safeAreaPadding(.top, 36)
+        .ignoresSafeArea(.container, edges: .vertical)
+        .background {
+            SettingsPageBackground()
+                .environment(\.settingsInWorkspace, false)
         }
     }
 
@@ -293,6 +311,12 @@ public struct SettingsPageStack<Route: Hashable, Root: View, Destination: View>:
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             .frame(width: viewport.width, height: viewport.height, alignment: .top)
             .environment(\.settingsPageContext, context)
+            .background {
+                NativeFocusRegionObserver(isEnabled: context.requestsEntryFocus) {
+                    guard navigation.pages.last?.id == id, navigation.entryPageID == id else { return }
+                    navigation.entryPageID = nil
+                }
+            }
             .environment(\.isEnabled, isEnabled && interactive)
             .allowsHitTesting(interactive)
             .accessibilityElement(children: interactive ? .contain : .ignore)
@@ -315,7 +339,7 @@ private struct SettingsPageEntryFocus: ViewModifier {
         content
             .focused($focused)
             .task(id: context?.requestsEntryFocus) {
-                guard enabled, searchRequest?.revealed != false, context?.requestsEntryFocus == true else { return }
+                guard enabled, searchRequest == nil, context?.requestsEntryFocus == true else { return }
                 await Task.yield()
                 guard !Task.isCancelled else { return }
                 focused = true
@@ -365,7 +389,7 @@ private struct SettingsPageBackHandler: ViewModifier {
         content
             .environment(\.settingsPageBackButton, showsBack
                 ? AnyView(SettingsBackButton(action: requestBack)
-                    .settingsPageEntryFocus().accessibilityIdentifier("settings-workspace-back"))
+                    .accessibilityIdentifier("settings-workspace-back"))
                 : nil)
             .onPreferenceChange(SettingsPageBackConfirmationKey.self) { confirmation = $0 }
             .onExitCommand(perform: isCurrent && canGoBack ? requestBack : nil)

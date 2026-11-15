@@ -158,6 +158,7 @@ final class HomeNavigationActivity {
 public enum HomeBrowseDestination: Hashable {
     case row(HomeRowBrowseModel)
     case watchlist
+    case upcoming
 
     @MainActor
     public func push(onto path: Binding<NavigationPath>, chrome: NavigationChromeModel? = nil) {
@@ -426,7 +427,8 @@ public struct HomeView: View {
         let _ = PlozzBodyRate.tick("HomeView")
         return ContentStateView(
             state: HomePresentationRow.displayState(
-                viewModel.state, liveTV: liveTV, visibility: visibility.visibility
+                viewModel.state, liveTV: liveTV, visibility: visibility.visibility,
+                upcoming: viewModel.upcoming.homeReleases
             ),
             emptyMessage: "Your libraries are empty. Add media on your media server to see it here.",
             onRetry: { Task { await viewModel.load() } },
@@ -685,11 +687,17 @@ public struct HomeView: View {
                                                 onBrowse: browseAction(for: presentation)
                                             )
                                         case let .library(row):
-                                            libraryRowView(row, onBrowse: browseAction(for: presentation))
+                                            if presentation.id == .global(.comingSoon) {
+                                                UpcomingHomeRow(title: row.section.displayName, releases: viewModel.upcoming.homeReleases) {
+                                                    onBrowse(.upcoming)
+                                                }
+                                            } else {
+                                                libraryRowView(row, onBrowse: browseAction(for: presentation))
                                                 .environment(
                                                     \.plozzLandscapeTitleLogo,
                                                     presentation.choice.collectionSection?.titleLogo ?? .off
                                                 )
+                                            }
                                         case let .liveTV(channels):
                                             MediaRowView(
                                                 title: liveTVTitle, items: [], style: .landscape,
@@ -1267,7 +1275,11 @@ public struct HomeView: View {
             await enrichMetadata(enrichmentItems)
         }
         guard !Task.isCancelled else { return }
-        let stableItems = heroCurator.deduplicating(enriched)
+        let stableItems = heroCurator.reconcile(
+            heroCurator.deduplicating(enriched), settings: settings,
+            watchMutations: durableWatchMutations + heroRuntime.watchMutations,
+            preservesLineup: settings.style == .followsFocus
+        )
         // Fold the fresh curation into whatever is already on screen instead of
         // replacing it, so a background refresh the viewer never asked for cannot
         // reshuffle the carousel, wipe the backdrop or move what they were looking
@@ -1288,7 +1300,7 @@ public struct HomeView: View {
         let onScreen = foldsIntoLoadedSet && !heroRuntime.items.isEmpty
             ? heroRuntime.items
             : (seedMatchesConfiguration ? heroRuntime.cachedItems : [])
-        let updatedPool = result.candidatePool.updatingItems(stableItems)
+        let updatedPool = result.candidatePool.updatingItems(enriched)
         let sourceEligibility = heroSourceEligibility(
             content: content,
             randomLibraries: randomLibraries,
@@ -1311,7 +1323,8 @@ public struct HomeView: View {
             current,
             settings: settings,
             watchMutations: durableWatchMutations + heroRuntime.watchMutations,
-            preservesLineup: settings.style == .followsFocus
+            preservesLineup: settings.style == .followsFocus,
+            verifiedWatchItems: enriched
         )
         let merge = HeroLiveMerge.merge(
             showing: showing,
@@ -1419,6 +1432,7 @@ public struct HomeView: View {
     }
 
     private func browseAction(for row: HomePresentationRow) -> (() -> Void)? {
+        if row.id == .global(.comingSoon) { return { onBrowse(.upcoming) } }
         guard row.canBrowse else { return nil }
         if row.id == .global(.watchlist) { return { onBrowse(.watchlist) } }
         return { onBrowse(.row(viewModel.browseRow(row))) }
@@ -1853,7 +1867,13 @@ public struct HomeView: View {
             let section = row.section
             let playsOnSelect = row.browseItem == nil && section.style == .landscape
                 && !CollectionCoverLayout.isCollectionGroup(section.items)
-            if let issue = row.issue {
+            if presentation.id == .global(.comingSoon) {
+                UpcomingHomeRow(
+                    title: section.displayName, releases: viewModel.upcoming.homeReleases,
+                    onFocusEntered: reporter.entered, onFocusChange: onFocusChange,
+                    onCardFocused: reporter.cardFocused
+                ) { onBrowse?() }
+            } else if let issue = row.issue {
                 sectionStatusView(issue, browseItem: row.browseItem)
                     .background { NativeFocusRegionObserver(onFocusEntered: reporter.entered) }
             } else if let failure = row.failure {
