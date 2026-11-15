@@ -399,24 +399,22 @@ public struct JellyfinClient: Sendable {
     /// brief-play threshold can hide that same episode from Resume. The combined
     /// Continue Watching feed dedupes Resume-first, so overlap is harmless.
     /// `EnableRewatching=false` avoids resurfacing fully-watched series.
+    /// The resumable companion is capped at one 100-item page; draining every
+    /// resumable page made the Home fan-out roughly 850 ms slower without
+    /// changing what a rail can show.
     func nextUpItems(
         userID: String, limit: Int, parentID: String? = nil, seriesID: String? = nil
     ) async throws -> [BaseItemDto] {
-        if limit == Int.max {
-            return try await exhaustiveItems { startIndex, pageSize in
-                return try await nextUpItemsPage(
-                    userID: userID,
-                    startIndex: startIndex,
-                    limit: pageSize,
-                    parentID: parentID,
-                    seriesID: seriesID
-                )
-            }
-        }
+        // The companion feed is bounded even for an unbounded Home row. Draining
+        // every resumable + next-up page is what made the resumable query ~850 ms
+        // slower than TestFlight; no Continue Watching rail presents more than
+        // 100 next-up cards. Resume remains the primary feed and is unaffected.
+        let isUnbounded = limit == Int.max
+        let boundedLimit = isUnbounded ? 100 : min(limit, 100)
         return try await nextUpItemsPage(
             userID: userID,
-            startIndex: nil,
-            limit: limit,
+            startIndex: isUnbounded ? 0 : nil,
+            limit: boundedLimit,
             parentID: parentID,
             seriesID: seriesID
         ).Items

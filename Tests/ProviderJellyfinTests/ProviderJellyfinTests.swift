@@ -402,30 +402,29 @@ final class JellyfinProviderMappingTests: XCTestCase {
         XCTAssertEqual(items.first?.resumePosition, 10)
     }
 
-    func testUnlimitedNextUpPagingFallsBackToBoundedRequest() async throws {
+    func testUnlimitedNextUpUsesOneBoundedCompanionPage() async throws {
         let stub = StubHTTPClient()
         stub.stub(pathSuffix: "/Users/u1/Items/Resume", json: #"{"Items":[],"TotalRecordCount":0}"#)
         let firstPage = (0..<100).map {
             #"{"Id":"next-\#($0)","Name":"Episode \#($0)","Type":"Episode","SeriesId":"series-\#($0)","UserData":{"LastPlayedDate":"2026-01-01T00:00:00Z"}}"#
         }.joined(separator: ",")
-        stub.stubSequence(pathSuffix: "/Shows/NextUp", jsons: [
-            #"{"Items":[\#(firstPage)],"TotalRecordCount":101}"#,
-            #"{"Items":[\#(firstPage)],"TotalRecordCount":101}"#,
-            #"{"Items":[{"Id":"fallback","Name":"Fallback","Type":"Episode","SeriesId":"series-fallback","UserData":{"LastPlayedDate":"2026-01-01T00:00:00Z"}}],"TotalRecordCount":1}"#
-        ])
+        stub.stub(
+            pathSuffix: "/Shows/NextUp",
+            json: #"{"Items":[\#(firstPage)],"TotalRecordCount":101}"#
+        )
         let provider = JellyfinProvider(session: makeSession(), http: stub)
 
         let items = try await provider.continueWatching(limit: .max)
 
-        XCTAssertEqual(items.map(\.id), ["fallback"])
+        XCTAssertEqual(items.count, 100)
         let nextUpQueries = zip(stub.sentPaths, stub.sentQueryItems)
             .filter { $0.0.hasSuffix("/Shows/NextUp") }
             .map(\.1)
-        XCTAssertEqual(nextUpQueries.count, 3)
-        let fallbackQuery = try XCTUnwrap(nextUpQueries.last)
-        XCTAssertEqual(fallbackQuery.first { $0.name == "Limit" }?.value, "100")
-        XCTAssertNil(fallbackQuery.first { $0.name == "StartIndex" },
-                     "The fallback must be one bounded request, not another paged attempt")
+        XCTAssertEqual(nextUpQueries.count, 1, "The companion feed must not drain every resumable page")
+        let query = try XCTUnwrap(nextUpQueries.first)
+        XCTAssertEqual(query.first { $0.name == "Limit" }?.value, "100")
+        XCTAssertEqual(query.first { $0.name == "StartIndex" }?.value, "0")
+        XCTAssertEqual(query.first { $0.name == "EnableTotalRecordCount" }?.value, "true")
     }
 
     func testContinueWatchingDedupesItemPresentInBothResumeAndNextUp() async throws {
