@@ -265,7 +265,7 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
             throw outcome.firstError ?? AppError.invalidResponse
         }
         let merged = outcome.items
-        let seriesDates = try await seriesLastPlayedDatesBestEffort(for: merged)
+        let seriesDates = try await seriesLastPlayedDatesBestEffort(for: merged, seedingFromFeed: true)
         // Stamp NextUp recency BEFORE capping: a just-finished show's next episode
         // must be able to survive the `limit` cut on its stamped recency rather than
         // being dropped merely because in-progress Resume items filled the limit
@@ -483,14 +483,32 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
     /// this feed are fetched, in bounded batches, so an exhaustive Continue
     /// Watching load never becomes an exhaustive library scan.
     private func seriesLastPlayedDatesBestEffort(
-        for items: [BaseItemDto]
+        for items: [BaseItemDto],
+        seedingFromFeed: Bool = false
     ) async throws -> [String: Date] {
+        // A series' recency is its most recently played episode, and the
+        // account-wide feed already carries that date for every in-progress
+        // episode. Seed from those before asking the server so a series whose
+        // metadata has no date does not need a per-series episode lookup.
+        // Scoped series resume keeps the server authoritative.
+        var result: [String: Date] = [:]
+        if seedingFromFeed {
+            for dto in items {
+                guard let seriesID = dto.SeriesId,
+                      let date = Self.parseDate(dto.UserData?.LastPlayedDate) else { continue }
+                result[seriesID] = max(result[seriesID] ?? date, date)
+            }
+        }
+        // Server metadata stays authoritative: it is still requested for every
+        // undated series, and its dates overwrite the feed seeds below. The
+        // seeds only spare the per-series episode lookup when the server has no
+        // series date at all.
         let seriesIDs = Set(items.compactMap { dto -> String? in
             guard dto.UserData?.LastPlayedDate == nil,
                   dto.Type == "Episode" else { return nil }
             return dto.SeriesId
         }).sorted()
-        guard !seriesIDs.isEmpty else { return [:] }
+        guard !seriesIDs.isEmpty else { return result }
 
         let series: [BaseItemDto]
         do {
@@ -507,9 +525,8 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
             PlozzLog.networking.error(
                 "Jellyfin Continue Watching series-recency enrichment failed; preserving feed order: \(String(describing: error))"
             )
-            return [:]
+            return result
         }
-        var result: [String: Date] = [:]
         for dto in series {
             guard let date = Self.parseDate(dto.UserData?.LastPlayedDate) else { continue }
             result[dto.Id] = date

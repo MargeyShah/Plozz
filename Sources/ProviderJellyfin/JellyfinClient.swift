@@ -974,6 +974,31 @@ public struct JellyfinClient: Sendable {
         return LibraryQueryFacets(genres: response.Genres ?? [], years: response.Years ?? [])
     }
 
+    /// Existence-only probe for a collection directory.
+    ///
+    /// Deliberately lighter than `collectionCandidates`: one BoxSet, no sort,
+    /// no artwork and no fields. The probe only needs to know whether anything
+    /// exists, and a sorted/enriched one-row query made the shared
+    /// `libraries()` gate wait on work whose result was thrown away. The total
+    /// count stays so an inconsistent empty page still fails closed.
+    func collectionDirectoryHasItems(userID: String, libraryID: String?) async throws -> ItemsResponse {
+        let endpoint = Endpoint(
+            path: "/Users/\(userID)/Items",
+            queryItems: [
+                URLQueryItem(name: "IncludeItemTypes", value: "BoxSet"),
+                URLQueryItem(name: "Recursive", value: "true"),
+                URLQueryItem(name: "StartIndex", value: "0"),
+                URLQueryItem(name: "Limit", value: "1"),
+                URLQueryItem(name: "EnableImages", value: "false"),
+                URLQueryItem(name: "EnableTotalRecordCount", value: "true")
+            ] + (libraryID.map { [URLQueryItem(name: "ParentId", value: $0)] } ?? []),
+            headers: authHeaders
+        )
+        return try await HTTPResponseDiagnostics.$route.withValue(.collectionCandidates) {
+            try await readCollectionPage(endpoint)
+        }
+    }
+
     /// Match the native client: the server decides whether ParentId scopes BoxSets.
     func collectionCandidates(userID: String, libraryID: String?, page: PageRequest) async throws -> ItemsResponse {
         let endpoint = Endpoint(
