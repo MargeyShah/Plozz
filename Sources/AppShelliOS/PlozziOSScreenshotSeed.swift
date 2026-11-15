@@ -159,7 +159,7 @@ final class PlozziOSScreenshotDirector {
             try? await Task.sleep(nanoseconds: interval)
             if Task.isCancelled { break }
         }
-        return "ok \(burst.lastPathComponent)"
+        return "ok:\(burst.lastPathComponent)"
         #else
         return "debug-only"
         #endif
