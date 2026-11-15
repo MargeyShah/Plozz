@@ -229,6 +229,8 @@ def build_report(
     samples: dict[str, list[dict]],
     runs: int,
     self_build_configuration: str = "Debug",
+    production_bundle: str = PRODUCTION_BUNDLE,
+    self_build_bundle: str = SELF_BUILD_BUNDLE,
 ) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
@@ -292,7 +294,7 @@ def build_report(
         )
         lines.append("")
 
-    if PRODUCTION_BUNDLE in samples and SELF_BUILD_BUNDLE in samples:
+    if production_bundle in samples and self_build_bundle in samples:
         lines.extend(
             [
                 "## Diff (self-build − TestFlight)",
@@ -312,8 +314,8 @@ def build_report(
             ("Launch → Home load done", "home_done_wall_ms"),
             ("App-side aggregate", "aggregate_ms"),
         ):
-            production = summarise(samples[PRODUCTION_BUNDLE], key)["median"]
-            self_build = summarise(samples[SELF_BUILD_BUNDLE], key)["median"]
+            production = summarise(samples[production_bundle], key)["median"]
+            self_build = summarise(samples[self_build_bundle], key)["median"]
             delta = (
                 self_build - production
                 if self_build is not None and production is not None
@@ -325,8 +327,8 @@ def build_report(
             )
         for row in ROW_NAMES:
             key = f"row_{row}_ms"
-            production = summarise(samples[PRODUCTION_BUNDLE], key)["median"]
-            self_build = summarise(samples[SELF_BUILD_BUNDLE], key)["median"]
+            production = summarise(samples[production_bundle], key)["median"]
+            self_build = summarise(samples[self_build_bundle], key)["median"]
             if production is None and self_build is None:
                 continue
             delta = (
@@ -448,7 +450,8 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     report = build_report(
-        args.device_label, apps, samples, args.runs, args.self_build_configuration
+        args.device_label, apps, samples, args.runs, args.self_build_configuration,
+        args.production_bundle, args.self_build_bundle
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(report + "\n")
