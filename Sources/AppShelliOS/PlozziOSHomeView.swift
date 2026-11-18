@@ -3793,6 +3793,18 @@ struct PlozziOSHomeMediaCard: View {
                 card
             }
         }
+        // Home cards had no press-and-hold menu at all: the actions people reach
+        // for (mark watched, watchlist, remove from Continue Watching) lived only
+        // on the detail page, which is not where the row is. Navigation stays the
+        // tap, so only state-changing actions are offered here.
+        .modifier(PlozziOSHomeCardActionMenu(
+            actions: appModel.mediaItemActionHandler
+                .actions(for: item, context: .none)
+                .filter { !$0.isNavigation },
+            perform: { action in
+                appModel.mediaItemActionHandler.perform(action, on: item, context: .none)
+            }
+        ))
     }
 
     static func resolvedItem(
@@ -3850,6 +3862,27 @@ struct PlozziOSHomeMediaCard: View {
         return appModel.downloads.records.first {
             $0.identityKey == downloadRecord.identityKey
         } ?? downloadRecord
+    }
+}
+
+/// Press-and-hold actions for an iOS Home card. Applied only when the catalog
+/// offers something, so a card with no state actions keeps its plain tap.
+private struct PlozziOSHomeCardActionMenu: ViewModifier {
+    let actions: [MediaItemAction]
+    let perform: (MediaItemAction) -> Void
+
+    func body(content: Content) -> some View {
+        if actions.isEmpty {
+            content
+        } else {
+            content.contextMenu {
+                ForEach(actions) { action in
+                    Button(action.title, systemImage: action.systemImage) {
+                        perform(action)
+                    }
+                }
+            }
+        }
     }
 }
 
