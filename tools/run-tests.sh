@@ -93,7 +93,12 @@ PLOZZ_DERIVED_DATA="${PLOZZ_DERIVED_DATA:-$PWD/.build/test-derived-data}"
 PLOZZ_TEST_RESULTS_DIR="${PLOZZ_TEST_RESULTS_DIR:-$PWD/.build/test-results}"
 PLOZZ_CLONED_SOURCE_PACKAGES="${PLOZZ_CLONED_SOURCE_PACKAGES:-$PLOZZ_DERIVED_DATA/SourcePackages}"
 configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES"
-PLOZZ_HANG_SECS="${PLOZZ_HANG_SECS:-180}"
+# A shared CI runner can spend several minutes inside one silent step (a large
+# module's link, or a single huge file's compile), which is progress, not a
+# wedge. 180 s killed package shards 2 and 3 mid-link with no test executed, so
+# the window is wide enough for a slow-but-live build while still bounding a
+# genuinely wedged xcodebuild (the process tree is killed and the run fails).
+PLOZZ_HANG_SECS="${PLOZZ_HANG_SECS:-600}"
 # How long to let xcodebuild wind down AFTER every test bundle has reported its
 # result. Surviving tests can report success after a crash/restart, so these
 # lines only start the teardown grace period; xcresult decides the verdict.
