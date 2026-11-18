@@ -54,6 +54,32 @@ final class StubHTTPClient: HTTPClient, @unchecked Sendable {
         )
     }
 
+    /// Recorded paths minus capability probes that are not feed membership work.
+    ///
+    /// History and scoped-resume tests assert how many pages a feed reads. The
+    /// Next Up window and the optional plugin capability are one-off probes, so
+    /// they are counted separately rather than inflating those budgets.
+    static let probePaths: Set<String> = [
+        "/DisplayPreferences/usersettings",
+        "/DiscontinueWatching/Config",
+        "/DiscontinueWatching/items"
+    ]
+
+    var feedPaths: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return sentPaths.filter { !Self.probePaths.contains($0) }
+    }
+
+    /// Query items for the feed requests only, paired with ``feedPaths``.
+    var feedQueryItems: [[URLQueryItem]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return zip(sentPaths, sentQueryItems)
+            .filter { !Self.probePaths.contains($0.0) }
+            .map(\.1)
+    }
+
     /// All query items sent for the most recent request whose path ends in `suffix`.
     func queryItems(forPathSuffix suffix: String) -> [URLQueryItem]? {
         lock.lock()

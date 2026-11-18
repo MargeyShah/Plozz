@@ -592,6 +592,43 @@ Never cache or default that flag. A failed read, missing flag, or failed write
 must throw so the durable outbox retains the update. Leave favorites and play
 count out of the update. Jellyfin's stop fallback must never apply to Emby.
 
+### Optional server plugins
+
+A plugin is not part of the base Jellyfin API, so each capability is probed once
+per connection and the answer is cached for that connection; a missing plugin is
+"cannot express this", never an error.
+
+`jellyfin-plugin-discontinue-watching` provides the only server-side dismissal
+Jellyfin has. `JellyfinPluginAPIs.swift` probes `GET /DiscontinueWatching/Config`
+and, when present, dismisses with `POST /DiscontinueWatching/Items/{itemId}`,
+which hides the title from `UserItems/Resume` **and keeps its watch progress** —
+better than the fallback of clearing the position. The plugin's own
+`PlaybackStartConsumer` drops the denylist entry when the viewer plays the title
+again, so no client bookkeeping is needed. Without the plugin,
+`removeFromContinueWatching` clears the position, as before.
+
+The plugin filters `UserItems/Resume` only; it does not override
+`Shows/NextUp`. So Plozz reads the user's dismiss list
+(`GET /DiscontinueWatching/items`, normalised to Jellyfin's dashless ids) and
+subtracts those ids from **both** feeds. That is what makes dismissing a Next-Up
+suggestion stick: the record lives on the server (so it survives reinstall and
+reaches other Jellyfin clients the plugin covers), and the client applies it to
+the feed the plugin does not override. The read happens per feed load, not
+cached, so a dismissal disappears on the next refresh.
+
+### Next Up window
+
+Jellyfin applies **no** date cutoff unless the request sends one
+(`nextUpDateCutoff ?? DateTime.MinValue`), so a client that omits it lists every
+series the account ever touched. Jellyfin Web always sends "today minus
+`maxDaysForNextUp`" (default **365**, `0` = no limit) and passes its rewatching
+preference. Plozz reads the same values from the server's display preferences
+(`GET /DisplayPreferences/usersettings?userId=&client=emby`, `CustomPrefs`) and
+falls back to those defaults when the server has none — Jellyfin Web stores
+`maxDaysForNextUp` locally rather than syncing it, so the server often has
+nothing. The cutoff is sent only for the unscoped feed; a series-scoped lookup
+is about the next episode, not recent activity.
+
 `EmbyWatchStateTests` models the behavior reproduced against Emby 4.10.0.40 and
 checks persisted server state after marking, completion, rewatching, dismissal,
 reload, and failed-read recovery, not just successful HTTP responses.

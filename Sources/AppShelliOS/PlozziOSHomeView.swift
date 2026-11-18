@@ -3321,6 +3321,7 @@ struct PlozziOSHomeRowView: View {
                         continueWatchingAction: appModel.settings.homeVisibility.continueWatchingAction
                     ) ? .play : .openDetail,
                     showsResumeChip: row.kind == .continueWatching,
+                    isContinueWatching: row.kind == .continueWatching,
                     prefetchesArtwork: row.kind == .continueWatching,
                     pendingRemovalIDs: pendingWatchlistRemovalIDs,
                     loadingPlaceholderCount: row.kind == .watchlist
@@ -3457,6 +3458,9 @@ struct PlozziOSHomeMediaRail: View {
     /// promise that the row is Continue Watching.
     var interaction: PlozziOSRailInteraction = .openDetail
     var showsResumeChip: Bool = false
+    /// True only for the Continue Watching row, where a card is removable even
+    /// with no resume point (a Next Up suggestion).
+    var isContinueWatching: Bool = false
     /// Continue Watching opts in because its backdrop + logo composition costs
     /// more than an ordinary card. Keeping this scoped avoids warming every Home
     /// rail at launch when per-library rows are enabled.
@@ -3513,6 +3517,8 @@ struct PlozziOSHomeMediaRail: View {
                             interaction: interaction,
                             showsResumeChip: showsResumeChip,
                             showsSeriesArtwork: showsSeriesArtwork,
+                            actionContext: isContinueWatching
+                                ? .continueWatching : .none,
                             isPendingRemoval: pendingRemovalIDs.contains(
                                 item.stablePresentationID
                             ),
@@ -3759,6 +3765,7 @@ struct PlozziOSHomeMediaCard: View {
     var interaction: PlozziOSRailInteraction = .openDetail
     var showsResumeChip: Bool = false
     var showsSeriesArtwork: Bool = false
+    var actionContext: MediaItemActionContext = .none
     var isPendingRemoval: Bool = false
     let provider: (any MediaProvider)?
     @State private var downloadRecord: DownloadedMediaRecord?
@@ -3799,10 +3806,10 @@ struct PlozziOSHomeMediaCard: View {
         // tap, so only state-changing actions are offered here.
         .modifier(PlozziOSHomeCardActionMenu(
             actions: appModel.mediaItemActionHandler
-                .actions(for: item, context: .none)
+                .actions(for: item, context: actionContext)
                 .filter { !$0.isNavigation },
             perform: { action in
-                appModel.mediaItemActionHandler.perform(action, on: item, context: .none)
+                appModel.mediaItemActionHandler.perform(action, on: item, context: actionContext)
             }
         ))
     }

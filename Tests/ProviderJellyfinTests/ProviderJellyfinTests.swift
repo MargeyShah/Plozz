@@ -220,7 +220,7 @@ final class JellyfinProviderMappingTests: XCTestCase {
         let provider = JellyfinProvider(session: makeSession(), http: stub)
         let page = try await provider.items(in: "lib", kind: .series, page: PageRequest(startIndex: 0, limit: 60))
         XCTAssertEqual(page.items.map(\.unwatchedEpisodeCount), [18, 3, 0, nil, nil, nil])
-        XCTAssertEqual(stub.sentPaths.count, 1, "Existing listing response must supply all counts")
+        XCTAssertEqual(stub.feedPaths.count, 1, "Existing listing response must supply all counts")
     }
 
     private func makeSession(
@@ -421,7 +421,7 @@ final class JellyfinProviderMappingTests: XCTestCase {
                 let provider = JellyfinProvider(session: session, http: stub)
                 let items = try await provider.homeNextUp(libraryID: "shows", limit: limit)
                 XCTAssertEqual(items.map(\.id), (0..<expectedCount).map { "next-\($0)" })
-                XCTAssertEqual(stub.sentPaths.count, pages.count)
+                XCTAssertEqual(stub.feedPaths.count, pages.count)
                 XCTAssertTrue(stub.sentQueryItems.allSatisfy {
                     $0.first { $0.name == "ParentId" }?.value == "shows"
                 })
@@ -767,7 +767,10 @@ final class JellyfinProviderMappingTests: XCTestCase {
 
         XCTAssertEqual(Set(items.map(\.id)), ["resumed", "next"])
         XCTAssertEqual(Set(items.compactMap(\.seriesID)), ["first-show", "returning-show"])
-        XCTAssertEqual(stub.sentPaths.count, 2, "Membership must not fetch parent dates or latest played episodes")
+        XCTAssertEqual(
+            stub.feedPaths.count, 2,
+            "Membership must not fetch parent dates or latest played episodes"
+        )
     }
 
     func testOlderNextUpSeriesMovesBackWithoutBeingRemoved() async throws {

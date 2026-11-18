@@ -19,6 +19,10 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
     let collectionLibraryCache = MediaBrowserCollectionLibraryCache()
     let videoPlaylistCache = VideoPlaylistSnapshotCache()
     let liveTVLeases = JellyfinLiveTVLeaseStore()
+    /// Optional server-plugin surface, probed once per connection.
+    let pluginSupportCache = JellyfinPluginSupportCache()
+    /// Next Up preferences from the server's display-preferences store.
+    let nextUpPreferencesCache = JellyfinNextUpPreferencesCache()
     private let serverRatingsReader = JellyfinServerRatings()
     let themeArchiveResolver: @Sendable (String?) async -> URL?
     private let authenticatedStreamProber: (any AuthenticatedHTTPStreamProbing)?
@@ -387,11 +391,19 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
             limit: limit,
             parentID: parentID
         )
+        // A series-scoped lookup is about that show's next episode, not a
+        // recent-activity window, so it neither needs nor pays for the
+        // preferences read.
+        let nextUpPreferences = seriesID == nil
+            ? await nextUpQueryPreferences()
+            : (dateCutoff: Date?.none, enableRewatching: false)
         async let nextUpTask = client.nextUpItems(
             userID: session.userID,
             limit: limit,
             parentID: parentID,
-            seriesID: seriesID
+            seriesID: seriesID,
+            dateCutoff: nextUpPreferences.dateCutoff,
+            enableRewatching: nextUpPreferences.enableRewatching
         )
 
         var resume: [BaseItemDto] = []
@@ -428,6 +440,15 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
         }
 
         var seen = Set<String>()
+        // The discontinue-watching plugin can only filter `UserItems/Resume`, so
+        // subtract its per-user dismiss list from both feeds here. Without the
+        // plugin the list is empty and this costs nothing.
+        let denied = await deniedContinueWatchingIDs()
+        if !denied.isEmpty {
+            resume.removeAll { denied.contains(JellyfinClient.normalizedItemID($0.Id)) }
+            nextUp.removeAll { denied.contains(JellyfinClient.normalizedItemID($0.Id)) }
+        }
+
         let merged = (resume + nextUp).filter { seen.insert($0.Id).inserted }
         let scope = parentID == nil ? "account" : seriesID == nil ? "library" : "series"
         PlozzLog.networking.info(
@@ -3142,6 +3163,76 @@ extension JellyfinProvider: ResumeStateWriting {
             itemID: itemID,
             lastPlayedAt: capturedAt
         )
+    }
+}
+
+extension JellyfinProvider: ContinueWatchingRemovable {
+    /// Jellyfin's base API has no dismissal: the only built-in way to hide a
+    /// title from Continue Watching is to clear its position, which throws away
+    /// the viewer's progress. When the discontinue-watching plugin is installed,
+    /// add the title to its per-user denylist instead — the server then filters
+    /// it out of `UserItems/Resume` and drops the entry again when the viewer
+    /// plays the title.
+    ///
+    /// With no plugin the historical behaviour stands: clearing the position is
+    /// the only server-side action available.
+    public func removeFromContinueWatching(itemID: String) async throws {
+        if await serverPlugins().serverSideContinueWatchingRemoval {
+            try await client.discontinueWatchingDismiss(itemID: itemID)
+            return
+        }
+        try await setResumePosition(0, itemID: itemID)
+    }
+
+    /// The user's server-side dismiss list, or empty when the plugin is absent.
+    /// Read per feed load (not cached) so a dismissal disappears on the next
+    /// refresh; it is a single small request, and only on plugin servers.
+    private func deniedContinueWatchingIDs() async -> Set<String> {
+        guard await serverPlugins().serverSideContinueWatchingRemoval else { return [] }
+        do {
+            return try await client.discontinueWatchingDenylist()
+        } catch {
+            PlozzLog.networking.error(
+                "Could not read the Jellyfin dismiss list; showing the unfiltered feed."
+            )
+            return []
+        }
+    }
+
+    /// Optional server-plugin surface. A probe result is cached for the
+    /// connection: installing a plugin while the app runs is picked up on the
+    /// next launch or reconnect, never by re-probing on every card action.
+    private func serverPlugins() async -> JellyfinPluginSupport {
+        if let cached = pluginSupportCache.value() { return cached }
+        var support = JellyfinPluginSupport()
+        support.discontinueWatching = await client.discontinueWatchingAvailable()
+        pluginSupportCache.store(support)
+        return support
+    }
+
+    /// The Next Up window the server's own clients honour.
+    ///
+    /// Jellyfin applies no date cutoff unless one is sent, so omitting it lists
+    /// every series the account ever watched. Jellyfin Web sends "today minus
+    /// `maxDaysForNextUp`" (default 365, `0` meaning no limit) and passes the
+    /// rewatching preference; this reads the same values from the server's
+    /// display preferences and falls back to those defaults when the server has
+    /// none (Jellyfin Web stores them locally rather than syncing them).
+    private func nextUpQueryPreferences() async -> (dateCutoff: Date?, enableRewatching: Bool) {
+        let preferences: JellyfinClient.NextUpPreferences
+        if let cached = nextUpPreferencesCache.value() {
+            preferences = cached
+        } else {
+            do {
+                preferences = try await client.nextUpPreferences(userID: session.userID)
+                nextUpPreferencesCache.store(preferences)
+            } catch {
+                preferences = JellyfinClient.NextUpPreferences(maxDays: nil, includeRewatching: nil)
+            }
+        }
+        let days = preferences.maxDays ?? 365
+        let cutoff = days > 0 ? Date().addingTimeInterval(-Double(days) * 86_400) : nil
+        return (cutoff, preferences.includeRewatching ?? false)
     }
 }
 
