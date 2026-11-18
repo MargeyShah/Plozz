@@ -541,7 +541,7 @@ final class MediaBadgesTests: XCTestCase {
 
     // MARK: Resume affordance (drives hero + detail Play/Resume button)
 
-    func testBriefPlaysLookUnstartedUntilTheExactContinueWatchingThreshold() {
+    func testBriefPlaysLookUnstartedUntilTheExactPresentationThreshold() {
         let durations: [TimeInterval?] = [nil, 30, 120, 600, 1200, 3600, 7200]
         for kind in [MediaItemKind.movie, .episode, .video] {
             for runtime in durations {
@@ -553,7 +553,10 @@ final class MediaBadgesTests: XCTestCase {
                     )
                     let visible = position >= minimum
                     XCTAssertEqual(item.hasVisiblePlaybackProgress, visible)
-                    XCTAssertEqual(ContinueWatchingPolicy.admits(item), visible)
+                    // Admission is the provider's decision now: a saved position
+                    // belongs in the row however small. Only the chip and badge
+                    // presentation still wait for a meaningful fraction.
+                    XCTAssertTrue(ContinueWatchingPolicy.admits(item))
                     XCTAssertEqual(item.resumeProgressFraction != nil, visible && runtime != nil)
                     XCTAssertEqual(item.resumeRemainingText != nil, visible && runtime != nil)
                     if kind != .video {

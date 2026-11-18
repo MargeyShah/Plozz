@@ -3,20 +3,32 @@ import XCTest
 
 /// Progress eligibility is independent of optional recency restrictions.
 final class ContinueWatchingPolicyTests: XCTestCase {
-    func testAdaptiveProgressAdmissionAtExactBoundaries() {
+    /// Membership is the server's answer: any saved position it returned belongs
+    /// in the row, however small a fraction of the runtime it is. A runtime-based
+    /// floor made Plozz hide titles Jellyfin's own row listed.
+    func testAnyPositivePositionIsAdmitted() {
+        let positions: [TimeInterval] = [0.001, 2.1, 4.1, 9.2, 54, 120, 2_400]
+        for runtime in [TimeInterval?.none, 10, 600, 1_200, 7_200] {
+            for position in positions {
+                let video = MediaItem(
+                    id: "video", title: "Video", kind: .video,
+                    runtime: runtime, resumePosition: position
+                )
+                XCTAssertTrue(
+                    ContinueWatchingPolicy.default.keeps(video),
+                    "position \(position) of runtime \(String(describing: runtime))"
+                )
+            }
+        }
+    }
+
+    func testThePresentationFloorIsUnchanged() {
         let cases: [(TimeInterval?, TimeInterval)] = [
             (10, 5), (60, 5), (240, 12), (600, 30), (1_200, 60), (7_200, 60),
             (nil, 60), (0, 60), (-1, 60), (.infinity, 60), (.nan, 60)
         ]
         for (duration, threshold) in cases {
-            var video = MediaItem(id: "video", title: "Video", kind: .video, runtime: duration)
             XCTAssertEqual(ContinueWatchingPolicy.minimumResumePosition(duration: duration), threshold)
-            video.resumePosition = threshold - 0.001
-            XCTAssertFalse(ContinueWatchingPolicy.default.keeps(video))
-            video.resumePosition = threshold
-            XCTAssertTrue(ContinueWatchingPolicy.default.keeps(video))
-            video.resumePosition = threshold + 0.001
-            XCTAssertTrue(ContinueWatchingPolicy.default.keeps(video))
         }
     }
 
