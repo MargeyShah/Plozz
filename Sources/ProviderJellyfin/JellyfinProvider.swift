@@ -3093,38 +3093,55 @@ extension JellyfinProvider: WatchStateProviding {
 }
 
 extension JellyfinProvider: ResumeStateWriting {
-    /// Writes a resume position **out-of-band** (convergence/durability path)
-    /// without disturbing any live now-playing session.
+    /// Converges a resume position through the endpoint that owns the rules.
     ///
-    /// Routes through the session-less user-data endpoint
-    /// (`POST /UserItems/{itemId}/UserData`, Jellyfin 10.9+), updating position
-    /// and recency while preserving watched state. The previous implementation reported a `stop` at
-    /// the position, which posts to `/Sessions/Playing/Stopped` and **terminates
-    /// the live session**, snapping the server's now-playing dashboard to 0:00 —
-    /// the bug this avoids. A position of `0` clears the resume point.
+    /// Jellyfin decides what counts as resumable — `MinResumePct`,
+    /// `MaxResumePct`, `MinResumeDurationSeconds`, and "a finished title is
+    /// played and keeps no position" — inside
+    /// `UserDataManager.UpdatePlayState`, which only the `/Sessions/Playing*`
+    /// endpoints call. `/Items/Resume` then lists any row with
+    /// `PlaybackPositionTicks > 0` and re-validates nothing. Writing
+    /// `PlaybackPositionTicks` straight into `POST /UserItems/{itemId}/UserData`
+    /// therefore publishes resume points the server would have discarded, and
+    /// every Jellyfin client renders them because the row is trusted as-is.
     ///
-    /// On Jellyfin < 10.9 (no user-data endpoint → `404`) it falls back to the
-    /// legacy stop report so the position still converges rather than being
-    /// silently dropped (durability / never-drop). Documented caveat: on that
-    /// older-server fallback only, a convergence write can still disturb a
-    /// concurrent live session of the same title.
+    /// So a non-zero convergence write is reported as the end of playback
+    /// (`POST /Sessions/Playing/Stopped`), exactly like a client that just
+    /// stopped watching: the server applies its own thresholds and completion
+    /// rule, and Plozz reads the outcome back from `Items/Resume` and
+    /// `Shows/NextUp` instead of duplicating the policy. Do not reintroduce a
+    /// client-side copy of those thresholds; a server that changes them would
+    /// silently diverge.
     ///
-    /// Emby's user-scoped endpoint resets an omitted Played flag, so the client
-    /// reads and preserves it explicitly. A failed read or write must throw so
-    /// the outbox retries, never synthesize a stop that could terminate another
-    /// transcode on that device.
+    /// `0` still means "clear the resume point" and stays out of band
+    /// (`POST /UserItems/{itemId}/UserData`): clearing cannot create a Continue
+    /// Watching row, it is Jellyfin's dismissal mechanism, and a stop report
+    /// would additionally unset `Played`, which dismissal must not do.
+    ///
+    /// Two documented caveats. A stop report is addressed to *this device's*
+    /// session, so a deferred convergence write that drains while another title
+    /// is playing here can be read as that session stopping; in practice the
+    /// live-session guard defers a checkpoint until its own session ends. And
+    /// Emby keeps the session-less write (reading and preserving `Played`),
+    /// because its endpoint semantics are different and have not been validated
+    /// against Emby's own thresholds.
     public func setResumePosition(_ seconds: TimeInterval, itemID: String, capturedAt: Date = Date()) async throws {
-        do {
-            try await client.updatePlaybackPosition(max(seconds, 0), userID: session.userID, itemID: itemID, lastPlayedAt: capturedAt)
-        } catch AppError.notFound where kind == .jellyfin {
+        if seconds > 0, kind == .jellyfin {
             let progress = PlaybackProgress(
                 itemID: itemID,
                 playSessionID: nil,
-                positionSeconds: max(seconds, 0),
+                positionSeconds: seconds,
                 isPaused: true
             )
-            try await reportPlayback(progress, event: .stop, origin: "resume-convergence-fallback")
+            try await reportPlayback(progress, event: .stop, origin: "resume-convergence")
+            return
         }
+        try await client.updatePlaybackPosition(
+            max(seconds, 0),
+            userID: session.userID,
+            itemID: itemID,
+            lastPlayedAt: capturedAt
+        )
     }
 }
 

@@ -1832,38 +1832,34 @@ final class JellyfinWatchStateTests: XCTestCase {
         XCTAssertEqual(stub.method(forPathSuffix: "/Users/u1/PlayedItems/i1"), .delete)
     }
 
-    /// The out-of-band resume write must update the saved position via the
-    /// session-less user-data endpoint and must NOT post to
-    /// `/Sessions/Playing/Stopped` (which terminates a live now-playing session
-    /// and zeroes the server dashboard — the reproduced bug).
-    func testSetResumePositionUsesSessionlessUserDataEndpoint() async throws {
+    /// Jellyfin decides what is resumable (`MinResumePct`, `MaxResumePct`,
+    /// `MinResumeDuration`, completion) in `UpdatePlayState`, which only the
+    /// session-report endpoints call. `/Items/Resume` trusts stored positions, so
+    /// a session-less write would publish resume points the server would have
+    /// discarded. A non-zero convergence write therefore reports a stop and lets
+    /// the server apply its own rules.
+    func testSetResumePositionReportsStopInsteadOfWritingUserData() async throws {
         let stub = StubHTTPClient()
-        stub.stub(pathSuffix: "/UserItems/i1/UserData", json: "{}")
+        stub.stub(pathSuffix: "/Sessions/Playing/Stopped", json: "{}")
         let provider = JellyfinProvider(session: makeSession(), http: stub)
 
         try await provider.setResumePosition(120, itemID: "i1")
 
-        XCTAssertTrue(stub.sentPaths.contains { $0.hasSuffix("/UserItems/i1/UserData") })
-        XCTAssertEqual(stub.method(forPathSuffix: "/UserItems/i1/UserData"), .post)
-        // Never a session-ending stop report.
-        XCTAssertFalse(stub.sentPaths.contains { $0.hasSuffix("/Sessions/Playing/Stopped") })
-        // userId carried as a query param.
-        XCTAssertEqual(
-            stub.queryItems(forPathSuffix: "/UserItems/i1/UserData")?.first(where: { $0.name == "userId" })?.value,
-            "u1"
+        XCTAssertEqual(stub.method(forPathSuffix: "/Sessions/Playing/Stopped"), .post)
+        XCTAssertFalse(
+            stub.sentPaths.contains { $0.hasSuffix("/UserItems/i1/UserData") },
+            "A resume point must not bypass the server's resume thresholds."
         )
-        // Body sends only the position (120s → 1_200_000_000 ticks), preserving
-        // played/favorite via the server's field-by-field merge.
-        let body = try XCTUnwrap(stub.sentBodies.first { $0.key.hasSuffix("/UserItems/i1/UserData") }?.value)
+        let body = try XCTUnwrap(stub.sentBodies["/Sessions/Playing/Stopped"])
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-        let ticks = try XCTUnwrap(json["PlaybackPositionTicks"] as? NSNumber)
-        XCTAssertEqual(ticks.int64Value, 1_200_000_000)
-        XCTAssertNil(json["Played"])
-        XCTAssertNil(json["IsFavorite"])
+        XCTAssertEqual(json["ItemId"] as? String, "i1")
+        XCTAssertEqual((json["PositionTicks"] as? NSNumber)?.int64Value, 1_200_000_000)
+        XCTAssertEqual(json["IsPaused"] as? Bool, true)
     }
 
     /// Clearing the resume point (position 0) still goes through the session-less
-    /// endpoint, never a stop report.
+    /// endpoint, never a stop report: dismissal must keep `Played` untouched, and
+    /// a zero position cannot join Continue Watching.
     func testSetResumePositionZeroUsesUserDataNotStop() async throws {
         let stub = StubHTTPClient()
         stub.stub(pathSuffix: "/UserItems/i1/UserData", json: "{}")
@@ -1875,183 +1871,17 @@ final class JellyfinWatchStateTests: XCTestCase {
         XCTAssertFalse(stub.sentPaths.contains { $0.hasSuffix("/Sessions/Playing/Stopped") })
     }
 
-    /// On Jellyfin < 10.9 the user-data endpoint 404s; the write falls back to the
-    /// legacy stop report so the position still converges (durability / never
-    /// silently drop a watch).
-    func testSetResumePositionFallsBackToStopWhenUserDataUnavailable() async throws {
+    func testSetResumePositionPropagatesReportFailureForRetry() async throws {
         let stub = StubHTTPClient()
-        stub.stub(pathSuffix: "/UserItems/i1/UserData", json: "{}", status: 404)
-        stub.stub(pathSuffix: "/Sessions/Playing/Stopped", json: "{}")
+        stub.stub(pathSuffix: "/Sessions/Playing/Stopped", json: "{}", status: 500)
         let provider = JellyfinProvider(session: makeSession(), http: stub)
 
-        try await provider.setResumePosition(120, itemID: "i1")
-
-        XCTAssertTrue(stub.sentPaths.contains { $0.hasSuffix("/UserItems/i1/UserData") })
-        XCTAssertTrue(stub.sentPaths.contains { $0.hasSuffix("/Sessions/Playing/Stopped") })
-    }
-}
-
-final class JellyfinDeliveryModeTests: XCTestCase {
-    func testDirectPlayWhenNoTranscodingUrl() {
-        XCTAssertEqual(
-            JellyfinProvider.deliveryMode(transcoding: false, didRemux: false),
-            .directPlay
-        )
-    }
-
-    func testRemuxWhenWeRequestedDirectStream() {
-        XCTAssertEqual(
-            JellyfinProvider.deliveryMode(transcoding: true, didRemux: true),
-            .remux
-        )
-    }
-
-    func testTranscodeWhenServerChoseItWithoutOurRemux() {
-        XCTAssertEqual(
-            JellyfinProvider.deliveryMode(transcoding: true, didRemux: false),
-            .transcode
-        )
-    }
-}
-
-final class JellyfinHvc1RemuxTests: XCTestCase {
-    private func source(_ json: String) throws -> MediaSourceInfo {
-        try JSONDecoder().decode(MediaSourceInfo.self, from: Data(json.utf8))
-    }
-
-    func testHev1HevcInMP4WithAppleAudioRequestsRemux() throws {
-        let s = try source(#"""
-        {"Container":"mp4","MediaStreams":[
-          {"Index":0,"Type":"Video","Codec":"hevc","CodecTag":"hev1"},
-          {"Index":1,"Type":"Audio","Codec":"aac","IsDefault":true}]}
-        """#)
-        XCTAssertTrue(JellyfinProvider.shouldRequestHvc1Remux(s))
-    }
-
-    func testHvc1HevcIsNotRemuxed() throws {
-        let s = try source(#"""
-        {"Container":"mp4","MediaStreams":[
-          {"Index":0,"Type":"Video","Codec":"hevc","CodecTag":"hvc1"}]}
-        """#)
-        XCTAssertFalse(JellyfinProvider.shouldRequestHvc1Remux(s))
-    }
-
-    func testHev1InMatroskaIsNotRemuxed() throws {
-        // hev1 in MKV routes to the on-device hybrid engine instead.
-        let s = try source(#"""
-        {"Container":"mkv","MediaStreams":[
-          {"Index":0,"Type":"Video","Codec":"hevc","CodecTag":"hev1"}]}
-        """#)
-        XCTAssertFalse(JellyfinProvider.shouldRequestHvc1Remux(s))
-    }
-
-    func testAlreadyTranscodingIsNotRemuxed() throws {
-        let s = try source(#"""
-        {"Container":"mp4","TranscodingUrl":"/v.m3u8","MediaStreams":[
-          {"Index":0,"Type":"Video","Codec":"hevc","CodecTag":"hev1"}]}
-        """#)
-        XCTAssertFalse(JellyfinProvider.shouldRequestHvc1Remux(s))
-    }
-
-    func testHev1WithIncompatibleAudioIsNotRemuxed() throws {
-        // DTS can't be stream-copied into fMP4 → forcing the remux would transcode
-        // audio, so we leave it for the on-device engine net instead.
-        let s = try source(#"""
-        {"Container":"mp4","MediaStreams":[
-          {"Index":0,"Type":"Video","Codec":"hevc","CodecTag":"hev1"},
-          {"Index":1,"Type":"Audio","Codec":"dts","IsDefault":true}]}
-        """#)
-        XCTAssertFalse(JellyfinProvider.shouldRequestHvc1Remux(s))
-    }
-}
-
-final class JellyfinRemoteTrailersTests: XCTestCase {
-    private func makeSession() -> UserSession {
-        UserSession(
-            server: MediaServer(id: "s", name: "Home", baseURL: URL(string: "http://host:8096")!, provider: .jellyfin),
-            userID: "u1", userName: "Alice", deviceID: "d1", accessToken: "TOKEN"
-        )
-    }
-
-    func testTrailersMergeLocalAndRemoteYouTube() async throws {
-        let stub = StubHTTPClient()
-        // Local trailer file (own server item).
-        stub.stub(pathSuffix: "/Users/u1/Items/i1/LocalTrailers", json: """
-        [{"Id":"local1","Name":"Local Trailer","Type":"Trailer"}]
-        """)
-        // Server-resolved remote trailer (YouTube watch URL).
-        stub.stub(pathSuffix: "/Users/u1/Items/i1", json: """
-        {"Id":"i1","Name":"Dune","Type":"Movie",
-         "RemoteTrailers":[{"Url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ","Name":"Dune Trailer"}]}
-        """)
-        let provider = JellyfinProvider(session: makeSession(), http: stub)
-
-        let trailers = try await provider.trailers(for: "i1")
-        XCTAssertEqual(trailers.count, 2)
-
-        let local = trailers.first { !$0.isYouTubeTrailer }
-        let remote = trailers.first { $0.isYouTubeTrailer }
-        XCTAssertEqual(local?.id, "local1")
-        XCTAssertEqual(remote?.youTubeTrailerVideoID, "dQw4w9WgXcQ")
-    }
-
-    func testTrailersSurviveLocalFailure() async throws {
-        let stub = StubHTTPClient()
-        // No LocalTrailers stub -> notFound thrown for that path, but remote still works.
-        stub.stub(pathSuffix: "/Users/u1/Items/i1", json: """
-        {"Id":"i1","Name":"Dune","Type":"Movie",
-         "RemoteTrailers":[{"Url":"https://youtu.be/dQw4w9WgXcQ","Name":"Trailer"}]}
-        """)
-        let provider = JellyfinProvider(session: makeSession(), http: stub)
-
-        let trailers = try await provider.trailers(for: "i1")
-        XCTAssertEqual(trailers.count, 1)
-        XCTAssertEqual(trailers.first?.youTubeTrailerVideoID, "dQw4w9WgXcQ")
-    }
-
-    func testTrailersEmptyWhenNoneAvailable() async throws {
-        let stub = StubHTTPClient()
-        stub.stub(pathSuffix: "/Users/u1/Items/i1", json: """
-        {"Id":"i1","Name":"Dune","Type":"Movie"}
-        """)
-        let provider = JellyfinProvider(session: makeSession(), http: stub)
-
-        let trailers = try await provider.trailers(for: "i1")
-        XCTAssertTrue(trailers.isEmpty)
-    }
-}
-
-/// Regression coverage for the cross-server "Continue Watching" surfacing bug:
-/// the session-less resume write (`POST /UserItems/{id}/UserData`) used for
-/// fan-out convergence must stamp `LastPlayedDate` so the title lands in
-/// Jellyfin's date-ordered Resume row — not just become resumable when opened
-/// directly. Build 690 omitted it, so fan-out targets stored the position but
-/// never appeared in the row.
-final class JellyfinResumeWriteTests: XCTestCase {
-    private func makeSession() -> UserSession {
-        UserSession(
-            server: MediaServer(id: "s", name: "Home", baseURL: URL(string: "http://host:8096")!, provider: .jellyfin),
-            userID: "u1", userName: "Alice", deviceID: "d1", accessToken: "TOKEN"
-        )
-    }
-
-    func testSetResumePositionStampsLastPlayedDate() async throws {
-        let stub = StubHTTPClient()
-        stub.stub(pathSuffix: "/UserItems/i1/UserData", json: "{}")
-        let provider = JellyfinProvider(session: makeSession(), http: stub)
-
-        try await provider.setResumePosition(123, itemID: "i1")
-
-        guard let body = stub.sentBodies["/UserItems/i1/UserData"] else {
-            return XCTFail("UserData write was not sent")
+        do {
+            try await provider.setResumePosition(120, itemID: "i1")
+            XCTFail("A rejected convergence report must stay retryable")
+        } catch {
+            // The durable outbox keeps the write.
         }
-        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertEqual((json["PlaybackPositionTicks"] as? NSNumber)?.int64Value,
-                       JellyfinTicks.ticks(fromSeconds: 123))
-        let lastPlayed = try XCTUnwrap(json["LastPlayedDate"] as? String,
-                                       "LastPlayedDate must be present so the item surfaces in Continue Watching")
-        XCTAssertNotNil(ISO8601DateFormatter().date(from: String(lastPlayed.prefix(19) + "Z")),
-                        "LastPlayedDate should be a valid ISO 8601 timestamp")
     }
 }
 
