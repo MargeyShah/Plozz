@@ -292,12 +292,16 @@ final class NextEpisodeCoordinator {
             await provider.releaseStreamingSession(request)
             return
         }
-        guard let host, !host.upNextProvider.kind.playbackInfoIsIdempotent else { return }
-        guard let sessionID = request.playSessionID, !sessionID.isEmpty else { return }
-        let progress = PlaybackProgress(
-            itemID: request.item.id, playSessionID: sessionID, positionSeconds: 0, isPaused: true)
-        try? await host.upNextProvider.reportPlayback(progress, event: .stop)
-        PlozzLog.playback.info("Released orphaned prefetched next-episode session")
+        // Nothing else was ever opened. `playbackInfo` is a read: a prefetched
+        // session that never reported a start has no now-playing row and no
+        // encoding job, so there is nothing to close. A stop report would not be
+        // a no-op — Jellyfin writes user data from it, and at position 0 that
+        // erases the real resume point of an episode the viewer never played.
+        if let host, !host.upNextProvider.kind.playbackInfoIsIdempotent {
+            PlozzLog.playback.info(
+                "Released prefetched next-episode session without a stop report: playback never started."
+            )
+        }
     }
 
     /// Cancels the in-flight next-episode prefetch (its session, if any, is

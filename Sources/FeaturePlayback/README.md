@@ -942,6 +942,15 @@ to fit small viewports. VOD retains its existing 360-point maximum.
 
 ## Playback completion reporting
 
+A stop report is a **watch-state write, not cleanup**: Jellyfin saves the
+position through `UpdatePlayState`, so a stop at `0` erases a real resume point
+and a stop at a small position publishes a resume point for playback that never
+advanced. Stop reporting is therefore admitted only for a session whose start
+was enqueued. A rendition restart before the first frame, a teardown while
+loading, and a prefetched next episode that was never adopted report nothing;
+the prefetch still releases its transcode job. Do not "close" an unstarted
+session with a stop report — there is no server session to close.
+
 Playback lifecycle reports capture the request, position, duration, and tracker
 percentage before suspension and drain in order. At most one unsent heartbeat
 is retained, with newer progress replacing its snapshot; lifecycle events

@@ -129,6 +129,13 @@ final class WatchProgressReporter {
     ) -> Task<Void, Never>? {
         if event == .stop {
             if let terminalReport { return terminalReport }
+            // A session whose start was never reported has nothing to close —
+            // and a stop report is not a harmless cleanup: Jellyfin writes user
+            // data from it (`UpdatePlayState`). Sending one for playback that
+            // never began erases a real resume point or publishes a bogus one.
+            // A rendition restart before the first frame and a teardown during
+            // load both reach here, so admission is gated on the start report.
+            guard hasEnqueuedPlaybackStart else { return nil }
             cancel()
         } else if isEndingSession {
             return nil

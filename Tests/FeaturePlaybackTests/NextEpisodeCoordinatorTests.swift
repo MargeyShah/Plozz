@@ -166,7 +166,11 @@ final class NextEpisodeCoordinatorTests: XCTestCase {
         XCTAssertNotNil(sut.prefetchedNext, "a miss must not clear the cached prefetch")
     }
 
-    func testReleaseOrphanedPrefetchReportsStopForJellyfin() async {
+    /// `playbackInfo` is a read: a prefetched session that never reported a start
+    /// has no now-playing row and no encoding job. Closing it with a stop report
+    /// is not a cleanup — Jellyfin saves user data from that report, so a stop at
+    /// position 0 erases the resume point of an episode the viewer never played.
+    func testOrphanedPrefetchDoesNotReportStopForJellyfin() async {
         let (sut, host, _, provider) = makeSUT(providerKind: .jellyfin)
         host.resolveResult = prefetched(itemID: "next-1")
         sut.startNextEpisodePrefetch(trigger: "eager")
@@ -174,7 +178,7 @@ final class NextEpisodeCoordinatorTests: XCTestCase {
 
         await sut.releaseOrphanedPrefetchIfNeeded()
         let reports = await provider.stopReports
-        XCTAssertEqual(reports.count, 1, "a non-idempotent orphan is released with a .stop")
+        XCTAssertTrue(reports.isEmpty, "An unstarted prefetch has nothing to close.")
         XCTAssertNil(sut.prefetchedNext)
     }
 
@@ -258,7 +262,7 @@ final class NextEpisodeCoordinatorTests: XCTestCase {
         XCTAssertNotNil(sut.prefetchedNext, "The unadopted version remains owned until stop.")
         await sut.releaseOrphanedPrefetchIfNeeded()
         let stops = await provider.stopReports
-        XCTAssertEqual(stops.count, 1)
+        XCTAssertTrue(stops.isEmpty, "Releasing an unstarted prefetch must not write user data.")
     }
 
     func testCancelledJoinReleasesTheInFlightNextSessionOnce() async throws {
@@ -277,7 +281,8 @@ final class NextEpisodeCoordinatorTests: XCTestCase {
         XCTAssertNil(prepared)
         await sut.releaseOrphanedPrefetchIfNeeded()
         let stops = await provider.stopReports
-        XCTAssertEqual(stops.map(\.playSessionID), ["session-next-1"])
+        XCTAssertTrue(stops.isEmpty, "An unstarted prefetch has nothing to close.")
+        XCTAssertNil(sut.prefetchedNext)
     }
 
     func testNativeTargetSkipsProbeAndKeepsTheNormalDisplayReset() async {
@@ -309,10 +314,10 @@ final class NextEpisodeCoordinatorTests: XCTestCase {
         XCTAssertNil(prepared)
         XCTAssertEqual(engine.stopCount, 0)
         let stops = await provider.stopReports
-        XCTAssertEqual(stops.map(\.playSessionID), ["session-previous"])
+        XCTAssertTrue(stops.isEmpty, "An unstarted probe session has nothing to close.")
         await sut.releaseOrphanedPrefetchIfNeeded()
         let finalStops = await provider.stopReports
-        XCTAssertEqual(finalStops.count, 1)
+        XCTAssertTrue(finalStops.isEmpty)
     }
 
     func testSDROrNativePlaybackDoesNotAddAnOnDemandProbe() async {
