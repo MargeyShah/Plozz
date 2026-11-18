@@ -9,6 +9,7 @@ import FeatureAuth
 import FeatureDiscovery
 import FeatureDiscoveryCore
 import FeatureMusic
+import FeatureHomeCore
 import FeatureLiveTVCore
 import FeatureProfiles
 import FeatureSyncSetup
@@ -490,6 +491,13 @@ public final class AppState {
         } else {
             store = InMemoryWatchMutationStore()
         }
+        // One-time disposal of the Jellyfin Continue Watching state a pre-fix
+        // build left on this device, before the reconciler loads the outbox.
+        ContinueWatchingLocalReset.runIfNeeded(
+            profileID: profileID,
+            homeStore: HomeContentStore(namespace: trackerNamespace),
+            outbox: store
+        )
         let applier = AppShellWatchMutationApplier(
             isActive: { [weak self] in
                 await MainActor.run {

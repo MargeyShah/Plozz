@@ -541,6 +541,24 @@ also fails decoding. Legacy unscoped mutations remain readable under their
 existing behavior. They are not retroactively stamped with the current
 server-user scope: their historical viewer cannot be reconstructed.
 
+## Continue Watching local disposal
+
+Continue Watching membership is server data: the row is `Items/Resume` plus
+`Shows/NextUp`, read live. Local state can still keep a dropped row alive for a
+while — the persisted Home snapshot feeds carry-forward, and a queued in-progress
+resume write republishes its position when it drains.
+
+`ContinueWatchingLocalReset` (FeatureHomeCore) is the one-time, per-profile
+disposal that runs when the reconciler is built: it removes Jellyfin-attributed
+cards from the persisted row and drops Jellyfin targets from pending in-progress
+resume writes. It keeps any card or target that another provider also owns, and
+keeps completion/dismissal writes, which remove rows rather than create them. It
+never writes to a server: a resume point Jellyfin still stores stays until it is
+removed (per title, or with a position clear).
+
+Bump `ContinueWatchingLocalReset.version` only when a later change needs the
+disposal to run again on devices that already applied it.
+
 ## Where to look first
 
 - `MediaProvider.swift` — the protocol that defines every backend.
