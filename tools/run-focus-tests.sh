@@ -15,12 +15,31 @@ if [[ ! -f Plozz.xcodeproj/project.pbxproj ]]; then
 fi
 if [[ -z "${PLOZZ_SIM_ID:-}" ]]; then
   PLOZZ_SIM_ID="$(xcrun simctl list devices available -j | python3 -c '
-import json,sys
-devices=[d for runtime,items in json.load(sys.stdin)["devices"].items()
-         if "tvOS" in runtime for d in items if d.get("isAvailable")]
-devices.sort(key=lambda d: d.get("state") != "Booted")
-if not devices: sys.exit("No available tvOS simulator")
-print(devices[0]["udid"])
+import json, re, sys
+devices = json.load(sys.stdin)["devices"]
+def version(runtime):
+    match = re.search(r"tvOS-(\d+)-(\d+)", runtime)
+    return (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+best = None
+for runtime, items in devices.items():
+    if "tvOS" not in runtime:
+        continue
+    # The app and the focus host build against tvOS 18. A stale booted runtime
+    # (17.4 here) makes every destination ineligible, and xcodebuild then dumps
+    # its whole ineligible list, which reads as if it picked iOS. Prefer the
+    # newest supported runtime, then a booted device.
+    release = version(runtime)
+    if release[0] < 18:
+        continue
+    for device in items:
+        if not device.get("isAvailable"):
+            continue
+        key = (release, device.get("state") == "Booted")
+        if best is None or key > best[0]:
+            best = (key, device["udid"])
+if best is None:
+    sys.exit("No available tvOS simulator with a tvOS 18+ runtime")
+print(best[1])
 ')"
 fi
 python3 tools/run-bounded.py 300 "focus simulator startup" -- \
