@@ -93,7 +93,12 @@ PLOZZ_DERIVED_DATA="${PLOZZ_DERIVED_DATA:-$PWD/.build/test-derived-data}"
 PLOZZ_TEST_RESULTS_DIR="${PLOZZ_TEST_RESULTS_DIR:-$PWD/.build/test-results}"
 PLOZZ_CLONED_SOURCE_PACKAGES="${PLOZZ_CLONED_SOURCE_PACKAGES:-$PLOZZ_DERIVED_DATA/SourcePackages}"
 configure_plozz_package_resolution "$PLOZZ_CLONED_SOURCE_PACKAGES"
-PLOZZ_HANG_SECS="${PLOZZ_HANG_SECS:-180}"
+# A shared CI runner can spend several minutes inside one silent step (a large
+# module's link, or a single huge file's compile), which is progress, not a
+# wedge. 180 s killed package shards 2 and 3 mid-link with no test executed, so
+# the window is wide enough for a slow-but-live build while still bounding a
+# genuinely wedged xcodebuild (the process tree is killed and the run fails).
+PLOZZ_HANG_SECS="${PLOZZ_HANG_SECS:-600}"
 # How long to let xcodebuild wind down AFTER every test bundle has reported its
 # result. Surviving tests can report success after a crash/restart, so these
 # lines only start the teardown grace period; xcresult decides the verdict.
@@ -161,23 +166,33 @@ fi
 
 # --- Pick a tvOS simulator ----------------------------------------------------
 if [[ -z "${PLOZZ_SIM_ID-}" ]]; then
-  PLOZZ_SIM_ID=$(xcrun simctl list devices booted -j 2>/dev/null \
-    | python3 -c 'import json,sys
-d=json.load(sys.stdin)
-for runtime,devs in d["devices"].items():
-  if "tvOS" not in runtime: continue
-  for dev in devs:
-    if dev.get("state")=="Booted": print(dev["udid"]); sys.exit(0)' || true)
-fi
-if [[ -z "${PLOZZ_SIM_ID-}" ]]; then
-  PLOZZ_SIM_ID=$(xcrun simctl list devices available -j \
-    | python3 -c 'import json,sys
-d=json.load(sys.stdin)
-for runtime,devs in d["devices"].items():
-  if "tvOS" not in runtime: continue
-  for dev in devs:
-    if dev.get("isAvailable") and "Apple TV" in dev["name"]:
-      print(dev["udid"]); sys.exit(0)')
+  PLOZZ_SIM_ID=$(xcrun simctl list devices available -j | python3 -c '
+import json, re, sys
+devices = json.load(sys.stdin)["devices"]
+def version(runtime):
+    match = re.search(r"tvOS-(\d+)-(\d+)", runtime)
+    return (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+best = None
+for runtime, items in devices.items():
+    if "tvOS" not in runtime:
+        continue
+    # The app and the focus host build against tvOS 18. A stale booted runtime
+    # (17.4 here) makes every destination ineligible, and xcodebuild then dumps
+    # its whole ineligible list, which reads as if it picked iOS. Prefer the
+    # newest supported runtime, then a booted device.
+    release = version(runtime)
+    if release[0] < 18:
+        continue
+    for device in items:
+        if not device.get("isAvailable"):
+            continue
+        key = (release, device.get("state") == "Booted")
+        if best is None or key > best[0]:
+            best = (key, device["udid"])
+if best is None:
+    sys.exit("No available tvOS simulator with a tvOS 18+ runtime")
+print(best[1])
+')
 fi
 echo "Using tvOS Simulator: $PLOZZ_SIM_ID"
 python3 tools/run-bounded.py "${PLOZZ_SIM_BOOT_TIMEOUT:-300}" "simulator startup" -- \

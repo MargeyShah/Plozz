@@ -546,20 +546,100 @@ and simulator limitations.
 ## Watch-state writes
 
 Manual marking and playback completion both use the shared watch outbox.
-`PlayedItems` writes watched state; the following session-less `UserData` write
-clears or updates the resume position without stopping playback.
+`PlayedItems` writes watched state. A resume position is written through the
+endpoint that **owns the resume rules**, and never through a client-side copy of
+them.
+
+Jellyfin decides what is resumable — `MinResumePct`, `MaxResumePct`,
+`MinResumeDurationSeconds`, and "a finished title is played and keeps no
+position" — inside `UserDataManager.UpdatePlayState`, which only the
+`/Sessions/Playing*` endpoints call. `/Items/Resume` then lists every row with
+`PlaybackPositionTicks > 0` and re-validates nothing. A session-less
+`POST /UserItems/{itemId}/UserData` write stores that field verbatim, so a
+convergence write through it publishes resume points the server's own pipeline
+would have discarded — and every Jellyfin client renders them, because the row
+is trusted as-is. That is how a briefly played title ends up in Continue
+Watching on Plozz and not on Jellyfin.
+
+So `setResumePosition(seconds > 0)` for Jellyfin posts the end of playback
+(`POST /Sessions/Playing/Stopped`) at that position, exactly like a client that
+just stopped watching: the server applies its own thresholds and its own
+completion rule, and Plozz reads the result back from `Items/Resume` and
+`Shows/NextUp`. **Do not reintroduce `GET /System/Configuration` or a local copy
+of the thresholds** — a server that changes them would silently diverge, and a
+correct client does not need to know them.
+
+`setResumePosition(0)` still clears through the session-less endpoint
+(`POST /UserItems/{itemId}/UserData`). Clearing cannot create a Continue Watching
+row, it is Jellyfin's dismissal mechanism, and a stop report would additionally
+unset `Played`, which dismissal must not do.
+
+Two caveats worth knowing before changing this. A stop report is addressed to
+*this device's* session, so a deferred convergence write that drains while a
+different title is playing here can be read as that session stopping; the
+live-session guard normally defers a checkpoint until its own session has ended.
+And Emby keeps the session-less write, because its endpoint semantics differ and
+have not been validated against Emby's own thresholds.
+
+Do not "close" a prefetched-but-unstarted session with a stop report: there is
+no server session to close, and the report is a user-data write that erases a
+real resume point at position 0. See `FeaturePlayback`'s reporting rules.
 
 Emby's `UserData` endpoint is not a field-by-field patch for `Played`: omitting
 that field saves `false`, even when the request succeeds. Before each Emby resume
 write, read the same user's current item state and explicitly preserve `Played`.
 Never cache or default that flag. A failed read, missing flag, or failed write
 must throw so the durable outbox retains the update. Leave favorites and play
-count out of the update. Jellyfin retains its partial update without the extra
-read; its older-server stop fallback must never apply to Emby.
+count out of the update. Jellyfin's stop fallback must never apply to Emby.
+
+### Optional server plugins
+
+A plugin is not part of the base Jellyfin API, so each capability is probed once
+per connection and the answer is cached for that connection; a missing plugin is
+"cannot express this", never an error.
+
+`jellyfin-plugin-discontinue-watching` provides the only server-side dismissal
+Jellyfin has. `JellyfinPluginAPIs.swift` probes `GET /DiscontinueWatching/Config`
+and, when present, dismisses with `POST /DiscontinueWatching/Items/{itemId}`,
+which hides the title from `UserItems/Resume` **and keeps its watch progress** —
+better than the fallback of clearing the position. The plugin's own
+`PlaybackStartConsumer` drops the denylist entry when the viewer plays the title
+again, so no client bookkeeping is needed. Without the plugin,
+`removeFromContinueWatching` clears the position, as before.
+
+The plugin filters `UserItems/Resume` only; it does not override
+`Shows/NextUp`. So Plozz reads the user's dismiss list
+(`GET /DiscontinueWatching/items`, normalised to Jellyfin's dashless ids) and
+subtracts those ids from **both** feeds. That is what makes dismissing a Next-Up
+suggestion stick: the record lives on the server (so it survives reinstall and
+reaches other Jellyfin clients the plugin covers), and the client applies it to
+the feed the plugin does not override. The read happens per feed load, not
+cached, so a dismissal disappears on the next refresh.
+
+### Next Up window
+
+Jellyfin applies **no** date cutoff unless the request sends one
+(`nextUpDateCutoff ?? DateTime.MinValue`), so a client that omits it lists every
+series the account ever touched. Jellyfin Web always sends "today minus
+`maxDaysForNextUp`" (default **365**, `0` = no limit) and passes its rewatching
+preference. Plozz reads the same values from the server's display preferences
+(`GET /DisplayPreferences/usersettings?userId=&client=emby`, `CustomPrefs`) and
+falls back to those defaults when the server has none — Jellyfin Web stores
+`maxDaysForNextUp` locally rather than syncing it, so the server often has
+nothing. The cutoff is sent only for the unscoped feed; a series-scoped lookup
+is about the next episode, not recent activity.
 
 `EmbyWatchStateTests` models the behavior reproduced against Emby 4.10.0.40 and
 checks persisted server state after marking, completion, rewatching, dismissal,
 reload, and failed-read recovery, not just successful HTTP responses.
+
+Known gap: `reportPlayback` sends only `ItemId`, `PlaySessionId`,
+`PositionTicks`, and `IsPaused`. Official clients also send `PlayMethod`,
+`CanSeek`, and `MediaSourceId`; the first two only affect the now-playing
+display, but on Jellyfin 12+ `MediaSourceId` selects which alternate version's
+position is stored. Plozz therefore relies on the server's default version for
+per-version resume. Add the fields to `PlaybackProgress` if that becomes
+visible.
 
 ## Collections
 

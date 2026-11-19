@@ -19,6 +19,10 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
     let collectionLibraryCache = MediaBrowserCollectionLibraryCache()
     let videoPlaylistCache = VideoPlaylistSnapshotCache()
     let liveTVLeases = JellyfinLiveTVLeaseStore()
+    /// Optional server-plugin surface, probed once per connection.
+    let pluginSupportCache = JellyfinPluginSupportCache()
+    /// Next Up preferences from the server's display-preferences store.
+    let nextUpPreferencesCache = JellyfinNextUpPreferencesCache()
     private let serverRatingsReader = JellyfinServerRatings()
     let themeArchiveResolver: @Sendable (String?) async -> URL?
     private let authenticatedStreamProber: (any AuthenticatedHTTPStreamProbing)?
@@ -387,11 +391,19 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
             limit: limit,
             parentID: parentID
         )
+        // A series-scoped lookup is about that show's next episode, not a
+        // recent-activity window, so it neither needs nor pays for the
+        // preferences read.
+        let nextUpPreferences = seriesID == nil
+            ? await nextUpQueryPreferences()
+            : (dateCutoff: Date?.none, enableRewatching: false)
         async let nextUpTask = client.nextUpItems(
             userID: session.userID,
             limit: limit,
             parentID: parentID,
-            seriesID: seriesID
+            seriesID: seriesID,
+            dateCutoff: nextUpPreferences.dateCutoff,
+            enableRewatching: nextUpPreferences.enableRewatching
         )
 
         var resume: [BaseItemDto] = []
@@ -428,6 +440,15 @@ public struct JellyfinProvider: LibraryItemBatchProviding, ServerRatingsProvidin
         }
 
         var seen = Set<String>()
+        // The discontinue-watching plugin can only filter `UserItems/Resume`, so
+        // subtract its per-user dismiss list from both feeds here. Without the
+        // plugin the list is empty and this costs nothing.
+        let denied = await deniedContinueWatchingIDs()
+        if !denied.isEmpty {
+            resume.removeAll { denied.contains(JellyfinClient.normalizedItemID($0.Id)) }
+            nextUp.removeAll { denied.contains(JellyfinClient.normalizedItemID($0.Id)) }
+        }
+
         let merged = (resume + nextUp).filter { seen.insert($0.Id).inserted }
         let scope = parentID == nil ? "account" : seriesID == nil ? "library" : "series"
         PlozzLog.networking.info(
@@ -3093,38 +3114,125 @@ extension JellyfinProvider: WatchStateProviding {
 }
 
 extension JellyfinProvider: ResumeStateWriting {
-    /// Writes a resume position **out-of-band** (convergence/durability path)
-    /// without disturbing any live now-playing session.
+    /// Converges a resume position through the endpoint that owns the rules.
     ///
-    /// Routes through the session-less user-data endpoint
-    /// (`POST /UserItems/{itemId}/UserData`, Jellyfin 10.9+), updating position
-    /// and recency while preserving watched state. The previous implementation reported a `stop` at
-    /// the position, which posts to `/Sessions/Playing/Stopped` and **terminates
-    /// the live session**, snapping the server's now-playing dashboard to 0:00 —
-    /// the bug this avoids. A position of `0` clears the resume point.
+    /// Jellyfin decides what counts as resumable — `MinResumePct`,
+    /// `MaxResumePct`, `MinResumeDurationSeconds`, and "a finished title is
+    /// played and keeps no position" — inside
+    /// `UserDataManager.UpdatePlayState`, which only the `/Sessions/Playing*`
+    /// endpoints call. `/Items/Resume` then lists any row with
+    /// `PlaybackPositionTicks > 0` and re-validates nothing. Writing
+    /// `PlaybackPositionTicks` straight into `POST /UserItems/{itemId}/UserData`
+    /// therefore publishes resume points the server would have discarded, and
+    /// every Jellyfin client renders them because the row is trusted as-is.
     ///
-    /// On Jellyfin < 10.9 (no user-data endpoint → `404`) it falls back to the
-    /// legacy stop report so the position still converges rather than being
-    /// silently dropped (durability / never-drop). Documented caveat: on that
-    /// older-server fallback only, a convergence write can still disturb a
-    /// concurrent live session of the same title.
+    /// So a non-zero convergence write is reported as the end of playback
+    /// (`POST /Sessions/Playing/Stopped`), exactly like a client that just
+    /// stopped watching: the server applies its own thresholds and completion
+    /// rule, and Plozz reads the outcome back from `Items/Resume` and
+    /// `Shows/NextUp` instead of duplicating the policy. Do not reintroduce a
+    /// client-side copy of those thresholds; a server that changes them would
+    /// silently diverge.
     ///
-    /// Emby's user-scoped endpoint resets an omitted Played flag, so the client
-    /// reads and preserves it explicitly. A failed read or write must throw so
-    /// the outbox retries, never synthesize a stop that could terminate another
-    /// transcode on that device.
+    /// `0` still means "clear the resume point" and stays out of band
+    /// (`POST /UserItems/{itemId}/UserData`): clearing cannot create a Continue
+    /// Watching row, it is Jellyfin's dismissal mechanism, and a stop report
+    /// would additionally unset `Played`, which dismissal must not do.
+    ///
+    /// Two documented caveats. A stop report is addressed to *this device's*
+    /// session, so a deferred convergence write that drains while another title
+    /// is playing here can be read as that session stopping; in practice the
+    /// live-session guard defers a checkpoint until its own session ends. And
+    /// Emby keeps the session-less write (reading and preserving `Played`),
+    /// because its endpoint semantics are different and have not been validated
+    /// against Emby's own thresholds.
     public func setResumePosition(_ seconds: TimeInterval, itemID: String, capturedAt: Date = Date()) async throws {
-        do {
-            try await client.updatePlaybackPosition(max(seconds, 0), userID: session.userID, itemID: itemID, lastPlayedAt: capturedAt)
-        } catch AppError.notFound where kind == .jellyfin {
+        if seconds > 0, kind == .jellyfin {
             let progress = PlaybackProgress(
                 itemID: itemID,
                 playSessionID: nil,
-                positionSeconds: max(seconds, 0),
+                positionSeconds: seconds,
                 isPaused: true
             )
-            try await reportPlayback(progress, event: .stop, origin: "resume-convergence-fallback")
+            try await reportPlayback(progress, event: .stop, origin: "resume-convergence")
+            return
         }
+        try await client.updatePlaybackPosition(
+            max(seconds, 0),
+            userID: session.userID,
+            itemID: itemID,
+            lastPlayedAt: capturedAt
+        )
+    }
+}
+
+extension JellyfinProvider: ContinueWatchingRemovable {
+    /// Jellyfin's base API has no dismissal: the only built-in way to hide a
+    /// title from Continue Watching is to clear its position, which throws away
+    /// the viewer's progress. When the discontinue-watching plugin is installed,
+    /// add the title to its per-user denylist instead — the server then filters
+    /// it out of `UserItems/Resume` and drops the entry again when the viewer
+    /// plays the title.
+    ///
+    /// With no plugin the historical behaviour stands: clearing the position is
+    /// the only server-side action available.
+    public func removeFromContinueWatching(itemID: String) async throws {
+        if await serverPlugins().serverSideContinueWatchingRemoval {
+            try await client.discontinueWatchingDismiss(itemID: itemID)
+            return
+        }
+        try await setResumePosition(0, itemID: itemID)
+    }
+
+    /// The user's server-side dismiss list, or empty when the plugin is absent.
+    /// Read per feed load (not cached) so a dismissal disappears on the next
+    /// refresh; it is a single small request, and only on plugin servers.
+    private func deniedContinueWatchingIDs() async -> Set<String> {
+        guard await serverPlugins().serverSideContinueWatchingRemoval else { return [] }
+        do {
+            return try await client.discontinueWatchingDenylist()
+        } catch {
+            PlozzLog.networking.error(
+                "Could not read the Jellyfin dismiss list; showing the unfiltered feed."
+            )
+            return []
+        }
+    }
+
+    /// Optional server-plugin surface. A probe result is cached for the
+    /// connection: installing a plugin while the app runs is picked up on the
+    /// next launch or reconnect, never by re-probing on every card action.
+    private func serverPlugins() async -> JellyfinPluginSupport {
+        if let cached = pluginSupportCache.value() { return cached }
+        var support = JellyfinPluginSupport()
+        support.discontinueWatching = await client.discontinueWatchingAvailable()
+        pluginSupportCache.store(support)
+        return support
+    }
+
+    /// The Next Up window the server's own clients honour.
+    ///
+    /// Jellyfin applies no date cutoff unless one is sent, so omitting it lists
+    /// every series the account ever watched. Jellyfin Web sends "today minus
+    /// `maxDaysForNextUp`" (default 365, `0` meaning no limit) and passes the
+    /// rewatching preference; this reads the same values from the server's
+    /// display preferences and falls back to those defaults when the server has
+    /// none (Jellyfin Web stores them locally rather than syncing them).
+    private func nextUpQueryPreferences() async -> (dateCutoff: Date?, enableRewatching: Bool) {
+        let preferences: JellyfinClient.NextUpPreferences
+        if let cached = nextUpPreferencesCache.value() {
+            preferences = cached
+        } else {
+            do {
+                preferences = try await client.nextUpPreferences(userID: session.userID)
+                nextUpPreferencesCache.store(preferences)
+            } catch {
+                preferences = JellyfinClient.NextUpPreferences(maxDays: nil, includeRewatching: nil)
+            }
+        }
+        let days = preferences.maxDays ?? 365
+        let cutoff = days > 0 ? Date().addingTimeInterval(-Double(days) * 86_400) : nil
+        return (cutoff, preferences.includeRewatching ?? false)
     }
 }
 

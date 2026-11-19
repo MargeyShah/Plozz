@@ -311,4 +311,26 @@ final class MediaItemActionCatalogTests: XCTestCase {
             )
         }
     }
+
+    /// A Continue Watching row contains Next Up suggestions, which have no resume
+    /// point. "Has somewhere to resume" must not decide whether they can be
+    /// removed from the row.
+    func testContinueWatchingRowOffersRemovalForAZeroProgressSuggestion() {
+        let suggestion = item(id: "next-up", kind: .episode)
+        XCTAssertNil(suggestion.resumePosition)
+
+        XCTAssertFalse(
+            MediaItemActionCatalog.actions(for: suggestion, supportsWatchState: true)
+                .contains(.removeFromContinueWatching)
+        )
+        let inRow = MediaItemActionCatalog.actions(
+            for: suggestion, supportsWatchState: true, context: .continueWatching
+        )
+        XCTAssertEqual(inRow.last, .removeFromContinueWatching)
+
+        let unsupported = MediaItemActionCatalog.actions(
+            for: suggestion, supportsWatchState: false, context: .continueWatching
+        )
+        XCTAssertFalse(unsupported.contains(.removeFromContinueWatching))
+    }
 }

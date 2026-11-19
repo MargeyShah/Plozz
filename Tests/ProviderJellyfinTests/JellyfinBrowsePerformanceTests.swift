@@ -48,14 +48,19 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             let episode = try XCTUnwrap(feed.first { $0.seriesID == "series-250" })
             XCTAssertEqual(episode.id, "episode-250")
             XCTAssertEqual(episode.resumePosition, 120)
-            XCTAssertEqual(stub.sentPaths.count, 4)
-            print("Issue56 baseline \(kind): series resume = \(stub.sentPaths.count) requests, \(feed.count) decoded episodes")
+            // The Next Up window probe is a one-time preferences read, not a
+            // history page; it must not count as feed membership work.
+            func feedPaths() -> [String] {
+                stub.feedPaths
+            }
+            XCTAssertEqual(feedPaths().count, 4)
+            print("Issue56 baseline \(kind): series resume = \(feedPaths().count) requests, \(feed.count) decoded episodes")
 
             let scoped = try await provider(stub, kind: kind).resumeEpisode(inSeries: "series-250")
             XCTAssertEqual(scoped?.id, episode.id)
             XCTAssertEqual(scoped?.resumePosition, episode.resumePosition)
-            XCTAssertEqual(stub.sentPaths.count - 4, 2)
-            for query in stub.sentQueryItems.suffix(2) {
+            XCTAssertEqual(feedPaths().count - 4, 2)
+            for query in stub.feedQueryItems.suffix(2) {
                 XCTAssertEqual(query.first { $0.name == "ParentId" }?.value, "series-250")
                 XCTAssertEqual(query.first { $0.name == "StartIndex" }?.value, "0")
             }
@@ -83,11 +88,11 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
                 ids["series-\(index)"] = try await provider.item(id: "series-\(index)").providerIDs
             }
             XCTAssertEqual(ids.count, 20)
-            XCTAssertEqual(stub.sentPaths.count, 20)
-            XCTAssertTrue(stub.sentQueryItems.allSatisfy {
+            XCTAssertEqual(stub.feedPaths.count, 20)
+            XCTAssertTrue(stub.feedQueryItems.allSatisfy {
                 $0.first { $0.name == "Fields" }?.value?.contains("MediaSources") == true
             })
-            print("Issue56 baseline \(kind): 20 Home series identities = \(stub.sentPaths.count) full-detail requests")
+            print("Issue56 baseline \(kind): 20 Home series identities = \(stub.feedPaths.count) full-detail requests")
 
             let series = (0..<20).map { index in
                 #"{"Id":"series-\#(index)","Type":"Series","ProviderIds":{"Tvdb":"\#(index + 1)"}}"#
@@ -95,7 +100,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             stub.stub(pathSuffix: "/Users/user/Items", json: #"{"Items":[\#(series)]}"#)
             let batch = try await provider.seriesProviderIDs(for: Array(ids.keys))
             XCTAssertEqual(batch, ids)
-            XCTAssertEqual(stub.sentPaths.count - 20, 1)
+            XCTAssertEqual(stub.feedPaths.count - 20, 1)
             let query = try XCTUnwrap(stub.queryItems(forPathSuffix: "/Users/user/Items"))
             XCTAssertEqual(query.first { $0.name == "Fields" }?.value, "ProviderIds")
             XCTAssertEqual(query.first { $0.name == "EnableImages" }?.value, "false")
@@ -132,7 +137,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             XCTAssertNotNil(episode?.lastPlayedAt)
             let recency = try XCTUnwrap(stub.queryItems(forPathSuffix: "/Users/user/Items"))
             XCTAssertEqual(recency.first { $0.name == "Ids" }?.value, "show")
-            XCTAssertEqual(stub.sentPaths.count, 3)
+            XCTAssertEqual(stub.feedPaths.count, 3)
         }
     }
 
@@ -149,8 +154,8 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             stub.stub(pathSuffix: "/Shows/NextUp", json: #"{"Items":[],"TotalRecordCount":0}"#)
             let episode = try await provider(stub, kind: kind).resumeEpisode(inSeries: "show")
             XCTAssertEqual(episode?.id, "newest")
-            XCTAssertEqual(stub.sentPaths.count, 3)
-            XCTAssertTrue(stub.sentQueryItems.allSatisfy {
+            XCTAssertEqual(stub.feedPaths.count, 3)
+            XCTAssertTrue(stub.feedQueryItems.allSatisfy {
                 $0.first { $0.name == "ParentId" }?.value == "show"
             })
         }
@@ -171,7 +176,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
         let second = try await provider.resumeEpisode(inSeries: "show")
         XCTAssertEqual(first?.resumePosition, 120)
         XCTAssertEqual(second?.resumePosition, 240)
-        XCTAssertEqual(stub.sentPaths.count, 4)
+        XCTAssertEqual(stub.feedPaths.count, 4)
     }
 
     func testScopedResumeKeepsTheSuccessfulEndpointAndThrowsWhenNeitherAnswers() async throws {
@@ -204,7 +209,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
         } catch let error as AppError {
             XCTAssertEqual(error, .cancelled)
         }
-        XCTAssertTrue(stub.sentQueryItems.allSatisfy {
+        XCTAssertTrue(stub.feedQueryItems.allSatisfy {
             $0.first { $0.name == "ParentId" }?.value == "show"
         })
     }
@@ -216,7 +221,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             stub.stub(pathSuffix: "/Shows/NextUp", json: #"{"Items":[],"TotalRecordCount":0}"#)
             let episode = try await provider(stub, kind: kind).resumeEpisode(inSeries: "show")
             XCTAssertNil(episode)
-            XCTAssertEqual(stub.sentPaths.count, 2)
+            XCTAssertEqual(stub.feedPaths.count, 2)
         }
     }
 
@@ -241,8 +246,8 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             let episode = try await provider(stub, kind: kind).resumeEpisode(inSeries: "show")
             XCTAssertEqual(episode?.id, "resuming")
             XCTAssertEqual(episode?.resumePosition, 120)
-            XCTAssertEqual(stub.sentPaths.count, 2)
-            XCTAssertTrue(stub.sentQueryItems.allSatisfy {
+            XCTAssertEqual(stub.feedPaths.count, 2)
+            XCTAssertTrue(stub.feedQueryItems.allSatisfy {
                 $0.first { $0.name == "ParentId" }?.value == "show"
             })
         }
@@ -262,7 +267,7 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             let episode = try await provider(stub, kind: kind).resumeEpisode(inSeries: "show")
             XCTAssertEqual(episode?.id, "resuming")
             XCTAssertEqual(episode?.resumePosition, 120)
-            XCTAssertEqual(stub.sentPaths.count, 2)
+            XCTAssertEqual(stub.feedPaths.count, 2)
         }
     }
 
@@ -289,8 +294,8 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             let episode = try await provider(stub, kind: kind).resumeEpisode(inSeries: "show")
             XCTAssertEqual(episode?.id, "next")
             XCTAssertNotNil(episode?.lastPlayedAt)
-            XCTAssertEqual(stub.sentPaths.count, 4)
-            XCTAssertTrue(stub.sentQueryItems.allSatisfy {
+            XCTAssertEqual(stub.feedPaths.count, 4)
+            XCTAssertTrue(stub.feedQueryItems.allSatisfy {
                 $0.contains(URLQueryItem(name: "ParentId", value: "show"))
                     || $0.contains(URLQueryItem(name: "Ids", value: "show"))
             })
@@ -314,8 +319,8 @@ final class JellyfinBrowsePerformanceTests: XCTestCase {
             }
             let result = try await provider(stub, kind: kind).seriesProviderIDs(for: ids + ids + [""])
             XCTAssertEqual(Set(result.keys), Set(ids))
-            XCTAssertEqual(stub.sentPaths.count, 2)
-            XCTAssertEqual(stub.sentQueryItems.map {
+            XCTAssertEqual(stub.feedPaths.count, 2)
+            XCTAssertEqual(stub.feedQueryItems.map {
                 $0.first { $0.name == "Limit" }?.value
             }, ["50", "1"])
         }

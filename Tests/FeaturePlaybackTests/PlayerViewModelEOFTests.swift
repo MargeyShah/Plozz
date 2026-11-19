@@ -3037,7 +3037,10 @@ final class PlayerViewModelEOFTests: XCTestCase {
         let prepared = await handoff.value
         XCTAssertNil(prepared)
         let reports = await provider.reports
-        XCTAssertEqual(reports.filter { $0.progress.playSessionID == "prepared-session" && $0.event == .stop }.count, 1)
+        XCTAssertFalse(
+            reports.contains { $0.progress.playSessionID == "prepared-session" },
+            "A prepared session that never started has nothing to close, and a stop report would write user data (Jellyfin erases the resume point at position 0)."
+        )
         XCTAssertEqual(engine.preservedDisplayStops, [false])
     }
 
@@ -3065,7 +3068,10 @@ final class PlayerViewModelEOFTests: XCTestCase {
         await viewModel.discardEpisodeHandoff(prepared)
         XCTAssertEqual(engine.preservedDisplayStops, [true, false])
         let reports = await provider.reports
-        XCTAssertEqual(reports.filter { $0.progress.playSessionID == "prepared-session" && $0.event == .stop }.count, 1)
+        XCTAssertFalse(
+            reports.contains { $0.progress.playSessionID == "prepared-session" },
+            "A prepared session that never started has nothing to close, and a stop report would write user data (Jellyfin erases the resume point at position 0)."
+        )
     }
 
     func testCancellationDuringEpisodeResolutionReleasesLegacyProviderSession() async throws {
@@ -3094,7 +3100,10 @@ final class PlayerViewModelEOFTests: XCTestCase {
         let prepared = await handoff.value
         XCTAssertNil(prepared)
         let reports = await provider.reports
-        XCTAssertEqual(reports.filter { $0.progress.playSessionID == "prepared-session" && $0.event == .stop }.count, 1)
+        XCTAssertFalse(
+            reports.contains { $0.progress.playSessionID == "prepared-session" },
+            "A prepared session that never started has nothing to close, and a stop report would write user data (Jellyfin erases the resume point at position 0)."
+        )
         XCTAssertEqual(engine.stopCount, 0)
         await viewModel.stop()
     }
@@ -3184,13 +3193,14 @@ final class PlayerViewModelEOFTests: XCTestCase {
 
         await viewModel.stop()
         await gate.release()
-        let released = await waitForReport(
-            provider,
-            itemID: next.item.id,
-            event: .stop
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+        let reports = await provider.reports
+        XCTAssertFalse(
+            reports.contains { $0.progress.itemID == next.item.id },
+            "The prefetched session never started, so closing it with a stop report would write user data instead of releasing anything."
         )
-
-        XCTAssertTrue(released)
         XCTAssertNil(viewModel.prefetchedNext)
     }
 

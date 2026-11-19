@@ -65,7 +65,10 @@ final class JellyfinHistoryVisibilityTests: XCTestCase {
             XCTAssertTrue(historyQueries(http).allSatisfy {
                 $0.first { $0.name == "ParentId" }?.value == "visible"
             })
-            XCTAssertEqual(Set(http.sentPaths), ["/Users/viewer/Items/Resume", "/Shows/NextUp"])
+            XCTAssertEqual(
+                Set(http.feedPaths).subtracting(["/DisplayPreferences/usersettings"]),
+                ["/Users/viewer/Items/Resume", "/Shows/NextUp"]
+            )
             XCTAssertEqual(http.queryItems(forPathSuffix: "/Shows/NextUp")?
                 .first { $0.name == "UserId" }?.value, "viewer")
         }
@@ -164,7 +167,9 @@ final class JellyfinHistoryVisibilityTests: XCTestCase {
                 limit: 10, inLibraries: ["visible"], separateNextUp: true
             )
             XCTAssertTrue(combined.isEmpty && resume.isEmpty)
-            XCTAssertEqual(http.sentPaths.count, 3)
+            XCTAssertEqual(
+                http.feedPaths.count, 3
+            )
             XCTAssertEqual(historyQueries(http).count, 3)
             XCTAssertTrue(historyQueries(http).allSatisfy {
                 $0.first { $0.name == "ParentId" }?.value == "visible"
@@ -278,7 +283,9 @@ final class JellyfinHistoryVisibilityTests: XCTestCase {
                 limit: 0, inLibraries: [], separateNextUp: true
             )
             XCTAssertTrue(noItems.isEmpty && noResume.isEmpty)
-            XCTAssertEqual(http.sentPaths.count, 3)
+            XCTAssertEqual(
+                http.feedPaths.count, 3
+            )
             XCTAssertEqual(historyQueries(http).count, 3)
             XCTAssertTrue(historyQueries(http).allSatisfy { !$0.contains { $0.name == "ParentId" } })
         }

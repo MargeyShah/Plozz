@@ -9,7 +9,7 @@ import CoreModels
 /// the next episode; movies and in-place progress do not need that refresh.
 @MainActor
 final class HomeViewModelNewResumeReloadTests: XCTestCase {
-    func testBriefResumeAndTrailerCannotBypassCurationViaProviderOrOptimisticUpdates() async {
+    func testAnySavedPositionJoinsTheRowButATrailerNeverDoes() async {
         let movie = MediaItem(
             id: "movie", title: "Movie", kind: .movie, runtime: 7_200,
             resumePosition: 2, sourceAccountID: "a"
@@ -22,21 +22,23 @@ final class HomeViewModelNewResumeReloadTests: XCTestCase {
         provider.continueWatchingItems = [movie, trailer, next]
         let vm = makeViewModel(provider: provider)
         await vm.load()
-        XCTAssertEqual(cw(vm).map(\.id), ["next"])
+        // The server's feed is the membership decision: a 2 s position on a
+        // two-hour film is listed by Jellyfin, so it is listed here too.
+        XCTAssertEqual(cw(vm).map(\.id), ["movie", "next"])
         vm.applyWatchedState(.init(
             itemIDs: ["movie"], scopedItemIDs: ["a:movie"], resumePosition: 59.999, item: movie
         ))
         vm.applyWatchedState(.init(
             itemIDs: ["trailer"], scopedItemIDs: ["a:trailer"], resumePosition: 100, item: trailer
         ))
-        XCTAssertEqual(cw(vm).map(\.id), ["next"])
+        XCTAssertEqual(cw(vm).map(\.id), ["movie", "next"], "A trailer never becomes a resume row entry")
         vm.applyWatchedState(.init(
             itemIDs: ["movie"], scopedItemIDs: ["a:movie"], resumePosition: 60, item: movie
         ))
         XCTAssertEqual(cw(vm).map(\.id), ["movie", "next"])
     }
 
-    func testPendingAndCarriedProgressCannotBypassAdmission() {
+    func testPendingAndCarriedProgressKeepTheCardAndTrailersStayOut() {
         let movie = MediaItem(
             id: "movie", title: "Movie", kind: .movie, runtime: 7_200,
             resumePosition: 60, sourceAccountID: "a"
@@ -45,12 +47,18 @@ final class HomeViewModelNewResumeReloadTests: XCTestCase {
             capturedAt: Date(), canonicalMediaID: "movie", resumePosition: 5,
             targets: [.init(accountID: "a", itemID: "movie")]
         )
-        XCTAssertTrue(HomeViewModel.reconcileContinueWatching([movie], pending: [pending]).isEmpty)
+        XCTAssertEqual(
+            HomeViewModel.reconcileContinueWatching([movie], pending: [pending]).map(\.id),
+            ["movie"]
+        )
         var brief = movie
         brief.resumePosition = 5
-        XCTAssertTrue(HomeViewModel.reconcileContinueWatching(
-            [], pending: [pending], carryForward: [brief]
-        ).isEmpty)
+        XCTAssertEqual(
+            HomeViewModel.reconcileContinueWatching(
+                [], pending: [pending], carryForward: [brief]
+            ).map(\.id),
+            ["movie"]
+        )
         XCTAssertTrue(HomeViewModel.reconcileContinueWatching(
             [movie.markingAsTrailer()], pending: []
         ).isEmpty)

@@ -196,9 +196,10 @@ final class WatchProgressReporterTests: XCTestCase {
     func testReportHonorsPositionOverrideForScrobblePercent() async {
         // At stop() the engine reads 0; the override must drive the scrobble percent.
         let (sut, _, _, scrobbler, _) = makeSUT()
+        await sut.reportStart(isPaused: false, positionOverride: 0)
         await sut.report(event: .stop, isPaused: true, positionOverride: 900)
         let scrobbles = await scrobbler.calls
-        XCTAssertEqual(scrobbles.first?.progress ?? -1, 90, accuracy: 0.001)
+        XCTAssertEqual(scrobbles.last?.progress ?? -1, 90, accuracy: 0.001)
     }
 
     func testStopUsesCapturedDurationAfterEngineTeardown() async {
@@ -207,12 +208,28 @@ final class WatchProgressReporterTests: XCTestCase {
                 item: MediaItem(id: "item-1", title: "Ep", kind: .episode, runtime: runtime)
             )
             host.engineDuration = 0
+            await sut.reportStart(isPaused: false, positionOverride: 0)
             await sut.report(event: .stop, isPaused: true, positionOverride: 950, durationOverride: 1_000)
             let events = await provider.events
             let calls = await scrobbler.calls
             XCTAssertEqual(events.last?.duration, 1_000)
             XCTAssertEqual(calls.last?.progress, 95)
         }
+    }
+
+    /// A stop report is a user-data write on Jellyfin, not a cleanup: at position
+    /// 0 it erases a real resume point. A rendition restart or a teardown before
+    /// the first frame must therefore report nothing at all.
+    func testStopBeforeStartIsNeitherReportedNorScrobbled() async {
+        let (sut, _, provider, scrobbler, _) = makeSUT()
+        await sut.report(
+            event: .stop, isPaused: true, positionOverride: 0, durationOverride: 1_000
+        )
+        await sut.finishSession(position: 0, duration: 1_000)?.value
+        let events = await provider.events
+        let scrobbles = await scrobbler.calls
+        XCTAssertTrue(events.isEmpty, "A session that never started has nothing to close.")
+        XCTAssertTrue(scrobbles.isEmpty)
     }
 
     func testReportCapturesPercentBeforeProviderSuspends() async {

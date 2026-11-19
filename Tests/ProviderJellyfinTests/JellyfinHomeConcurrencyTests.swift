@@ -153,6 +153,13 @@ private actor RecencyWindowHTTPClient: HTTPClient {
         let json: String
         if endpoint.path.hasSuffix("/Resume") {
             json = #"{"Items":[],"TotalRecordCount":0}"#
+        } else if endpoint.path.hasSuffix("/DisplayPreferences/usersettings") {
+            // The Next Up window lives in the server's display preferences; this
+            // fixture has none, so Plozz applies Jellyfin's defaults.
+            json = #"{"CustomPrefs":{}}"#
+        } else if endpoint.path.hasSuffix("/DiscontinueWatching/Config") {
+            // No plugin on this fixture: the probe must fail closed.
+            throw AppError.notFound
         } else if endpoint.path.hasSuffix("/NextUp") {
             let items = (0..<9).map {
                 #"{"Id":"episode-\#($0)","Type":"Episode","SeriesId":"show-\#($0)"}"#

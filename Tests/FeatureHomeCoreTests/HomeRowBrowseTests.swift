@@ -25,21 +25,27 @@ final class HomeRowBrowseTests: XCTestCase {
             defaults: .custom, order: [row.id], shown: [row.id], serverRows: [server]
         ))
         let browser = HomeRowBrowseFactory.make(row, accounts: [account], visibility: visibility, isCurrent: { true })
+        // Every positive position the provider returned belongs in the row, so a
+        // page is no longer emptied by curation. Only the trailer is dropped.
         await browser.load()
-        XCTAssertTrue(browser.items.isEmpty)
+        XCTAssertEqual(browser.items.count, 60)
+        XCTAssertFalse(browser.items.contains { $0.id == "61" }, "A trailer is never a resume row entry")
         XCTAssertTrue(browser.hasMore)
         await browser.load()
-        XCTAssertEqual(browser.items.map(\.id), ["60"])
+        XCTAssertEqual(browser.items.count, 119, "Second page minus the trailer")
         await browser.load()
-        XCTAssertEqual(browser.items.map(\.id), ["60", "124"])
+        XCTAssertEqual(browser.items.count, 124, "125 videos, one trailer")
         XCTAssertFalse(browser.hasMore)
         XCTAssertNil(browser.error)
         let offsets = await provider.offsets
         XCTAssertEqual(offsets, [0, 60, 120])
-        await browser.applyMutation(.init(itemIDs: ["60"], resumePosition: 2))
-        XCTAssertEqual(browser.items.map(\.id), ["124"])
         await browser.applyMutation(.init(itemIDs: ["60"], resumePosition: 30))
-        XCTAssertEqual(browser.items.map(\.id), ["60", "124"])
+        XCTAssertEqual(
+            browser.items.first { $0.id == "60" }?.resumePosition, 30,
+            "A mutation refreshes the row without re-reading the provider"
+        )
+        let finalOffsets = await provider.offsets
+        XCTAssertEqual(finalOffsets, [0, 60, 120], "Mutations must not page the provider again")
     }
 
     func testBrowserRetainsResolvedCollectionCoverShapeForBothProviders() async throws {

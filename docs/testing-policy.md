@@ -500,7 +500,7 @@ after the tests have already finished. Two things used to turn that into a
 ~7-minute wait for an answer that existed at second six:
 
 - The stall looked identical to a wedged build, so the no-progress watchdog
-  (`PLOZZ_HANG_SECS`, 180s) killed it…
+  (`PLOZZ_HANG_SECS`, 180 s at the time) killed it…
 - …and a watchdog kill triggered the from-clean self-heal, which wiped
   DerivedData and **recompiled everything to reprint the same failures**.
 

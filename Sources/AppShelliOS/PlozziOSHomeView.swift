@@ -3348,6 +3348,7 @@ struct PlozziOSHomeRowView: View {
                         continueWatchingAction: appModel.settings.homeVisibility.continueWatchingAction
                     ) ? .play : .openDetail,
                     showsResumeChip: row.kind == .continueWatching,
+                    isContinueWatching: row.kind == .continueWatching,
                     prefetchesArtwork: row.kind == .continueWatching,
                     pendingRemovalIDs: pendingWatchlistRemovalIDs,
                     loadingPlaceholderCount: row.kind == .watchlist
@@ -3485,6 +3486,9 @@ struct PlozziOSHomeMediaRail: View {
     /// promise that the row is Continue Watching.
     var interaction: PlozziOSRailInteraction = .openDetail
     var showsResumeChip: Bool = false
+    /// True only for the Continue Watching row, where a card is removable even
+    /// with no resume point (a Next Up suggestion).
+    var isContinueWatching: Bool = false
     /// Continue Watching opts in because its backdrop + logo composition costs
     /// more than an ordinary card. Keeping this scoped avoids warming every Home
     /// rail at launch when per-library rows are enabled.
@@ -3550,6 +3554,8 @@ struct PlozziOSHomeMediaRail: View {
                             interaction: interaction,
                             showsResumeChip: showsResumeChip,
                             showsSeriesArtwork: showsSeriesArtwork,
+                            actionContext: isContinueWatching
+                                ? .continueWatching : .none,
                             isPendingRemoval: pendingRemovalIDs.contains(
                                 item.stablePresentationID
                             ),
@@ -3807,6 +3813,7 @@ struct PlozziOSHomeMediaCard: View {
     var interaction: PlozziOSRailInteraction = .openDetail
     var showsResumeChip: Bool = false
     var showsSeriesArtwork: Bool = false
+    var actionContext: MediaItemActionContext = .none
     var isPendingRemoval: Bool = false
     let provider: (any MediaProvider)?
     var revisit: PlozziOSDetailArtworkRevisit? = nil
@@ -3847,6 +3854,18 @@ struct PlozziOSHomeMediaCard: View {
                 card
             }
         }
+        // Home cards had no press-and-hold menu at all: the actions people reach
+        // for (mark watched, watchlist, remove from Continue Watching) lived only
+        // on the detail page, which is not where the row is. Navigation stays the
+        // tap, so only state-changing actions are offered here.
+        .modifier(PlozziOSHomeCardActionMenu(
+            actions: appModel.mediaItemActionHandler
+                .actions(for: item, context: actionContext)
+                .filter { !$0.isNavigation },
+            perform: { action in
+                appModel.mediaItemActionHandler.perform(action, on: item, context: actionContext)
+            }
+        ))
     }
 
     static func resolvedItem(
@@ -3904,6 +3923,27 @@ struct PlozziOSHomeMediaCard: View {
         return appModel.downloads.records.first {
             $0.identityKey == downloadRecord.identityKey
         } ?? downloadRecord
+    }
+}
+
+/// Press-and-hold actions for an iOS Home card. Applied only when the catalog
+/// offers something, so a card with no state actions keeps its plain tap.
+private struct PlozziOSHomeCardActionMenu: ViewModifier {
+    let actions: [MediaItemAction]
+    let perform: (MediaItemAction) -> Void
+
+    func body(content: Content) -> some View {
+        if actions.isEmpty {
+            content
+        } else {
+            content.contextMenu {
+                ForEach(actions) { action in
+                    Button(action.title, systemImage: action.systemImage) {
+                        perform(action)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -15,10 +15,25 @@ public struct MediaItemActionContext: Sendable, Equatable {
     /// action span seasons: marking up to S2E3 also clears all of season 1.
     public var precedingContainerIDs: [String]
 
-    public init(orderedSiblings: [MediaItem] = [], precedingContainerIDs: [String] = []) {
+    /// Whether the item is being shown inside the Continue Watching row.
+    ///
+    /// A Continue Watching entry is removable even when it has no resume point:
+    /// a Next Up suggestion has position 0, so "has somewhere to resume" is the
+    /// wrong test for offering the action there.
+    public var isInContinueWatching: Bool
+
+    public init(
+        orderedSiblings: [MediaItem] = [],
+        precedingContainerIDs: [String] = [],
+        isInContinueWatching: Bool = false
+    ) {
         self.orderedSiblings = orderedSiblings
         self.precedingContainerIDs = precedingContainerIDs
+        self.isInContinueWatching = isInContinueWatching
     }
+
+    /// A Continue Watching row context for the items it renders.
+    public static let continueWatching = MediaItemActionContext(isInContinueWatching: true)
 
     /// No surrounding-list context — the default for standalone cards.
     public static let none = MediaItemActionContext()
@@ -143,7 +158,8 @@ public enum MediaItemActionCatalog {
         // on the Continue Watching row. The row is the reason to want it, but what
         // is being undone is the resume point itself, and meeting the same title in
         // a library or on its own page is no reason to withhold it.
-        if supportsWatchState, isWatchStateEligible(item), hasResumePoint(item) {
+        if supportsWatchState, isWatchStateEligible(item),
+           hasResumePoint(item) || context.isInContinueWatching {
             actions.append(.removeFromContinueWatching)
         }
 

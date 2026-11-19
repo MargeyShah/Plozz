@@ -402,7 +402,12 @@ public struct JellyfinClient: Sendable {
     /// resumable candidates because compatible servers may not scope Resume to a
     /// series; the provider still prefers Resume when both return the same episode.
     func nextUpItems(
-        userID: String, limit: Int, parentID: String? = nil, seriesID: String? = nil
+        userID: String,
+        limit: Int,
+        parentID: String? = nil,
+        seriesID: String? = nil,
+        dateCutoff: Date? = nil,
+        enableRewatching: Bool = false
     ) async throws -> [BaseItemDto] {
         if limit > 100 {
             return try await exhaustiveItems(limit: limit) { startIndex, pageSize in
@@ -411,7 +416,9 @@ public struct JellyfinClient: Sendable {
                     startIndex: startIndex,
                     limit: pageSize,
                     parentID: parentID,
-                    seriesID: seriesID
+                    seriesID: seriesID,
+                    dateCutoff: dateCutoff,
+                    enableRewatching: enableRewatching
                 )
             }
         }
@@ -420,8 +427,54 @@ public struct JellyfinClient: Sendable {
             startIndex: nil,
             limit: limit,
             parentID: parentID,
-            seriesID: seriesID
+            seriesID: seriesID,
+            dateCutoff: dateCutoff,
+            enableRewatching: enableRewatching
         ).Items
+    }
+
+    /// The per-user Next Up preferences Jellyfin's own clients honour.
+    ///
+    /// These live in the server's `DisplayPreferences` store for the web client.
+    /// Jellyfin Web writes `maxDaysForNextUp` locally rather than syncing it, so
+    /// the server often has no value; the caller falls back to Jellyfin's own
+    /// defaults (365 days, rewatching off) in that case.
+    struct NextUpPreferences: Sendable, Equatable {
+        var maxDays: Int?
+        var includeRewatching: Bool?
+    }
+
+    func nextUpPreferences(userID: String) async throws -> NextUpPreferences {
+        struct Response: Decodable {
+            let CustomPrefs: [String: String]?
+        }
+        let response = try await http.decode(
+            Response.self,
+            from: Endpoint(
+                path: "/DisplayPreferences/usersettings",
+                queryItems: [
+                    URLQueryItem(name: "userId", value: userID),
+                    URLQueryItem(name: "client", value: "emby")
+                ],
+                headers: authHeaders
+            ),
+            baseURL: baseURL
+        )
+        let preferences = response.CustomPrefs ?? [:]
+        return NextUpPreferences(
+            maxDays: preferences["maxDaysForNextUp"].flatMap(Int.init),
+            includeRewatching: preferences["enableRewatchingInNextUp"].flatMap(Bool.init)
+        )
+    }
+
+    /// Jellyfin parses this as a date, so a date-only UTC string cannot drift a
+    /// series out of the window through a timezone offset.
+    static func nextUpDateCutoffString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     private func nextUpItemsPage(
@@ -429,16 +482,27 @@ public struct JellyfinClient: Sendable {
         startIndex: Int?,
         limit: Int,
         parentID: String?,
-        seriesID: String?
+        seriesID: String?,
+        dateCutoff: Date?,
+        enableRewatching: Bool
     ) async throws -> ItemsResponse {
         var queryItems = [
             URLQueryItem(name: "UserId", value: userID),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "MediaTypes", value: "Video"),
             URLQueryItem(name: "EnableResumable", value: seriesID == nil ? "false" : "true"),
-            URLQueryItem(name: "EnableRewatching", value: "false"),
+            URLQueryItem(name: "EnableRewatching", value: enableRewatching ? "true" : "false"),
             URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ProviderIds,\(Self.homeRowSortFields)")
         ]
+        // Jellyfin applies no cutoff unless one is sent (`nextUpDateCutoff ??
+        // DateTime.MinValue`), which is why a client that omits it lists every
+        // series the account ever touched. Its own web client always sends
+        // "today - maxDaysForNextUp".
+        if let dateCutoff {
+            queryItems.append(
+                URLQueryItem(name: "NextUpDateCutoff", value: Self.nextUpDateCutoffString(dateCutoff))
+            )
+        }
         if let startIndex {
             queryItems.append(URLQueryItem(name: "StartIndex", value: String(startIndex)))
             queryItems.append(URLQueryItem(name: "EnableTotalRecordCount", value: "true"))
@@ -1536,6 +1600,60 @@ public struct JellyfinClient: Sendable {
             HandoffDiagnostics.emit("session RESUME_WRITE_FAILED \(context) error=\(HandoffDiagnostics.errorCode((error as? AppError) ?? .unknown("")))")
             throw error
         }
+    }
+
+    /// Probes the discontinue-watching plugin. Any failure means "not
+    /// installed": a plugin probe must never fail a playback or a removal.
+    func discontinueWatchingAvailable() async -> Bool {
+        do {
+            _ = try await http.decode(
+                DiscontinueWatchingConfig.self,
+                from: Endpoint(path: "/DiscontinueWatching/Config", headers: authHeaders),
+                baseURL: baseURL
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Adds the item to the user's server-side dismiss list. This keeps the
+    /// playback position (unlike clearing it) and is what a Jellyfin viewer's
+    /// own "remove from Continue Watching" does with the plugin installed.
+    func discontinueWatchingDismiss(itemID: String) async throws {
+        _ = try await http.send(
+            Endpoint(method: .post, path: "/DiscontinueWatching/Items/\(itemID)", headers: authHeaders),
+            baseURL: baseURL
+        )
+    }
+
+    /// The calling user's server-side dismiss list, normalised to Jellyfin's
+    /// dashless id form.
+    ///
+    /// The plugin only filters `UserItems/Resume`, so Plozz subtracts the same
+    /// ids from `Shows/NextUp` itself. That is what makes dismissing a Next-Up
+    /// card stick: the record lives on the server, and the client applies it to
+    /// the feed the plugin does not override.
+    func discontinueWatchingDenylist() async throws -> Set<String> {
+        let ids = try await http.decode(
+            [String].self,
+            from: Endpoint(path: "/DiscontinueWatching/items", headers: authHeaders),
+            baseURL: baseURL
+        )
+        return Set(ids.map(Self.normalizedItemID))
+    }
+
+    static func normalizedItemID(_ id: String) -> String {
+        id.replacingOccurrences(of: "-", with: "")
+    }
+
+    /// Drops the item from the dismiss list, e.g. when Plozz decides the title is
+    /// visible again before the server has seen a playback start.
+    func discontinueWatchingRestore(itemID: String) async throws {
+        _ = try await http.send(
+            Endpoint(method: .delete, path: "/DiscontinueWatching/Items/\(itemID)", headers: authHeaders),
+            baseURL: baseURL
+        )
     }
 
     func watchStateEpisodes(userID: String, parentID: String, kind: MediaItemKind) async throws -> [BaseItemDto] {

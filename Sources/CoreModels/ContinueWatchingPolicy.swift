@@ -2,8 +2,9 @@ import Foundation
 
 /// Continue Watching keeps eligible provider titles. Recency determines
 /// order, not membership: an older next episode still belongs until the server
-/// or viewer removes it. Brief plays and trailers retain their saved progress
-/// without appearing in this row. Age restrictions are explicit caller overrides.
+/// or viewer removes it. A title the provider returned with a saved position is
+/// in the row, however small that position is — the server already decided
+/// membership. Trailers never are. Age restrictions are explicit caller overrides.
 public struct ContinueWatchingPolicy: Sendable, Equatable, Codable {
     /// An explicit presentation limit; `.max` keeps every eligible title.
     /// Providers use bounded requests even when the total result is unlimited.
@@ -56,12 +57,21 @@ public struct ContinueWatchingPolicy: Sendable, Equatable, Codable {
 
     /// Resume storage is independent of row eligibility. Zero-position episodes
     /// can be Next Up suggestions and must not be discarded as brief plays.
+    ///
+    /// Any positive position is admitted. The server's Continue Watching feed
+    /// already decided membership — Jellyfin's `/Items/Resume` is literally
+    /// "position > 0" — so second-guessing it with a runtime-relative floor
+    /// hides titles the viewer can still see in their own Jellyfin row. That is
+    /// a membership mismatch, not curation: a 54-second position on a
+    /// 53-minute episode is 1.7 % and was being dropped here while Jellyfin
+    /// listed it. `minimumResumePosition` stays for presentation decisions
+    /// (whether the resume chip is worth drawing), not for membership.
     public static func admits(_ item: MediaItem) -> Bool {
         guard !item.isTrailer, !item.isYouTubeTrailer else { return false }
         guard let position = item.resumePosition else { return true }
         guard position.isFinite, position >= 0 else { return false }
         if position == 0 { return item.kind == .episode }
-        return position >= minimumResumePosition(duration: item.runtime)
+        return true
     }
 
     /// Whether an eligible title passes an explicitly configured age restriction.

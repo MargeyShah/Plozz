@@ -50,10 +50,10 @@ final class JellyfinHomeLayoutTests: XCTestCase {
                 let page = try await loader.load(source, start: start, limit: 5)
                 ids += page.items.map(\.id)
                 XCTAssertEqual(page.nextOffset, start + 5 == total ? nil : start + 5)
-                if start < 15 { XCTAssertEqual(stub.sentPaths.count, 1) }
+                if start < 15 { XCTAssertEqual(stub.feedPaths.count, 1) }
             }
             XCTAssertEqual(ids, (0..<total).map(String.init))
-            XCTAssertEqual(stub.sentPaths.count, kind == .emby ? 1 : 3)
+            XCTAssertEqual(stub.feedPaths.count, kind == .emby ? 1 : 3)
             XCTAssertTrue(stub.sentPaths.allSatisfy { $0 == "/Movies/Recommendations" })
         }
     }
@@ -75,12 +75,12 @@ final class JellyfinHomeLayoutTests: XCTestCase {
         let tail = try await loader.load(source, start: 1, limit: 5)
         XCTAssertEqual(tail.items.map(\.id), ["1", "2"])
         XCTAssertNil(tail.nextOffset)
-        XCTAssertEqual(stub.sentPaths.count, 1)
+        XCTAssertEqual(stub.feedPaths.count, 1)
         let refreshed = HomeContentPageLoader.Session(accounts: [account], visibility: .default) { _ in [] }
         let refreshedPage = try await refreshed.load(source, start: 0, limit: 5)
         XCTAssertEqual(refreshedPage.items.map(\.id), ["100", "101", "102"])
         XCTAssertNil(refreshedPage.nextOffset)
-        XCTAssertEqual(stub.sentPaths.count, 2)
+        XCTAssertEqual(stub.feedPaths.count, 2)
     }
 
     func testSmallRecommendationPageDoesNotTruncateItsOwnIdentityAnchors() async throws {
@@ -141,7 +141,7 @@ final class JellyfinHomeLayoutTests: XCTestCase {
         XCTAssertEqual(recovered.items.map(\.id), ["200"])
         let retained = try await loader.load(sources[0], start: 1, limit: 5)
         XCTAssertEqual(retained.items.map(\.id), ["1", "2"])
-        XCTAssertEqual(stub.sentPaths.count, 2)
+        XCTAssertEqual(stub.feedPaths.count, 2)
     }
 
     func testScopedRecommendationReuseDoesNotChangeExactLimitsOrUnscopedAndEmbyRequests() async throws {
@@ -158,11 +158,11 @@ final class JellyfinHomeLayoutTests: XCTestCase {
                     XCTAssertEqual(rows.first?.items.map(\.id), (0..<limit).map(String.init))
                 }
             }
-            XCTAssertEqual(stub.sentPaths.count, kind == .jellyfin ? 2 : 4)
+            XCTAssertEqual(stub.feedPaths.count, kind == .jellyfin ? 2 : 4)
             for _ in 0..<2 {
                 _ = try await provider.homeHubs(libraryID: "movies", kind: .movie, limit: 20, includeUnpromoted: true)
             }
-            XCTAssertEqual(stub.sentPaths.count, kind == .jellyfin ? 4 : 6)
+            XCTAssertEqual(stub.feedPaths.count, kind == .jellyfin ? 4 : 6)
         }
     }
 
@@ -197,13 +197,13 @@ final class JellyfinHomeLayoutTests: XCTestCase {
         XCTAssertEqual(retry.items.map(\.id), ["200"])
         let pinned = try await loader.load(sources[0], start: 0, limit: 1)
         XCTAssertEqual(pinned.items.map(\.id), ["0"])
-        XCTAssertEqual(stub.sentPaths.count, 2)
+        XCTAssertEqual(stub.feedPaths.count, 2)
         let newPreview = HomeContentPageLoader.Session(
             accounts: [account], visibility: .default, recommendationScope: scope, refreshRecommendations: true
         ) { _ in [] }
         let previewRetry = try await newPreview.load(sources[1], start: 0, limit: 1)
         XCTAssertEqual(previewRetry.items.map(\.id), ["200"])
-        XCTAssertEqual(stub.sentPaths.count, 3, "A new preview traversal's explicit Retry must also bypass reuse")
+        XCTAssertEqual(stub.feedPaths.count, 3, "A new preview traversal's explicit Retry must also bypass reuse")
     }
 
     func testRecommendationReuseDoesNotCrossAuthenticatedClientCopies() async throws {
@@ -220,7 +220,7 @@ final class JellyfinHomeLayoutTests: XCTestCase {
             XCTAssertEqual(old.first?.Items?.first?.Id, "0")
             XCTAssertEqual(new.first?.Items?.first?.Id, "100")
             XCTAssertEqual(retained.first?.Items?.first?.Id, "0")
-            XCTAssertEqual(stub.sentPaths.count, 2)
+            XCTAssertEqual(stub.feedPaths.count, 2)
         }
     }
 
@@ -470,12 +470,12 @@ final class JellyfinHomeLayoutTests: XCTestCase {
         XCTAssertTrue(query.contains(.init(name: "ParentId", value: "movies")))
         XCTAssertTrue(query.contains(.init(name: "Limit", value: "1")))
         XCTAssertTrue(query.contains(.init(name: "IncludeItemTypes", value: "Movie,Series,Season,Episode,Video")))
-        let requestCount = stub.sentPaths.count
+        let requestCount = stub.feedPaths.count
         let hidden = try await provider.serverHomeItems(
             section: section, limit: 20, excludingLibraryIDs: ["movies"]
         )
         XCTAssertTrue(hidden.isEmpty)
-        XCTAssertEqual(stub.sentPaths.count, requestCount)
+        XCTAssertEqual(stub.feedPaths.count, requestCount)
     }
 
     func testResumeAndNextUpRemainSeparateAndExcludeHiddenLibrariesAtTheServer() async throws {
@@ -678,7 +678,7 @@ final class JellyfinHomeLayoutTests: XCTestCase {
         XCTAssertTrue(query.contains(.init(name: "StartIndex", value: "0")))
         XCTAssertTrue(query.contains(.init(name: "ParentId", value: "shows")))
         XCTAssertFalse(query.contains { ["IncludeItemTypes", "MediaTypes"].contains($0.name) })
-        XCTAssertEqual(stub.sentPaths.count, 2)
+        XCTAssertEqual(stub.feedPaths.count, 2)
     }
 
     func testNativeAudioSectionsCannotBeRetargetedToDuplicateVideoResumeItems() async throws {
