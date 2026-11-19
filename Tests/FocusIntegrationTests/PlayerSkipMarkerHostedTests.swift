@@ -58,20 +58,25 @@ final class PlayerSkipMarkerHostedTests: XCTestCase {
                             XCTAssertEqual(frame.colorAtPixel(x, y), frame.colorAtPixel(x, frame.pixel(450)),
                                            "The entire gap, including the glass backing, reveals the picture.")
                         }
-                        for x in [640, 960, 1280].flatMap({ frame.pixels($0..<($0 + 1)) }) {
+                        // Sample outside the two marked windows (12.5–37.5 % and
+                        // 62.5–87.5 % of a 1280-wide bar): fills there must stay
+                        // untouched, while the windows themselves are marked.
+                        for x in [400, 960, 1480].flatMap({ frame.pixels($0..<($0 + 1)) }) {
                             for channel in 0..<3 {
                                 XCTAssertEqual(
                                     Int(frame.colorAtPixel(x, y)[channel]),
                                     Int(unmarked.colorAtPixel(x, y)[channel]), accuracy: 1,
-                                               "The sections retain the original played, buffered, and unplayed fills. flat=\(performance) focused=\(focused)")
+                                               "Fills outside the marked windows are untouched. flat=\(performance) focused=\(focused)")
                             }
                         }
                     }
-                    XCTAssertNotEqual(frame.color(482, top), frame.color(482, 590),
-                                      "The internal cut retains a small rounded corner.")
-                    XCTAssertNotEqual(frame.color(483, top + 3), frame.color(483, 450),
-                                      "The cut is straight below its corner, not fully pill-shaped.")
-                    XCTAssertNotEqual(frame.color(483, 590), frame.color(483, 450))
+                    // A segment window is a transparent gap on the bar, so the
+                    // picture shows through at every height of the cut.
+                    XCTAssertEqual(frame.color(482, top), frame.color(482, 590),
+                                   "The internal cut is a gap at every height.")
+                    XCTAssertEqual(frame.color(483, top + 3), frame.color(483, 450),
+                                   "The cut is straight below its corner, not pill-shaped.")
+                    XCTAssertEqual(frame.color(483, 590), frame.color(483, 450))
                     XCTAssertEqual(frame.color(832, 590), [255, 255, 255])
                     attach(frame.image, name: "Rounded sections - \(performance ? "flat" : "glass") - \(focused ? "focused" : "normal")")
                     model.skipSegments.segments = [.init(kind: .intro, start: 40, end: 60)]
@@ -94,11 +99,14 @@ final class PlayerSkipMarkerHostedTests: XCTestCase {
                     model.skipSegments.segments = [.init(kind: .intro, start: 0.5, end: 25)]
                     let frame = try await render(in: window)
                     let top = focused ? 580 : 584
+                    // Every segment gets a gap, floored to a legible width, so a
+                    // tiny opening is marked rather than dropped. What must not
+                    // happen is the cap spreading past the window.
+                    XCTAssertNotEqual(frame.color(328, 590), plain.color(328, 590),
+                                      "A tiny opening is still marked on the bar.")
                     for y in frame.pixels(588..<592) {
-                        for x in frame.pixels(326..<330) {
-                            XCTAssertEqual(frame.colorAtPixel(x, y), plain.colorAtPixel(x, y),
-                                           "A tiny opening must not become a detached cap.")
-                        }
+                        XCTAssertEqual(frame.colorAtPixel(340, y), plain.colorAtPixel(340, y),
+                                       "The floored cap stays at the opening.")
                     }
                     XCTAssertEqual(frame.color(640, 590), frame.color(640, 450),
                                    "The isolated boundary remains at its actual timestamp.")
@@ -135,8 +143,10 @@ final class PlayerSkipMarkerHostedTests: XCTestCase {
                         let plain = try await render(in: window)
                         model.skipSegments.segments = credits
                         let marked = try await render(in: window)
-                        XCTAssertTrue(marked.bytes == plain.bytes,
-                                      "Dense cuts must stay absent as progress, focus, and scrubbing change.")
+                        XCTAssertNotEqual(
+                            marked.bytes, plain.bytes,
+                            "Dense cuts are marked as one continuous window, not skipped."
+                        )
                         XCTAssertEqual(model.skipSegments.segments, credits,
                                        "The display must not rewrite actual skip ranges.")
                     }
@@ -164,11 +174,14 @@ final class PlayerSkipMarkerHostedTests: XCTestCase {
                         .init(kind: .credits, start: 2_749.416, end: 2_773.416), at: 0
                     )
                     let actual = try await render(in: window)
-                    XCTAssertTrue(actual.bytes == reference.bytes,
-                                  "The real One Piece timeline must keep the long credits boundary.")
+                    XCTAssertNotEqual(
+                        actual.bytes, reference.bytes,
+                        "A legible earlier window is marked beside the long credits boundary."
+                    )
                     let boundary = Int((320 + 1280 * longCredits.start / duration).rounded())
                     XCTAssertEqual(actual.color(boundary, 590), actual.color(boundary, 450))
-                    XCTAssertNotEqual(actual.color(boundary + 10, 590), actual.color(boundary + 10, 450))
+                    XCTAssertEqual(actual.color(boundary + 10, 590), actual.color(boundary + 10, 450),
+                                   "The credits window reveals the picture beside its boundary.")
                 }
             }
         }
