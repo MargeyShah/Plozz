@@ -4302,6 +4302,7 @@ private struct PlozziOSScreenshotPlaybackRegistration: ViewModifier {
 }
 #endif
 
+#if os(iOS)
 /// Presentation telemetry for Home, kept out of the page body.
 ///
 /// These are `onChange` observers with string formatting, and inline they pushed
@@ -4341,3 +4342,4 @@ private struct HomePresentationDiagnostics: ViewModifier {
     }
 }
 
+#endif
